@@ -19,7 +19,7 @@ Coroutines/Flow · JUnit4 + Robolectric + kotlinx-coroutines-test + Turbine.
 
 Every task's requirements implicitly include this section.
 
-- `minSdk 31`. `compileSdk` / `targetSdk` at the current stable level. Target device: Pixel 6a, Android 17.
+- `minSdk 30`. `compileSdk` / `targetSdk` at the current stable level. Target device: Pixel 6a, Android 17.
 - Package and namespace: `com.wasif.khata`.
 - Money is always `Long` **paisa**. Never `Double`, never `Float`, anywhere.
 - Currency is BDT only. No multi-currency handling.
@@ -67,7 +67,7 @@ curl -fsSL https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd -
 - [ ] **Step 2: Generate the project into the repo root**
 
 ```bash
-android create empty-activity --name="Khata" --minSdk=31 -o .
+android create empty-activity --name="Khata" --minSdk=30 -o .
 ```
 
 Expected: `app/`, `gradle/`, `settings.gradle.kts`, and `gradlew` appear alongside the existing `docs/` and `.git/`.
@@ -153,7 +153,7 @@ android {
     namespace = "com.wasif.khata"
     defaultConfig {
         applicationId = "com.wasif.khata"
-        minSdk = 31
+        minSdk = 30
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     testOptions {
