@@ -2,6 +2,7 @@ package com.wasif.khata.core.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -11,6 +12,11 @@ class MoneyTest {
     fun `ofTaka combines taka and paisa into minor units`() {
         assertEquals(123456L, Money.ofTaka(1234, 56).minor)
         assertEquals(500L, Money.ofTaka(5).minor)
+    }
+
+    @Test
+    fun `ofTaka throws on overflow instead of silently wrapping`() {
+        assertThrows(ArithmeticException::class.java) { Money.ofTaka(Long.MAX_VALUE) }
     }
 
     @Test
