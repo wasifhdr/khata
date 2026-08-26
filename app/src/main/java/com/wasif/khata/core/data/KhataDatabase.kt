@@ -1,0 +1,31 @@
+package com.wasif.khata.core.data
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import com.wasif.khata.core.data.dao.AccountDao
+import com.wasif.khata.core.data.dao.CategoryDao
+import com.wasif.khata.core.data.dao.MerchantDao
+import com.wasif.khata.core.data.dao.TransactionDao
+import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.data.entity.CategoryEntity
+import com.wasif.khata.core.data.entity.MerchantAliasEntity
+import com.wasif.khata.core.data.entity.MerchantEntity
+import com.wasif.khata.core.data.entity.TransactionEntity
+
+@Database(
+    entities = [
+        AccountEntity::class,
+        CategoryEntity::class,
+        TransactionEntity::class,
+        MerchantEntity::class,
+        MerchantAliasEntity::class,
+    ],
+    version = 1,
+    exportSchema = true,
+)
+abstract class KhataDatabase : RoomDatabase() {
+    abstract fun accountDao(): AccountDao
+    abstract fun categoryDao(): CategoryDao
+    abstract fun transactionDao(): TransactionDao
+    abstract fun merchantDao(): MerchantDao
+}
