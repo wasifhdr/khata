@@ -77,4 +77,35 @@ class MoneyTest {
         val original = Money(987654321)
         assertEquals(original, Money.parse(original.format()))
     }
+
+    @Test
+    fun `parse accepts negative amounts`() {
+        assertEquals(Money(-123456), Money.parse("-1234.56"))
+        assertEquals(Money(-123456), Money.parse("-৳1,234.56"))
+        assertEquals(Money(-1250), Money.parse("-12.5"))
+    }
+
+    @Test
+    fun `format and parse round-trip for negative amounts`() {
+        val original = Money(-987654321)
+        assertEquals(original, Money.parse(original.format()))
+    }
+
+    @Test
+    fun `parse rejects a taka part too large for Long`() {
+        assertNull(Money.parse("99999999999999999999.00"))
+    }
+
+    @Test
+    fun `parse rejects a taka value whose minor-unit conversion overflows`() {
+        // 92233720368547758.07 is exactly Long.MAX_VALUE in minor units (the true
+        // boundary), so bump the taka part by one to actually push past it.
+        assertNull(Money.parse("92233720368547759.07"))
+    }
+
+    @Test
+    fun `parse rejects a lone or doubled minus sign`() {
+        assertNull(Money.parse("-"))
+        assertNull(Money.parse("--123"))
+    }
 }

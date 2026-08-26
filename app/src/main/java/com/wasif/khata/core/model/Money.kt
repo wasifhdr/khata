@@ -30,7 +30,10 @@ value class Money(val minor: Long) : Comparable<Money> {
 
         val ZERO = Money(0)
 
-        fun ofTaka(taka: Long, paisa: Int = 0) = Money(taka * 100 + paisa)
+        // Overflow throws here but returns null in parse(): a bad argument is a
+        // programming error worth failing fast on, a bad string is untrusted input.
+        fun ofTaka(taka: Long, paisa: Int = 0) =
+            Money(Math.addExact(Math.multiplyExact(taka, 100L), paisa.toLong()))
 
         fun parse(input: String): Money? {
             val cleaned = input.replace(SYMBOL, "")
@@ -58,7 +61,12 @@ value class Money(val minor: Long) : Comparable<Money> {
             }
             if (!paisaPart.all { it.isDigit() }) return null
 
-            val magnitude = takaPart.toLong() * 100 + paisaPart.toLong()
+            val taka = takaPart.toLongOrNull() ?: return null
+            val magnitude = try {
+                Math.addExact(Math.multiplyExact(taka, 100L), paisaPart.toLong())
+            } catch (e: ArithmeticException) {
+                return null
+            }
             return Money(if (negative) -magnitude else magnitude)
         }
 
