@@ -15,7 +15,7 @@ interface CategoryDao {
     @Upsert
     suspend fun upsertAll(entities: List<CategoryEntity>)
 
-    @Query("SELECT * FROM categories WHERE deletedAt IS NULL ORDER BY name")
+    @Query("SELECT * FROM categories WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<CategoryEntity>>
 
     @Query("SELECT COUNT(*) FROM categories")

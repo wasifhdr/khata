@@ -3375,6 +3375,7 @@ import com.wasif.khata.domain.repository.TransactionRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -3383,6 +3384,10 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Hilt needs the assisted factory named here to resolve hiltViewModel's
+// generic <VM, VMF> overload; without it, injection silently falls back
+// to a no-arg constructor and crashes at runtime.
+@HiltViewModel(assistedFactory = TransactionEditorViewModel.Factory::class)
 class TransactionEditorViewModel @AssistedInject constructor(
     private val repository: TransactionRepository,
     private val referenceData: ReferenceDataRepository,
