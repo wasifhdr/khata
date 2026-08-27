@@ -2789,7 +2789,7 @@ class LedgerScreenTest {
 Connect the Pixel 6a over USB with developer mode and USB debugging enabled, then:
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*LedgerScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.ledger.LedgerScreenTest
 ```
 
 Expected: FAIL — `Unresolved reference: LedgerContent`.
@@ -2816,6 +2816,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -2826,9 +2827,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import java.time.format.DateTimeFormatter
@@ -2877,12 +2881,18 @@ fun LedgerContent(
         ) {
             items(
                 count = items.itemCount,
-                // peek() supplies a key without triggering a page load; items[] would.
-                key = { index ->
-                    when (val item = items.peek(index)) {
+                key = items.itemKey { item ->
+                    when (item) {
                         is LedgerItem.Row -> "row-${item.transaction.id}"
                         is LedgerItem.DayHeader -> "header-${item.date}"
-                        null -> "placeholder-$index"
+                    }
+                },
+                // Headers and rows are different shapes, so separate content types let
+                // LazyColumn recycle each against its own pool rather than one mixed pool.
+                contentType = items.itemContentType { item ->
+                    when (item) {
+                        is LedgerItem.Row -> "row"
+                        is LedgerItem.DayHeader -> "header"
                     }
                 },
             ) { index ->
@@ -2943,6 +2953,7 @@ private fun TransactionRow(item: LedgerItem.Row, onClick: () -> Unit) {
     val spacing = LocalSpacing.current
     val transaction = item.transaction
 
+    Column {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2970,6 +2981,9 @@ private fun TransactionRow(item: LedgerItem.Row, onClick: () -> Unit) {
             }
         }
         MoneyText(money = transaction.amount, direction = transaction.direction)
+        }
+        // Editorial surfaces separate with a rule, never a shadow.
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 ```
@@ -2977,7 +2991,7 @@ private fun TransactionRow(item: LedgerItem.Row, onClick: () -> Unit) {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*LedgerScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.ledger.LedgerScreenTest
 ```
 
 Expected: PASS, 4 tests.
@@ -3674,7 +3688,7 @@ class TransactionEditorScreenTest {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*TransactionEditorScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.editor.TransactionEditorScreenTest
 ```
 
 Expected: FAIL — `Unresolved reference: TransactionEditorContent`.
@@ -3882,7 +3896,7 @@ private fun ChipSection(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*TransactionEditorScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.editor.TransactionEditorScreenTest
 ```
 
 Expected: PASS, 7 tests.
