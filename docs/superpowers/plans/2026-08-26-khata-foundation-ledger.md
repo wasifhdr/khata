@@ -2480,9 +2480,18 @@ class LedgerViewModelTest {
         updatedAt = occurredAt,
     )
 
+    // cachedIn() turns this into a non-completable shared flow, so asSnapshot() can only
+    // learn loading is done from LoadState, not from flowOf's own completion — hence
+    // explicit end-of-pagination states. Without this the test hangs forever.
+    private val endOfPagination = LoadStates(
+        refresh = LoadState.NotLoading(endOfPaginationReached = true),
+        prepend = LoadState.NotLoading(endOfPaginationReached = true),
+        append = LoadState.NotLoading(endOfPaginationReached = true),
+    )
+
     private fun repositoryReturning(vararg transactions: Transaction) = object : TransactionRepository {
         override fun pagedTransactions(): Flow<PagingData<Transaction>> =
-            flowOf(PagingData.from(transactions.toList()))
+            flowOf(PagingData.from(transactions.toList(), sourceLoadStates = endOfPagination))
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
