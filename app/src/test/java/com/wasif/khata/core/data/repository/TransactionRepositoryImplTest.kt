@@ -3,6 +3,7 @@ package com.wasif.khata.core.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
@@ -37,7 +38,7 @@ class TransactionRepositoryImplTest {
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = TransactionRepositoryImpl(db.transactionDao(), db.accountDao(), clock)
+        repository = TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), clock)
     }
 
     @After
@@ -157,6 +158,31 @@ class TransactionRepositoryImplTest {
     }
 
     @Test
+    fun `save rolls back the balance reversal when the write that follows it fails`() = runTest {
+        val accountId = account(opening = 100_000)
+        val id = repository.save(draft(accountId, Money(25_000), TransactionDirection.DEBIT)).getOrThrow()
+        val balanceAfterFirstSave = balance()
+
+        // Reuses the same in-memory database, but through an AccountDao that lets the
+        // reversal (the first adjustBalance call) actually commit, then fails the write
+        // that was supposed to apply the new effect - reproducing a process death or
+        // cancellation partway through the old, un-transacted save().
+        val brittleRepository = TransactionRepositoryImpl(
+            db,
+            db.transactionDao(),
+            ThrowsOnSecondAdjustBalanceAccountDao(db.accountDao()),
+            clock,
+        )
+
+        val result = brittleRepository.save(
+            draft(accountId, Money(10_000), TransactionDirection.DEBIT).copy(id = id)
+        )
+
+        assertTrue(result.isFailure)
+        assertEquals(balanceAfterFirstSave, balance())
+    }
+
+    @Test
     fun `saved transactions map back to domain models with Money amounts`() = runTest {
         val accountId = account()
         val id = repository.save(draft(accountId, Money(25_000), TransactionDirection.DEBIT)).getOrThrow()
@@ -166,5 +192,23 @@ class TransactionRepositoryImplTest {
         assertEquals(Money(25_000), saved?.amount)
         assertEquals("SHWAPNO", saved?.merchantRaw)
         assertEquals(5_000L, saved?.updatedAt)
+    }
+}
+
+/**
+ * Delegates every call to the real [AccountDao] except the second invocation of
+ * [adjustBalance], which fails - simulating a crash or cancellation between the
+ * reversal write and the write that applies the new effect.
+ */
+private class ThrowsOnSecondAdjustBalanceAccountDao(
+    private val delegate: AccountDao,
+) : AccountDao by delegate {
+
+    private var adjustBalanceCalls = 0
+
+    override suspend fun adjustBalance(accountId: Long, deltaMinor: Long, updatedAt: Long) {
+        adjustBalanceCalls++
+        if (adjustBalanceCalls == 2) throw DataError.NotFound
+        delegate.adjustBalance(accountId, deltaMinor, updatedAt)
     }
 }

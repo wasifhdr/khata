@@ -1219,7 +1219,7 @@ class TransactionRepositoryImplTest {
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = TransactionRepositoryImpl(db.transactionDao(), db.accountDao(), clock)
+        repository = TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), clock)
     }
 
     @After
@@ -1549,6 +1549,8 @@ import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
+import androidx.room.withTransaction
+import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
@@ -1560,13 +1562,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class TransactionRepositoryImpl @Inject constructor(
+    private val db: KhataDatabase,
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val clock: KhataClock,
 ) : TransactionRepository {
 
     override fun pagedTransactions(): Flow<PagingData<Transaction>> =
-        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25)) {
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
             transactionDao.pagingSource()
         }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
@@ -1574,50 +1577,54 @@ class TransactionRepositoryImpl @Inject constructor(
         transactionDao.observeById(id).map { it?.toDomain() }
 
     override suspend fun save(draft: TransactionDraft): Result<Long> = runCatchingData {
-        val now = clock.now()
-        val existing = draft.id?.let { transactionDao.findById(it) }
-        if (draft.id != null && existing == null) throw DataError.NotFound
+        db.withTransaction {
+            val now = clock.now()
+            val existing = draft.id?.let { transactionDao.findById(it) }
+            if (draft.id != null && existing == null) throw DataError.NotFound
 
-        // Reverse the previous effect before applying the new one, or an edit
-        // compounds onto the balance instead of replacing.
-        if (existing != null) {
-            accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
-        }
+            // Reverse the previous effect before applying the new one, or an edit
+            // compounds onto the balance instead of replacing.
+            if (existing != null) {
+                accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
+            }
 
-        val rowId = transactionDao.upsert(
-            TransactionEntity(
-                id = existing?.id ?: 0,
-                uuid = existing?.uuid ?: UUID.randomUUID().toString(),
-                accountId = draft.accountId,
-                amountMinor = draft.amount.minor,
-                direction = draft.direction,
-                occurredAt = draft.occurredAt,
-                merchantRaw = draft.merchantRaw,
-                merchantId = existing?.merchantId,
-                categoryId = draft.categoryId,
-                note = draft.note,
-                source = existing?.source ?: TransactionSource.MANUAL,
-                confidence = existing?.confidence ?: Confidence.HIGH,
-                rawMessageId = existing?.rawMessageId,
-                transferGroupId = existing?.transferGroupId,
-                feeMinor = existing?.feeMinor,
-                referenceNumber = existing?.referenceNumber,
-                createdAt = existing?.createdAt ?: now,
-                updatedAt = now,
+            val rowId = transactionDao.upsert(
+                TransactionEntity(
+                    id = existing?.id ?: 0,
+                    uuid = existing?.uuid ?: UUID.randomUUID().toString(),
+                    accountId = draft.accountId,
+                    amountMinor = draft.amount.minor,
+                    direction = draft.direction,
+                    occurredAt = draft.occurredAt,
+                    merchantRaw = draft.merchantRaw,
+                    merchantId = existing?.merchantId,
+                    categoryId = draft.categoryId,
+                    note = draft.note,
+                    source = existing?.source ?: TransactionSource.MANUAL,
+                    confidence = existing?.confidence ?: Confidence.HIGH,
+                    rawMessageId = existing?.rawMessageId,
+                    transferGroupId = existing?.transferGroupId,
+                    feeMinor = existing?.feeMinor,
+                    referenceNumber = existing?.referenceNumber,
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now,
+                )
             )
-        )
 
-        accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
+            accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
 
-        // @Upsert returns -1 when it updated rather than inserted.
-        if (rowId == -1L) existing!!.id else rowId
+            // @Upsert returns -1 when it updated rather than inserted.
+            if (rowId == -1L) existing!!.id else rowId
+        }
     }
 
     override suspend fun delete(id: Long): Result<Unit> = runCatchingData {
-        val existing = transactionDao.findById(id) ?: throw DataError.NotFound
-        val now = clock.now()
-        accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
-        transactionDao.softDelete(id, now)
+        db.withTransaction {
+            val existing = transactionDao.findById(id) ?: throw DataError.NotFound
+            val now = clock.now()
+            accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
+            transactionDao.softDelete(id, now)
+        }
     }
 }
 
