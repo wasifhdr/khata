@@ -19,7 +19,7 @@ Coroutines/Flow · JUnit4 + Robolectric + kotlinx-coroutines-test + Turbine.
 
 Every task's requirements implicitly include this section.
 
-- `minSdk 31`. `compileSdk` / `targetSdk` at the current stable level. Target device: Pixel 6a, Android 17.
+- `minSdk 30`. `compileSdk` / `targetSdk` at the current stable level. Target device: Pixel 6a, Android 17.
 - Package and namespace: `com.wasif.khata`.
 - Money is always `Long` **paisa**. Never `Double`, never `Float`, anywhere.
 - Currency is BDT only. No multi-currency handling.
@@ -67,7 +67,7 @@ curl -fsSL https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd -
 - [ ] **Step 2: Generate the project into the repo root**
 
 ```bash
-android create empty-activity --name="Khata" --minSdk=31 -o .
+android create empty-activity --name="Khata" --minSdk=30 -o .
 ```
 
 Expected: `app/`, `gradle/`, `settings.gradle.kts`, and `gradlew` appear alongside the existing `docs/` and `.git/`.
@@ -116,6 +116,7 @@ Add to `gradle/libs.versions.toml`, filling the `[versions]` values from Step 5:
 [libraries]
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
@@ -153,7 +154,7 @@ android {
     namespace = "com.wasif.khata"
     defaultConfig {
         applicationId = "com.wasif.khata"
-        minSdk = 31
+        minSdk = 30
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     testOptions {
@@ -170,6 +171,8 @@ room {
 dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    // Room's KSP processor cannot generate a PagingSource return type without this.
+    implementation(libs.androidx.room.paging)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.hilt.android)
@@ -394,7 +397,10 @@ value class Money(val minor: Long) : Comparable<Money> {
 
         val ZERO = Money(0)
 
-        fun ofTaka(taka: Long, paisa: Int = 0) = Money(taka * 100 + paisa)
+        // Overflow throws here but returns null in parse(): a bad argument is a
+        // programming error worth failing fast on, a bad string is untrusted input.
+        fun ofTaka(taka: Long, paisa: Int = 0) =
+            Money(Math.addExact(Math.multiplyExact(taka, 100L), paisa.toLong()))
 
         fun parse(input: String): Money? {
             val cleaned = input.replace(SYMBOL, "")
@@ -422,7 +428,12 @@ value class Money(val minor: Long) : Comparable<Money> {
             }
             if (!paisaPart.all { it.isDigit() }) return null
 
-            val magnitude = takaPart.toLong() * 100 + paisaPart.toLong()
+            val taka = takaPart.toLongOrNull() ?: return null
+            val magnitude = try {
+                Math.addExact(Math.multiplyExact(taka, 100L), paisaPart.toLong())
+            } catch (e: ArithmeticException) {
+                return null
+            }
             return Money(if (negative) -magnitude else magnitude)
         }
 
@@ -959,7 +970,7 @@ interface AccountDao {
     suspend fun getAll(): List<AccountEntity>
 
     @Query("SELECT COUNT(*) FROM accounts")
-    suspend fun count(): Int
+    suspend fun countIncludingDeleted(): Int
 
     @Query(
         "UPDATE accounts SET currentBalanceMinor = currentBalanceMinor + :deltaMinor, " +
@@ -993,7 +1004,7 @@ interface CategoryDao {
     fun observeAll(): Flow<List<CategoryEntity>>
 
     @Query("SELECT COUNT(*) FROM categories")
-    suspend fun count(): Int
+    suspend fun countIncludingDeleted(): Int
 }
 ```
 
@@ -1208,7 +1219,7 @@ class TransactionRepositoryImplTest {
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = TransactionRepositoryImpl(db.transactionDao(), db.accountDao(), clock)
+        repository = TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), clock)
     }
 
     @After
@@ -1538,6 +1549,8 @@ import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
+import androidx.room.withTransaction
+import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
@@ -1549,13 +1562,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class TransactionRepositoryImpl @Inject constructor(
+    private val db: KhataDatabase,
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val clock: KhataClock,
 ) : TransactionRepository {
 
     override fun pagedTransactions(): Flow<PagingData<Transaction>> =
-        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25)) {
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
             transactionDao.pagingSource()
         }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
@@ -1563,50 +1577,54 @@ class TransactionRepositoryImpl @Inject constructor(
         transactionDao.observeById(id).map { it?.toDomain() }
 
     override suspend fun save(draft: TransactionDraft): Result<Long> = runCatchingData {
-        val now = clock.now()
-        val existing = draft.id?.let { transactionDao.findById(it) }
-        if (draft.id != null && existing == null) throw DataError.NotFound
+        db.withTransaction {
+            val now = clock.now()
+            val existing = draft.id?.let { transactionDao.findById(it) }
+            if (draft.id != null && existing == null) throw DataError.NotFound
 
-        // Reverse the previous effect before applying the new one, or an edit
-        // compounds onto the balance instead of replacing.
-        if (existing != null) {
-            accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
-        }
+            // Reverse the previous effect before applying the new one, or an edit
+            // compounds onto the balance instead of replacing.
+            if (existing != null) {
+                accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
+            }
 
-        val rowId = transactionDao.upsert(
-            TransactionEntity(
-                id = existing?.id ?: 0,
-                uuid = existing?.uuid ?: UUID.randomUUID().toString(),
-                accountId = draft.accountId,
-                amountMinor = draft.amount.minor,
-                direction = draft.direction,
-                occurredAt = draft.occurredAt,
-                merchantRaw = draft.merchantRaw,
-                merchantId = existing?.merchantId,
-                categoryId = draft.categoryId,
-                note = draft.note,
-                source = existing?.source ?: TransactionSource.MANUAL,
-                confidence = existing?.confidence ?: Confidence.HIGH,
-                rawMessageId = existing?.rawMessageId,
-                transferGroupId = existing?.transferGroupId,
-                feeMinor = existing?.feeMinor,
-                referenceNumber = existing?.referenceNumber,
-                createdAt = existing?.createdAt ?: now,
-                updatedAt = now,
+            val rowId = transactionDao.upsert(
+                TransactionEntity(
+                    id = existing?.id ?: 0,
+                    uuid = existing?.uuid ?: UUID.randomUUID().toString(),
+                    accountId = draft.accountId,
+                    amountMinor = draft.amount.minor,
+                    direction = draft.direction,
+                    occurredAt = draft.occurredAt,
+                    merchantRaw = draft.merchantRaw,
+                    merchantId = existing?.merchantId,
+                    categoryId = draft.categoryId,
+                    note = draft.note,
+                    source = existing?.source ?: TransactionSource.MANUAL,
+                    confidence = existing?.confidence ?: Confidence.HIGH,
+                    rawMessageId = existing?.rawMessageId,
+                    transferGroupId = existing?.transferGroupId,
+                    feeMinor = existing?.feeMinor,
+                    referenceNumber = existing?.referenceNumber,
+                    createdAt = existing?.createdAt ?: now,
+                    updatedAt = now,
+                )
             )
-        )
 
-        accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
+            accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
 
-        // @Upsert returns -1 when it updated rather than inserted.
-        if (rowId == -1L) existing!!.id else rowId
+            // @Upsert returns -1 when it updated rather than inserted.
+            if (rowId == -1L) existing!!.id else rowId
+        }
     }
 
     override suspend fun delete(id: Long): Result<Unit> = runCatchingData {
-        val existing = transactionDao.findById(id) ?: throw DataError.NotFound
-        val now = clock.now()
-        accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
-        transactionDao.softDelete(id, now)
+        db.withTransaction {
+            val existing = transactionDao.findById(id) ?: throw DataError.NotFound
+            val now = clock.now()
+            accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
+            transactionDao.softDelete(id, now)
+        }
     }
 }
 
@@ -1854,7 +1872,7 @@ class DatabaseSeeder @Inject constructor(
     suspend fun seedIfEmpty() {
         val now = clock.now()
 
-        if (accountDao.count() == 0) {
+        if (accountDao.countIncludingDeleted() == 0) {
             DEFAULT_ACCOUNTS.forEach { seed ->
                 accountDao.upsert(
                     AccountEntity(
@@ -1874,7 +1892,7 @@ class DatabaseSeeder @Inject constructor(
             }
         }
 
-        if (categoryDao.count() == 0) {
+        if (categoryDao.countIncludingDeleted() == 0) {
             categoryDao.upsertAll(
                 DEFAULT_CATEGORIES.map { seed ->
                     CategoryEntity(
@@ -2462,9 +2480,18 @@ class LedgerViewModelTest {
         updatedAt = occurredAt,
     )
 
+    // cachedIn() turns this into a non-completable shared flow, so asSnapshot() can only
+    // learn loading is done from LoadState, not from flowOf's own completion — hence
+    // explicit end-of-pagination states. Without this the test hangs forever.
+    private val endOfPagination = LoadStates(
+        refresh = LoadState.NotLoading(endOfPaginationReached = true),
+        prepend = LoadState.NotLoading(endOfPaginationReached = true),
+        append = LoadState.NotLoading(endOfPaginationReached = true),
+    )
+
     private fun repositoryReturning(vararg transactions: Transaction) = object : TransactionRepository {
         override fun pagedTransactions(): Flow<PagingData<Transaction>> =
-            flowOf(PagingData.from(transactions.toList()))
+            flowOf(PagingData.from(transactions.toList(), sourceLoadStates = endOfPagination))
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
@@ -2762,7 +2789,7 @@ class LedgerScreenTest {
 Connect the Pixel 6a over USB with developer mode and USB debugging enabled, then:
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*LedgerScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.ledger.LedgerScreenTest
 ```
 
 Expected: FAIL — `Unresolved reference: LedgerContent`.
@@ -2789,6 +2816,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -2799,9 +2827,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemContentType
+import androidx.paging.compose.itemKey
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import java.time.format.DateTimeFormatter
@@ -2850,12 +2881,18 @@ fun LedgerContent(
         ) {
             items(
                 count = items.itemCount,
-                // peek() supplies a key without triggering a page load; items[] would.
-                key = { index ->
-                    when (val item = items.peek(index)) {
+                key = items.itemKey { item ->
+                    when (item) {
                         is LedgerItem.Row -> "row-${item.transaction.id}"
                         is LedgerItem.DayHeader -> "header-${item.date}"
-                        null -> "placeholder-$index"
+                    }
+                },
+                // Headers and rows are different shapes, so separate content types let
+                // LazyColumn recycle each against its own pool rather than one mixed pool.
+                contentType = items.itemContentType { item ->
+                    when (item) {
+                        is LedgerItem.Row -> "row"
+                        is LedgerItem.DayHeader -> "header"
                     }
                 },
             ) { index ->
@@ -2916,6 +2953,7 @@ private fun TransactionRow(item: LedgerItem.Row, onClick: () -> Unit) {
     val spacing = LocalSpacing.current
     val transaction = item.transaction
 
+    Column {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2943,6 +2981,9 @@ private fun TransactionRow(item: LedgerItem.Row, onClick: () -> Unit) {
             }
         }
         MoneyText(money = transaction.amount, direction = transaction.direction)
+        }
+        // Editorial surfaces separate with a rule, never a shadow.
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 ```
@@ -2950,7 +2991,7 @@ private fun TransactionRow(item: LedgerItem.Row, onClick: () -> Unit) {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*LedgerScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.ledger.LedgerScreenTest
 ```
 
 Expected: PASS, 4 tests.
@@ -3334,6 +3375,7 @@ import com.wasif.khata.domain.repository.TransactionRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -3342,6 +3384,10 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+// Hilt needs the assisted factory named here to resolve hiltViewModel's
+// generic <VM, VMF> overload; without it, injection silently falls back
+// to a no-arg constructor and crashes at runtime.
+@HiltViewModel(assistedFactory = TransactionEditorViewModel.Factory::class)
 class TransactionEditorViewModel @AssistedInject constructor(
     private val repository: TransactionRepository,
     private val referenceData: ReferenceDataRepository,
@@ -3647,7 +3693,7 @@ class TransactionEditorScreenTest {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*TransactionEditorScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.editor.TransactionEditorScreenTest
 ```
 
 Expected: FAIL — `Unresolved reference: TransactionEditorContent`.
@@ -3855,7 +3901,7 @@ private fun ChipSection(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
-./gradlew connectedDebugAndroidTest --tests "*TransactionEditorScreenTest*"
+./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wasif.khata.feature.editor.TransactionEditorScreenTest
 ```
 
 Expected: PASS, 7 tests.

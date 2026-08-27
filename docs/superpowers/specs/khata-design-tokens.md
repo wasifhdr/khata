@@ -62,6 +62,10 @@ a wallpaper-derived scheme cannot guarantee the debit/credit distinction or the
 orange accent survive, and the pinned brief fixes the palette. Dynamic colour is
 therefore not wired up at all, rather than wired up and overridden.
 
+This is also why `minSdk 30` (Android 11) costs nothing. Dynamic colour is the one
+capability API 31 would have added, and it is declined on its own merits — so the
+floor drops a version with no branch, no fallback palette, and no lost feature.
+
 ### Why hairlines instead of elevation
 
 Editorial print separates with rules, not drop shadows. Rows, headers, and

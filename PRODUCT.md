@@ -9,7 +9,7 @@ android
 ## Stack
 
 Kotlin · Jetpack Compose · Material 3 · Room · Hilt · Paging 3 · WorkManager · Glance ·
-Coil · kotlinx.serialization. `minSdk 31`. Confirmed with the user while writing
+Coil · kotlinx.serialization. `minSdk 30`. Confirmed with the user while writing
 `docs/superpowers/specs/2026-08-26-khata-wallet-design.md`; not delegated.
 
 ## Users

@@ -91,14 +91,17 @@ implementation:
 **Stack:** Kotlin · Jetpack Compose · Material 3 · Room · Coroutines/Flow ·
 Paging 3 · WorkManager · Glance · Hilt · Coil · kotlinx-serialization.
 
-**SDK targets:** `minSdk 31` (Android 12), `compileSdk` / `targetSdk` at the current
-stable level (confirmed against the installed SDK at scaffold time). Target device
-is a Pixel 6a on Android 17; support below Android 12 is explicitly not required.
+**SDK targets:** `minSdk 30` (Android 11), `compileSdk` / `targetSdk` 37 (Android 17,
+the installed platform). Target device is a Pixel 6a on Android 17. Android 11 is
+the floor; support below it is explicitly not required.
 
-Because `minSdk` is 31, Material You dynamic color is unconditionally available —
-no version branch, no static fallback palette. The splash screen API is native, and
-the storage and permission models are the modern ones throughout, so no legacy
-compatibility handling appears anywhere in the media pipeline.
+`minSdk 30` costs this design nothing. The one capability it forgoes relative to 31
+is Material You dynamic color, which Khata declines anyway (§15) in favour of a
+fixed palette that guarantees the debit/credit distinction survives. Scoped storage
+is already fully enforced at API 30, so no legacy storage handling appears anywhere
+in the media pipeline, and the modern permission model applies throughout. The
+splash screen needs the `core-splashscreen` compat library rather than the native
+API — the only concession, and it is not used in Phase 1.
 
 **Package:** `com.wasif.khata`.
 
