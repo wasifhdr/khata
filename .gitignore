@@ -9,3 +9,6 @@ captures/
 .cxx
 *.apk
 *.keystore
+
+# Impeccable session scratch (machine-local)
+.impeccable/
