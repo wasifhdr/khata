@@ -116,6 +116,7 @@ Add to `gradle/libs.versions.toml`, filling the `[versions]` values from Step 5:
 [libraries]
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
@@ -170,6 +171,8 @@ room {
 dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    // Room's KSP processor cannot generate a PagingSource return type without this.
+    implementation(libs.androidx.room.paging)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.hilt.android)
@@ -967,7 +970,7 @@ interface AccountDao {
     suspend fun getAll(): List<AccountEntity>
 
     @Query("SELECT COUNT(*) FROM accounts")
-    suspend fun count(): Int
+    suspend fun countIncludingDeleted(): Int
 
     @Query(
         "UPDATE accounts SET currentBalanceMinor = currentBalanceMinor + :deltaMinor, " +
@@ -1001,7 +1004,7 @@ interface CategoryDao {
     fun observeAll(): Flow<List<CategoryEntity>>
 
     @Query("SELECT COUNT(*) FROM categories")
-    suspend fun count(): Int
+    suspend fun countIncludingDeleted(): Int
 }
 ```
 
@@ -1862,7 +1865,7 @@ class DatabaseSeeder @Inject constructor(
     suspend fun seedIfEmpty() {
         val now = clock.now()
 
-        if (accountDao.count() == 0) {
+        if (accountDao.countIncludingDeleted() == 0) {
             DEFAULT_ACCOUNTS.forEach { seed ->
                 accountDao.upsert(
                     AccountEntity(
@@ -1882,7 +1885,7 @@ class DatabaseSeeder @Inject constructor(
             }
         }
 
-        if (categoryDao.count() == 0) {
+        if (categoryDao.countIncludingDeleted() == 0) {
             categoryDao.upsertAll(
                 DEFAULT_CATEGORIES.map { seed ->
                     CategoryEntity(

@@ -19,7 +19,7 @@ interface AccountDao {
     suspend fun getAll(): List<AccountEntity>
 
     @Query("SELECT COUNT(*) FROM accounts")
-    suspend fun count(): Int
+    suspend fun countIncludingDeleted(): Int
 
     @Query(
         "UPDATE accounts SET currentBalanceMinor = currentBalanceMinor + :deltaMinor, " +

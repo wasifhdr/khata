@@ -19,5 +19,5 @@ interface CategoryDao {
     fun observeAll(): Flow<List<CategoryEntity>>
 
     @Query("SELECT COUNT(*) FROM categories")
-    suspend fun count(): Int
+    suspend fun countIncludingDeleted(): Int
 }
