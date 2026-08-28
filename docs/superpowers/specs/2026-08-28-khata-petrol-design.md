@@ -172,6 +172,23 @@ category, and a category never reads as a warning.
 stay fixed, because they encode data rather than taste — if a category changed colour between
 themes, the one thing colour actually carries information for would break.
 
+### Known collision: warm accents and the Living family
+
+The reasoning above — *teal and aqua are brand, so a teal dot would read as interactive* —
+holds for the default accent. But §9's tuner lets the accent become **Marigold**,
+**Chartreuse** or **Warm sand**, any of which sits close to Groceries `#E8C15A` or Education
+`#F2A63E`. Left alone, that reintroduces exactly the ambiguity the quarantine rule exists to
+prevent.
+
+**Resolved by shape, not by hue.** Interactive elements are always distinguished by form as
+well as colour: the accent appears as a filled pill, a progress ring, a FAB or a large numeral.
+A category appears only as an 8dp dot or a chip carrying its own name. No accent-coloured 8dp
+dot exists anywhere in the app, so proximity in hue never produces ambiguity in practice.
+
+This is the same discipline already required elsewhere — low-confidence rows use a ring *and*
+the word, categories use a dot *and* the name. Colour is never load-bearing alone, which is
+what makes a free-form accent axis safe.
+
 ---
 
 ## 3. Typography
@@ -343,7 +360,20 @@ animations" setting with an instant cut.
 - Drill-down: hub → module → detail. Back climbs out.
 - **Predictive back is not a nicety here — it is the navigation model.** Gesture-back is the
   only universal way out of any screen, so it must be implemented properly.
-- Where the Modules hub is not the root, a persistent affordance to reach it is required.
+
+### When a module is the root
+
+If the user sets a module as their home view, the Modules hub is no longer reachable by
+climbing back — so that module's nav row changes rather than gaining a floating control:
+
+| Position | Hub is root | Module is root |
+|---|---|---|
+| Top-left | *(nothing)* | **hub glyph** — pushes Modules onto the stack |
+| Top-right | settings gear | settings gear |
+
+The module-as-root screen therefore looks like home structurally: two rare controls in
+mirrored top corners, nothing in the thumb arc but content. Back from a module-as-root exits
+the app, as any root does; back from the hub it pushed returns to the module.
 
 ### The start destination is a preference
 
@@ -527,7 +557,24 @@ the first DataStore emission** and both fall out of the same fix.
 
 ---
 
-## 12. Files affected
+## 12. Scope — this is two plans, not one
+
+The work below does not fit one implementation plan. It splits cleanly along a dependency
+line, and the split is worth keeping because the first half is verifiable on its own.
+
+**Plan A — the system.** `minSdk 33`, Haze, the four bundled fonts, the full token rewrite
+(colour, type, shape, spacing, motion), `KhataGlass` and the shared components, and the 112
+pairwise contrast assertions. Ends with a green test suite and a theme nothing consumes yet.
+
+**Plan B — the screens.** The Modules hub, the rebuilt Ledger and Editor, hub-and-back
+navigation with a configurable start destination, the settings tuner, and the
+preference-before-composition fix. Depends on Plan A entirely.
+
+Attempting both at once means rebuilding screens against tokens that are still moving.
+
+---
+
+## 13. Files affected
 
 | File | Change |
 |---|---|
