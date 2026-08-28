@@ -2,82 +2,133 @@ package com.wasif.khata.core.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import kotlin.math.pow
 
-val LightColors: ColorScheme = lightColorScheme(
-    primary = Color(0xFFB23E06),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFE0CC),
-    onPrimaryContainer = Color(0xFF431300),
-    secondary = Color(0xFF5C5445),
-    onSecondary = Color(0xFFFFFFFF),
-    background = Color(0xFFF5F0E8),
-    onBackground = Color(0xFF241E17),
-    surface = Color(0xFFFFFCF6),
-    onSurface = Color(0xFF241E17),
-    surfaceVariant = Color(0xFFE8E0D2),
-    onSurfaceVariant = Color(0xFF554B3D),
-    outline = Color(0xFF8A7D6B),
-    outlineVariant = Color(0xFFD6CCBB),
-    error = Color(0xFFA32116),
-    onError = Color(0xFFFFFFFF),
+/** One palette option for the mesh field behind the glass. */
+data class FieldPalette(
+    val name: String,
+    /**
+     * The lightest stop in the mesh. Contrast is only ever at risk against the
+     * lightest point a gradient reaches, so that is the one worth asserting --
+     * every darker stop clears by construction.
+     */
+    val keyStop: Color,
 )
 
+object KhataPalette {
+
+    val ground: Color = Color(0xFF061214)
+    val onSurface: Color = Color(0xFFEDF2F1)
+    val onSurfaceDim: Color = Color(0xFFA8B8B8)
+    val onSurfaceFaint: Color = Color(0xFF6E8180)
+
+    val accent: Color = Color(0xFF8FE0CE)
+    val accentDeep: Color = Color(0xFF5FC9B2)
+
+    val alert: Color = Color(0xFFFF7A6B)
+    val warn: Color = Color(0xFFF2A63E)
+
+    /** Petrol. The gradient the active module card is filled with. */
+    val heroStops: List<Color> = listOf(
+        Color(0xFF12403F),
+        Color(0xFF0C2E30),
+        Color(0xFF08211F),
+    )
+
+    val grounds: List<Color> = listOf(
+        Color(0xFF061214), // teal black -- default
+        Color(0xFF0B0C18), // indigo black
+        Color(0xFF08111C), // navy black
+        Color(0xFF0A0D0F), // cool black
+    )
+
+    val accents: List<Color> = listOf(
+        Color(0xFF8FE0CE), // pale aqua -- default
+        Color(0xFFFFB627), // marigold
+        Color(0xFFB6E24A), // chartreuse
+        Color(0xFFE8C9A0), // warm sand
+    )
+
+    /**
+     * Key stops are **composited** values -- the colour that actually reaches
+     * the screen once the mesh stop is drawn at its own alpha over the ground,
+     * not the raw gradient colour. Asserting the raw colour would test a pixel
+     * that is never rendered, and would fail the default theme for no reason.
+     */
+    val fields: List<FieldPalette> = listOf(
+        FieldPalette("Verdigris", Color(0xFF185F56)), // default
+        FieldPalette("Abyss", Color(0xFF155159)),
+        FieldPalette("Counterpoint", Color(0xFF12555B)),
+        // Cyan is deliberately darker than the concept's swatch. At the value it
+        // was drawn, paper text over it lands at 2.78:1 -- unreadable. Being the
+        // brightest field is not worth being the one nothing can sit on.
+        FieldPalette("Cyan", Color(0xFF186A70)),
+        FieldPalette("Violet", Color(0xFF452F76)),
+        FieldPalette("Monochrome", Color(0xFF155553)),
+        FieldPalette("Deep sea", Color(0xFF105057)),
+        FieldPalette("Mist", Color(0xFF334B58)),
+    )
+
+    /**
+     * Quarantined: these appear only inside an 8dp dot or a chip, never as a
+     * background or a text colour, and the category name is always present so
+     * colour is never the sole signal.
+     *
+     * Keys are the tokens already seeded in DefaultData.kt and are deliberately
+     * left alone -- renaming them would need a data migration to buy nothing.
+     * The names no longer describe the hues; the category each token is
+     * attached to is what the hue was chosen for.
+     */
+    val categories: Map<String, Color> = mapOf(
+        // Living -- warm arc
+        "category_green" to Color(0xFFE8C15A), // Groceries
+        "category_orange" to Color(0xFFFF8A6B), // Eating Out
+        "category_indigo" to Color(0xFFF2A63E), // Education
+        // Recurring -- cool blues
+        "category_amber" to Color(0xFF9DB4C8), // Bills & Utilities
+        "category_teal" to Color(0xFF7FB8EC), // Mobile & Internet
+        "category_blue" to Color(0xFF93A9F2), // Transport
+        // Discretionary -- pink to violet
+        "category_violet" to Color(0xFFF293A8), // Shopping
+        "category_pink" to Color(0xFFB7A2EF), // Entertainment
+        "category_rose" to Color(0xFFDF8CCC), // Family & Gifts
+        // Place -- earth
+        "category_slate" to Color(0xFFDCC099), // Fuel
+        "category_bronze" to Color(0xFFC9A6BC), // Car & Maintenance
+        // Body
+        "category_red" to Color(0xFFEE6F80), // Health
+        // System -- neutral
+        "category_grey" to Color(0xFFB3B0A8), // Fees & Charges
+        "category_neutral" to Color(0xFF98A6B8), // Transfer, Uncategorized
+        // Income keeps a green: the ledger encodes credit as green, so this is
+        // the one place the reserved hue belongs.
+        "category_emerald" to Color(0xFF7FD4A8), // Income
+    )
+}
+
+/**
+ * Dark is the product, not a mode. There is deliberately no light scheme here:
+ * light mode is deferred, and the no-hardcoded-colour rule is what keeps adding
+ * one later an addition rather than a rewrite.
+ */
 val DarkColors: ColorScheme = darkColorScheme(
-    primary = Color(0xFFFF9A62),
-    onPrimary = Color(0xFF4A1600),
-    primaryContainer = Color(0xFF8A2F03),
-    onPrimaryContainer = Color(0xFFFFE0CC),
-    secondary = Color(0xFFD6C7AC),
-    onSecondary = Color(0xFF3A3223),
-    background = Color(0xFF16130F),
-    onBackground = Color(0xFFF0E8DA),
-    surface = Color(0xFF1E1A15),
-    onSurface = Color(0xFFF0E8DA),
-    surfaceVariant = Color(0xFF332D25),
-    onSurfaceVariant = Color(0xFFD3C8B6),
-    outline = Color(0xFF9A8D7B),
-    outlineVariant = Color(0xFF4A4237),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690006),
-)
-
-val CategoryColorsLight: Map<String, Color> = mapOf(
-    "category_green" to Color(0xFF4A7C36),
-    "category_orange" to Color(0xFFC2611F),
-    "category_blue" to Color(0xFF2A5D8F),
-    "category_slate" to Color(0xFF4F5D68),
-    "category_amber" to Color(0xFF9C6F0A),
-    "category_teal" to Color(0xFF1C6E63),
-    "category_red" to Color(0xFFA32116),
-    "category_violet" to Color(0xFF6B4A9E),
-    "category_pink" to Color(0xFFA63A6B),
-    "category_indigo" to Color(0xFF3B4A8F),
-    "category_rose" to Color(0xFF9E3450),
-    "category_bronze" to Color(0xFF7D5522),
-    "category_grey" to Color(0xFF6B6255),
-    "category_emerald" to Color(0xFF17694E),
-    "category_neutral" to Color(0xFF756B5C),
-)
-
-val CategoryColorsDark: Map<String, Color> = mapOf(
-    "category_green" to Color(0xFF93C47D),
-    "category_orange" to Color(0xFFE9A06A),
-    "category_blue" to Color(0xFF8CB4DC),
-    "category_slate" to Color(0xFFA7B4BE),
-    "category_amber" to Color(0xFFDDB55E),
-    "category_teal" to Color(0xFF6FBDB0),
-    "category_red" to Color(0xFFEC9C93),
-    "category_violet" to Color(0xFFBCA3E0),
-    "category_pink" to Color(0xFFE29BBB),
-    "category_indigo" to Color(0xFFA3AEE0),
-    "category_rose" to Color(0xFFE09CAB),
-    "category_bronze" to Color(0xFFC9A472),
-    "category_grey" to Color(0xFFB9B1A3),
-    "category_emerald" to Color(0xFF6FC0A0),
-    "category_neutral" to Color(0xFFB3AA9B),
+    primary = KhataPalette.accent,
+    onPrimary = KhataPalette.heroStops.last(),
+    primaryContainer = KhataPalette.heroStops.first(),
+    onPrimaryContainer = KhataPalette.onSurface,
+    secondary = KhataPalette.accentDeep,
+    onSecondary = KhataPalette.heroStops.last(),
+    background = KhataPalette.ground,
+    onBackground = KhataPalette.onSurface,
+    surface = KhataPalette.ground,
+    onSurface = KhataPalette.onSurface,
+    surfaceVariant = KhataPalette.heroStops[1],
+    onSurfaceVariant = KhataPalette.onSurfaceDim,
+    outline = KhataPalette.onSurfaceFaint,
+    outlineVariant = Color(0xFF1C2E30),
+    error = KhataPalette.alert,
+    onError = Color(0xFF2A0A06),
 )
 
 fun contrastRatio(a: Color, b: Color): Double {

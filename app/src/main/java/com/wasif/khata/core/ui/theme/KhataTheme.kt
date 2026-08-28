@@ -1,6 +1,5 @@
 package com.wasif.khata.core.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -11,16 +10,16 @@ val LocalCategoryColors = staticCompositionLocalOf<Map<String, Color>> { emptyMa
 
 @Composable
 fun KhataTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalMotion provides Motion(),
-        LocalCategoryColors provides if (darkTheme) CategoryColorsDark else CategoryColorsLight,
+        LocalCategoryColors provides KhataPalette.categories,
     ) {
         MaterialTheme(
-            colorScheme = if (darkTheme) DarkColors else LightColors,
+            colorScheme = DarkColors,
             typography = KhataTypography,
             content = content,
         )
