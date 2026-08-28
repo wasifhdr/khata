@@ -2,70 +2,111 @@ package com.wasif.khata.core.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+// Fraunces on the numerals, Instrument Sans on the working text. The previous
+// direction deferred a display face because Bengali had no matching pair --
+// which only ever applied to text. Numerals never need Bengali glyphs, so a
+// Latin-only serif is safe on amounts.
 val KhataTypography = Typography(
+    displayLarge = TextStyle(
+        fontFamily = KhataFonts.Display,
+        fontWeight = FontWeight.Bold,
+        fontSize = 50.sp,
+        lineHeight = 52.sp,
+    ),
     displaySmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 36.sp,
-        lineHeight = 42.sp,
+        fontFamily = KhataFonts.Display,
+        fontWeight = FontWeight.Bold,
+        fontSize = 38.sp,
+        lineHeight = 40.sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp,
-        lineHeight = 32.sp,
+        fontFamily = KhataFonts.Display,
+        fontWeight = FontWeight.Bold,
+        fontSize = 34.sp,
+        lineHeight = 39.sp,
     ),
     titleLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
-        fontSize = 20.sp,
-        lineHeight = 26.sp,
+        fontFamily = KhataFonts.Display,
+        fontWeight = FontWeight.Bold,
+        fontSize = 21.sp,
+        lineHeight = 24.sp,
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 22.sp,
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
+        fontFamily = KhataFonts.Text,
+        fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
     ),
-    bodySmall = TextStyle(
-        fontFamily = FontFamily.Default,
+    bodyMedium = TextStyle(
+        fontFamily = KhataFonts.Text,
         fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-    ),
-    labelLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
         fontSize = 13.sp,
         lineHeight = 18.sp,
-        letterSpacing = 0.4.sp,
     ),
-    labelSmall = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Medium,
+    bodySmall = TextStyle(
+        fontFamily = KhataFonts.Text,
+        fontWeight = FontWeight.Normal,
         fontSize = 11.sp,
         lineHeight = 15.sp,
-        letterSpacing = 0.5.sp,
+    ),
+    labelLarge = TextStyle(
+        fontFamily = KhataFonts.Text,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+        letterSpacing = 1.5.sp,
+    ),
+    labelSmall = TextStyle(
+        fontFamily = KhataFonts.Text,
+        fontWeight = FontWeight.Bold,
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 1.4.sp,
     ),
 )
 
-// Tabular figures, so amounts align on the decimal down a ledger column instead of
-// drifting with each digit's width. Not Monospace: that reads as a terminal, and
-// this is a page.
+// Tabular figures so amounts align on the decimal down a 3,000-row column
+// instead of drifting with each digit's width.
 val AmountTextStyle = TextStyle(
-    fontFamily = FontFamily.Default,
-    fontWeight = FontWeight.Medium,
-    fontSize = 15.sp,
-    lineHeight = 22.sp,
+    fontFamily = KhataFonts.Display,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 14.sp,
+    lineHeight = 20.sp,
     fontFeatureSettings = "tnum",
+)
+
+val WordmarkTextStyle = TextStyle(
+    fontFamily = KhataFonts.Wordmark,
+    fontWeight = FontWeight.Normal,
+    fontSize = 54.sp,
+    lineHeight = 70.sp,
+)
+
+// 34 against 11. The old build put every glyph between 12 and 20sp, which is
+// what "everything is the same size" was actually pointing at; the gap is
+// doing more work here than the absolute size.
+val PageHeadingStyle = TextStyle(
+    fontFamily = KhataFonts.Display,
+    fontWeight = FontWeight.Bold,
+    fontSize = 34.sp,
+    lineHeight = 39.sp,
+)
+
+val PageSublineStyle = TextStyle(
+    fontFamily = KhataFonts.Text,
+    fontWeight = FontWeight.Normal,
+    fontSize = 11.sp,
+    lineHeight = 15.sp,
+    letterSpacing = 0.6.sp,
+)
+
+// Bengali merchant names, notes, and anything derived from an SMS.
+val BengaliBodyStyle = TextStyle(
+    fontFamily = KhataFonts.Bengali,
+    fontWeight = FontWeight.Medium,
+    fontSize = 14.sp,
+    lineHeight = 20.sp,
 )
