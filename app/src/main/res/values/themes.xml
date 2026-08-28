@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Khata" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      The splash window paints the app's own ground, so the hold between process
+      start and the first composed frame is invisible rather than a flash of
+      white. The colour is KhataPalette.ground; it is duplicated here because a
+      window background is resolved before any Compose code runs.
+    -->
+    <style name="Theme.Khata.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#061214</item>
+        <item name="postSplashScreenTheme">@style/Theme.Khata</item>
+    </style>
+
+    <!-- Dark, not Light: this app has no light mode. -->
+    <style name="Theme.Khata" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#061214</item>
+    </style>
 </resources>
