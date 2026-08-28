@@ -25,9 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
@@ -70,19 +72,7 @@ fun ModulesContent(
     Box(Modifier.fillMaxSize().background(spec.ground)) {
         // The field is the backdrop the glass samples. It is a static surface,
         // which is why glass is affordable here and forbidden on a Paging list.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            spec.field.keyStop.copy(alpha = spec.intensity.alpha),
-                            spec.ground,
-                        ),
-                    ),
-                )
-                .khataFieldSource(haze),
-        )
+        FieldBackdrop(Modifier.fillMaxSize().khataFieldSource(haze))
 
         // enableEdgeToEdge draws behind the system bars, so the content insets
         // itself or the wordmark sits under the status bar.
@@ -144,6 +134,42 @@ fun ModulesContent(
             }
         }
     }
+}
+
+/**
+ * Soft radial pools, not a full-bleed sweep. The ground stays dominant and the
+ * field reads as atmosphere -- a linear gradient across the whole screen floods
+ * it, and the petrol wallet card then has nothing to sit against.
+ *
+ * Each pool is capped well below full opacity even at Full intensity, because
+ * the key stop is already the lightest colour the mesh should ever reach.
+ */
+@Composable
+private fun FieldBackdrop(modifier: Modifier = Modifier) {
+    val spec = LocalThemeSpec.current
+    val strength = spec.intensity.alpha
+
+    Box(
+        modifier.drawBehind {
+            drawRect(spec.ground)
+            if (strength <= 0f) return@drawBehind
+
+            fun pool(colour: Color, alpha: Float, cx: Float, cy: Float, r: Float) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(colour.copy(alpha = alpha * strength), Color.Transparent),
+                        center = Offset(size.width * cx, size.height * cy),
+                        radius = size.minDimension * r,
+                    ),
+                )
+            }
+
+            pool(spec.field.keyStop, 0.85f, 0.14f, 0.02f, 1.15f)
+            pool(spec.field.keyStop, 0.55f, 0.92f, 0.16f, 0.95f)
+            pool(KhataPalette.heroStops.first(), 0.60f, 0.70f, 0.78f, 1.00f)
+            pool(spec.ground, 0.70f, 0.10f, 0.95f, 0.90f)
+        },
+    )
 }
 
 @Composable
