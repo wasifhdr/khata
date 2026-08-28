@@ -112,23 +112,58 @@ object KhataPalette {
  * light mode is deferred, and the no-hardcoded-colour rule is what keeps adding
  * one later an addition rather than a rewrite.
  */
+/**
+ * Every role is set explicitly, including the ones this app never reads by
+ * name. Material's defaults are purple, and any role left unset leaks that
+ * purple into a teal world through whichever component happens to read it --
+ * FilterChip reads secondaryContainer, and got Material's #4A4458 until this
+ * was completed. `noRoleKeepsItsMaterialDefault` in ContrastTest holds the line.
+ */
 val DarkColors: ColorScheme = darkColorScheme(
     primary = KhataPalette.accent,
     onPrimary = KhataPalette.heroStops.last(),
     primaryContainer = KhataPalette.heroStops.first(),
     onPrimaryContainer = KhataPalette.onSurface,
+    inversePrimary = KhataPalette.heroStops.first(),
+
     secondary = KhataPalette.accentDeep,
     onSecondary = KhataPalette.heroStops.last(),
+    // The selected-chip pair: aqua on petrol, at 7.5:1.
+    secondaryContainer = KhataPalette.heroStops.first(),
+    onSecondaryContainer = KhataPalette.accent,
+
+    tertiary = KhataPalette.accentDeep,
+    onTertiary = KhataPalette.heroStops.last(),
+    tertiaryContainer = KhataPalette.heroStops[1],
+    onTertiaryContainer = KhataPalette.onSurface,
+
     background = KhataPalette.ground,
     onBackground = KhataPalette.onSurface,
     surface = KhataPalette.ground,
     onSurface = KhataPalette.onSurface,
     surfaceVariant = KhataPalette.heroStops[1],
     onSurfaceVariant = KhataPalette.onSurfaceDim,
+    surfaceTint = KhataPalette.accent,
+    inverseSurface = KhataPalette.onSurface,
+    inverseOnSurface = KhataPalette.ground,
+
+    // Petrol-tinted neutrals, so elevated Material surfaces stay in the world.
+    surfaceBright = Color(0xFF1C2E30),
+    surfaceDim = Color(0xFF040E10),
+    surfaceContainerLowest = Color(0xFF030B0C),
+    surfaceContainerLow = Color(0xFF0A1A1C),
+    surfaceContainer = Color(0xFF0E2022),
+    surfaceContainerHigh = Color(0xFF12282A),
+    surfaceContainerHighest = Color(0xFF173032),
+
     outline = KhataPalette.onSurfaceFaint,
     outlineVariant = Color(0xFF1C2E30),
+    scrim = Color(0xFF000000),
+
     error = KhataPalette.alert,
     onError = Color(0xFF2A0A06),
+    errorContainer = Color(0xFF5C1A14),
+    onErrorContainer = Color(0xFFFFDAD5),
 )
 
 fun contrastRatio(a: Color, b: Color): Double {

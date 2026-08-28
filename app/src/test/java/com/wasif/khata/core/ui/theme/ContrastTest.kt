@@ -1,5 +1,6 @@
 package com.wasif.khata.core.ui.theme
 
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import com.wasif.khata.core.data.seed.DEFAULT_CATEGORIES
 import org.junit.Assert.assertEquals
@@ -117,6 +118,67 @@ class ContrastTest {
         assertEquals(4, KhataPalette.accents.size)
         assertEquals(15, KhataPalette.categories.size)
         assertEquals(3, KhataPalette.heroStops.size)
+    }
+
+    @Test
+    fun `no role keeps its Material default`() {
+        // Material's defaults are purple. Any role left unset leaks that purple
+        // into a teal world through whichever component happens to read it --
+        // FilterChip reads secondaryContainer, and showed #4A4458 until every
+        // role was set. Nothing in the app reads most of these by name, which is
+        // exactly why only a test catches it.
+        val default = darkColorScheme()
+        val roles = listOf<Triple<String, Color, Color>>(
+            Triple("primary", DarkColors.primary, default.primary),
+            Triple("onPrimary", DarkColors.onPrimary, default.onPrimary),
+            Triple("primaryContainer", DarkColors.primaryContainer, default.primaryContainer),
+            Triple("onPrimaryContainer", DarkColors.onPrimaryContainer, default.onPrimaryContainer),
+            Triple("inversePrimary", DarkColors.inversePrimary, default.inversePrimary),
+            Triple("secondary", DarkColors.secondary, default.secondary),
+            Triple("onSecondary", DarkColors.onSecondary, default.onSecondary),
+            Triple("secondaryContainer", DarkColors.secondaryContainer, default.secondaryContainer),
+            Triple("onSecondaryContainer", DarkColors.onSecondaryContainer, default.onSecondaryContainer),
+            Triple("tertiary", DarkColors.tertiary, default.tertiary),
+            Triple("onTertiary", DarkColors.onTertiary, default.onTertiary),
+            Triple("tertiaryContainer", DarkColors.tertiaryContainer, default.tertiaryContainer),
+            Triple("onTertiaryContainer", DarkColors.onTertiaryContainer, default.onTertiaryContainer),
+            Triple("background", DarkColors.background, default.background),
+            Triple("onBackground", DarkColors.onBackground, default.onBackground),
+            Triple("surface", DarkColors.surface, default.surface),
+            Triple("onSurface", DarkColors.onSurface, default.onSurface),
+            Triple("surfaceVariant", DarkColors.surfaceVariant, default.surfaceVariant),
+            Triple("onSurfaceVariant", DarkColors.onSurfaceVariant, default.onSurfaceVariant),
+            Triple("surfaceTint", DarkColors.surfaceTint, default.surfaceTint),
+            Triple("inverseSurface", DarkColors.inverseSurface, default.inverseSurface),
+            Triple("inverseOnSurface", DarkColors.inverseOnSurface, default.inverseOnSurface),
+            Triple("surfaceBright", DarkColors.surfaceBright, default.surfaceBright),
+            Triple("surfaceDim", DarkColors.surfaceDim, default.surfaceDim),
+            Triple("surfaceContainerLowest", DarkColors.surfaceContainerLowest, default.surfaceContainerLowest),
+            Triple("surfaceContainerLow", DarkColors.surfaceContainerLow, default.surfaceContainerLow),
+            Triple("surfaceContainer", DarkColors.surfaceContainer, default.surfaceContainer),
+            Triple("surfaceContainerHigh", DarkColors.surfaceContainerHigh, default.surfaceContainerHigh),
+            Triple("surfaceContainerHighest", DarkColors.surfaceContainerHighest, default.surfaceContainerHighest),
+            Triple("outline", DarkColors.outline, default.outline),
+            Triple("outlineVariant", DarkColors.outlineVariant, default.outlineVariant),
+            Triple("error", DarkColors.error, default.error),
+            Triple("onError", DarkColors.onError, default.onError),
+            Triple("errorContainer", DarkColors.errorContainer, default.errorContainer),
+            Triple("onErrorContainer", DarkColors.onErrorContainer, default.onErrorContainer),
+        )
+        roles.forEach { (name, ours, theirs) ->
+            assertTrue("$name is still Material's default $theirs", ours != theirs)
+        }
+    }
+
+    @Test
+    fun `every container pair in the scheme is legible`() {
+        // Container/on-container pairs carry text, so they owe the text floor.
+        assertFloor("onPrimaryContainer", DarkColors.onPrimaryContainer, DarkColors.primaryContainer, textFloor)
+        assertFloor("onSecondaryContainer", DarkColors.onSecondaryContainer, DarkColors.secondaryContainer, textFloor)
+        assertFloor("onTertiaryContainer", DarkColors.onTertiaryContainer, DarkColors.tertiaryContainer, textFloor)
+        assertFloor("onErrorContainer", DarkColors.onErrorContainer, DarkColors.errorContainer, textFloor)
+        assertFloor("onSurfaceVariant", DarkColors.onSurfaceVariant, DarkColors.surfaceVariant, textFloor)
+        assertFloor("onSurface / containerHighest", DarkColors.onSurface, DarkColors.surfaceContainerHighest, textFloor)
     }
 
     @Test
