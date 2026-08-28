@@ -22,4 +22,9 @@ interface TransactionRepository {
     fun observe(id: Long): Flow<Transaction?>
     suspend fun save(draft: TransactionDraft): Result<Long>
     suspend fun delete(id: Long): Result<Unit>
+
+    /** Debits only, over a half-open window. Boundaries are the caller's to compute in Dhaka. */
+    fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money>
+
+    fun observeMostRecent(): Flow<Transaction?>
 }

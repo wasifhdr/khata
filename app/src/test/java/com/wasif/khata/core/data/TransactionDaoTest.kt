@@ -11,6 +11,9 @@ import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
+import com.wasif.khata.core.time.dhakaMonthStart
+import com.wasif.khata.core.time.dhakaNextMonthStart
+import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -53,14 +56,21 @@ class TransactionDaoTest {
         )
     )
 
-    private fun transaction(accountId: Long, occurredAt: Long, uuid: String) =
+    private fun transaction(
+        accountId: Long,
+        occurredAt: Long,
+        uuid: String,
+        amountMinor: Long = 10_000,
+        direction: TransactionDirection = TransactionDirection.DEBIT,
+        merchantRaw: String? = "SHWAPNO",
+    ) =
         TransactionEntity(
             uuid = uuid,
             accountId = accountId,
-            amountMinor = 10_000,
-            direction = TransactionDirection.DEBIT,
+            amountMinor = amountMinor,
+            direction = direction,
             occurredAt = occurredAt,
-            merchantRaw = "SHWAPNO",
+            merchantRaw = merchantRaw,
             merchantId = null,
             categoryId = null,
             note = null,
@@ -132,5 +142,61 @@ class TransactionDaoTest {
 
         db.accountDao().adjustBalance(accountId, deltaMinor = 8000, updatedAt = 3000)
         assertEquals(3000, db.accountDao().observeAll().first().single().currentBalanceMinor)
+    }
+
+    @Test
+    fun `observeTotalMinorBetween sums only debits inside the window`() = runTest {
+        val accountId = insertAccount()
+        val inWindow = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+        val before = Instant.parse("2026-07-10T06:00:00Z").toEpochMilli()
+        val dao = db.transactionDao()
+
+        dao.upsert(transaction(accountId, inWindow, "t1", amountMinor = 2_340_50))
+        dao.upsert(transaction(accountId, inWindow, "t2", amountMinor = 42_000))
+        // A credit inside the window and a debit outside it must both be excluded.
+        dao.upsert(
+            transaction(accountId, inWindow, "t3", amountMinor = 85_000_00, direction = TransactionDirection.CREDIT),
+        )
+        dao.upsert(transaction(accountId, before, "t4", amountMinor = 999_00))
+
+        val total = dao.observeTotalMinorBetween(
+            direction = TransactionDirection.DEBIT,
+            fromInclusive = inWindow.dhakaMonthStart(),
+            toExclusive = inWindow.dhakaNextMonthStart(),
+        ).first()
+
+        assertEquals(2_340_50L + 42_000L, total)
+    }
+
+    @Test
+    fun `observeTotalMinorBetween returns zero rather than null when empty`() = runTest {
+        // COALESCE matters: a null here would fail at the repository boundary on
+        // a brand new install, which is the one moment the hub is guaranteed to
+        // be shown.
+        val now = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+
+        val total = db.transactionDao().observeTotalMinorBetween(
+            direction = TransactionDirection.DEBIT,
+            fromInclusive = now.dhakaMonthStart(),
+            toExclusive = now.dhakaNextMonthStart(),
+        ).first()
+
+        assertEquals(0L, total)
+    }
+
+    @Test
+    fun `observeMostRecent ignores soft-deleted rows`() = runTest {
+        val accountId = insertAccount()
+        val older = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+        val newer = Instant.parse("2026-08-20T06:00:00Z").toEpochMilli()
+        val dao = db.transactionDao()
+
+        dao.upsert(transaction(accountId, older, "old", merchantRaw = "Chaldal"))
+        val newestId = dao.upsert(transaction(accountId, newer, "new", merchantRaw = "Daraz"))
+
+        assertEquals("Daraz", dao.observeMostRecent().first()?.merchantRaw)
+
+        dao.softDelete(newestId, deletedAt = newer)
+        assertEquals("Chaldal", dao.observeMostRecent().first()?.merchantRaw)
     }
 }

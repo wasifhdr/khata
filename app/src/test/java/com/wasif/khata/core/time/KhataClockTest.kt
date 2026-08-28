@@ -8,6 +8,33 @@ import org.junit.Test
 class KhataClockTest {
 
     @Test
+    fun `month start is midnight Dhaka on the first`() {
+        val mid = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
+        // Dhaka is UTC+6, so 1 August 00:00 Dhaka is 31 July 18:00 UTC.
+        val expected = Instant.parse("2026-07-31T18:00:00Z").toEpochMilli()
+
+        assertEquals(expected, mid.dhakaMonthStart())
+    }
+
+    @Test
+    fun `next month start is exclusive and rolls the year`() {
+        val dec = Instant.parse("2026-12-15T00:00:00Z").toEpochMilli()
+        val expected = Instant.parse("2026-12-31T18:00:00Z").toEpochMilli()
+
+        assertEquals(expected, dec.dhakaNextMonthStart())
+    }
+
+    @Test
+    fun `an instant just after Dhaka midnight belongs to the new month`() {
+        // 1 September 00:30 Dhaka is 31 August 18:30 UTC. Computing the month
+        // in UTC would put this in August, and every month-to-date figure would
+        // be wrong for the first six hours of every month.
+        val earlySep = Instant.parse("2026-08-31T18:30:00Z").toEpochMilli()
+
+        assertEquals(Instant.parse("2026-08-31T18:00:00Z").toEpochMilli(), earlySep.dhakaMonthStart())
+    }
+
+    @Test
     fun `an evening UTC instant is already the next calendar day in Dhaka`() {
         val millis = Instant.parse("2026-08-26T20:30:00Z").toEpochMilli()
 

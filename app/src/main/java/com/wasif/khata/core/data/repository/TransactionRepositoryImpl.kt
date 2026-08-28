@@ -10,6 +10,7 @@ import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.Confidence
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
@@ -37,6 +38,16 @@ class TransactionRepositoryImpl @Inject constructor(
 
     override fun observe(id: Long): Flow<Transaction?> =
         transactionDao.observeById(id).map { it?.toDomain() }
+
+    override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+        transactionDao.observeTotalMinorBetween(
+            direction = TransactionDirection.DEBIT,
+            fromInclusive = fromInclusive,
+            toExclusive = toExclusive,
+        ).map { Money(it) }
+
+    override fun observeMostRecent(): Flow<Transaction?> =
+        transactionDao.observeMostRecent().map { it?.toDomain() }
 
     override suspend fun save(draft: TransactionDraft): Result<Long> = runCatchingData {
         db.withTransaction {
