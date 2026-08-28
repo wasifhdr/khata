@@ -7,28 +7,59 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
+import com.wasif.khata.feature.hub.ModulesScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
+import com.wasif.khata.feature.settings.SettingsScreen
 
-private const val ROUTE_LEDGER = "ledger"
-private const val ROUTE_EDITOR_NEW = "editor/new"
-private const val ROUTE_EDITOR_EDIT = "editor/edit/{transactionId}"
-private const val ARG_TRANSACTION_ID = "transactionId"
+object KhataRoutes {
+    const val Modules = "modules"
+    const val Ledger = "ledger"
+    const val Settings = "settings"
+    const val EditorNew = "editor/new"
+    const val EditorEdit = "editor/edit/{transactionId}"
+    const val ArgTransactionId = "transactionId"
+
+    fun editorEdit(id: Long): String = "editor/edit/$id"
+}
 
 @Composable
-fun KhataNavHost() {
+fun KhataNavHost(homeView: HomeView) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = ROUTE_LEDGER) {
-        composable(ROUTE_LEDGER) {
-            LedgerScreen(
-                onAddTransaction = { navController.navigate(ROUTE_EDITOR_NEW) },
-                onOpenTransaction = { id -> navController.navigate("editor/edit/$id") },
+    // The preference IS the back-stack root, which is why it has to be resolved
+    // before this composes: back from the root exits the app, and that cannot
+    // be changed once the graph is built.
+    val start = when (homeView) {
+        HomeView.Modules -> KhataRoutes.Modules
+        // Routes to the Ledger until Plan C builds the Wallet dashboard. The
+        // preference and the routing are correct; only the destination is
+        // provisional -- which is also why nothing in Settings sets this yet.
+        HomeView.Wallet -> KhataRoutes.Ledger
+    }
+
+    NavHost(navController = navController, startDestination = start) {
+        composable(KhataRoutes.Modules) {
+            ModulesScreen(
+                onOpenWallet = { navController.navigate(KhataRoutes.Ledger) },
+                onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
             )
         }
 
-        composable(ROUTE_EDITOR_NEW) {
+        composable(KhataRoutes.Ledger) {
+            LedgerScreen(
+                onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
+                onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+            )
+        }
+
+        composable(KhataRoutes.Settings) {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(KhataRoutes.EditorNew) {
             TransactionEditorScreen(
                 onDone = { navController.popBackStack() },
                 viewModel = editorViewModel(transactionId = null),
@@ -36,12 +67,12 @@ fun KhataNavHost() {
         }
 
         composable(
-            route = ROUTE_EDITOR_EDIT,
-            arguments = listOf(navArgument(ARG_TRANSACTION_ID) { type = NavType.LongType }),
+            route = KhataRoutes.EditorEdit,
+            arguments = listOf(navArgument(KhataRoutes.ArgTransactionId) { type = NavType.LongType }),
         ) { entry ->
             TransactionEditorScreen(
                 onDone = { navController.popBackStack() },
-                viewModel = editorViewModel(entry.arguments?.getLong(ARG_TRANSACTION_ID)),
+                viewModel = editorViewModel(entry.arguments?.getLong(KhataRoutes.ArgTransactionId)),
             )
         }
     }
