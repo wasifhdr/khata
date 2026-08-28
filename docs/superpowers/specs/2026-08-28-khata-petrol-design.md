@@ -260,8 +260,11 @@ from `admin@lipighor.com`** for web-font use plus a footer backlink.
 - **Any published web page (including design artifacts):** requires permission. Not obtained;
   artifacts therefore use a Google Font for the wordmark.
 - **A Play Store release** ships the TTF inside the APK, which is arguably distribution.
-  **Permission must be obtained before any public release.** Recorded here so it is not
-  discovered late.
+  **Permission must be obtained before any public release.**
+
+**Deferred by the user 2026-08-28.** Not a blocker for the sideloaded build, which is the only
+build that exists. This is a release-gate item, not an implementation item — it must be cleared
+before the first public release and does not affect any task in the plans below.
 
 ---
 
@@ -284,8 +287,8 @@ exception, and it is narrow: **one fixed string in the brand lockup, no language
 translation layer, no other Bengali UI copy.** The constraint must be amended to say so
 explicitly rather than be silently contradicted.
 
-**Open:** the Bengali line was drafted by Claude and needs a native-speaker pass before it
-ships. The user has been asked to confirm it reads naturally rather than as translated.
+**Confirmed 2026-08-28:** the line passed a native-speaker review by the user. It ships as
+written.
 
 ---
 
@@ -547,9 +550,10 @@ the first DataStore emission** and both fall out of the same fix.
 
 ## 11. What this does not settle
 
-- **The Bengali tagline needs a native-speaker pass.** Drafted by Claude; not yet confirmed to
-  read naturally.
-- **Lipighor permission** for any public release or web use. Not obtained.
+- ~~The Bengali tagline needs a native-speaker pass.~~ **Cleared 2026-08-28** — passed, ships
+  as written.
+- ~~Lipighor permission.~~ **Deferred 2026-08-28** — a release gate, not an implementation
+  blocker. Must be cleared before any public release.
 - **The decimal keypad** and the **three-tap widget** flow.
 - **Insights, Budgets, Accounts and Settings** have no drawings. They get designed during
   implementation against the system above, which is now specific enough to design against.
