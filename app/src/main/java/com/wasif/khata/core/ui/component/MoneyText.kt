@@ -22,6 +22,9 @@ fun MoneyText(
         null -> ""
     }
     val color = when (direction) {
+        // Credits take the accent; debits stay paper. The accent is the only
+        // colour on a ledger row, which is what makes a credit findable while
+        // scrolling.
         TransactionDirection.CREDIT -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.onSurface
     }
