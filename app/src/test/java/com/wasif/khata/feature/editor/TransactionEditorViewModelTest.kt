@@ -43,6 +43,9 @@ class TransactionEditorViewModelTest {
             return saveResult
         }
         override suspend fun delete(id: Long) = Result.success(Unit)
+        override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+            flowOf(Money.ZERO)
+        override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
     }
 
     private val bkash = Account(
