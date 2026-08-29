@@ -20,9 +20,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
@@ -76,7 +77,7 @@ fun LedgerScreen(
 fun LedgerContent(
     items: LazyPagingItems<LedgerItem>,
     header: LedgerHeaderState,
-    categoryTokens: Map<Long, String>,
+    categoryTokens: Map<Long, CategoryChip>,
     canGoForward: Boolean,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
@@ -146,7 +147,7 @@ fun LedgerContent(
                         is LedgerItem.DayHeader -> DayHeaderRow(item)
                         is LedgerItem.Row -> TransactionRow(
                             item = item,
-                            token = item.transaction.categoryId?.let { categoryTokens[it] },
+                            chip = item.transaction.categoryId?.let { categoryTokens[it] },
                             onClick = { onOpenTransaction(item.transaction.id) },
                         )
                         null -> Unit
@@ -155,7 +156,9 @@ fun LedgerContent(
             }
         }
 
-        if (items.itemCount == 0) {
+        // enablePlaceholders = false drops itemCount to 0 during every refresh, so
+        // itemCount alone would flash this on each month step before rows arrive.
+        if (items.itemCount == 0 && items.loadState.refresh !is LoadState.Loading) {
             EmptyLedger(Modifier.align(Alignment.Center), monthLabel = header.monthLabel)
         }
 
@@ -190,7 +193,7 @@ private fun MonthHeader(
     val spacing = LocalSpacing.current
     Row(modifier.padding(horizontal = spacing.sm), verticalAlignment = Alignment.CenterVertically) {
         MonthArrow(
-            icon = Icons.Filled.ChevronLeft,
+            icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
             description = "Previous month",
             enabled = true,
             onClick = onPreviousMonth,
@@ -204,8 +207,15 @@ private fun MonthHeader(
             )
             Text(
                 // A past month has no days left; "0 days left" would be a
-                // different and wrong claim.
-                text = header.daysLeft?.let { "$it days left" } ?: "Complete month",
+                // different and wrong claim. 0 and 1 need their own words too:
+                // "0 days left" is wrong on the last day, and "1 days left" is
+                // ungrammatical on the second-to-last.
+                text = when (val daysLeft = header.daysLeft) {
+                    null -> "Complete month"
+                    0 -> "Last day"
+                    1 -> "1 day left"
+                    else -> "$daysLeft days left"
+                },
                 style = PageSublineStyle,
                 color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center,
@@ -213,7 +223,7 @@ private fun MonthHeader(
             )
         }
         MonthArrow(
-            icon = Icons.Filled.ChevronRight,
+            icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             description = "Next month",
             enabled = canGoForward,
             onClick = onNextMonth,
@@ -301,7 +311,7 @@ private fun DayHeaderRow(header: LedgerItem.DayHeader) {
 @Composable
 private fun TransactionRow(
     item: LedgerItem.Row,
-    token: String?,
+    chip: CategoryChip?,
     onClick: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
@@ -318,7 +328,10 @@ private fun TransactionRow(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             CategoryDot(
-                token = token ?: "category_neutral",
+                // Null passes straight through: CategoryDot only announces
+                // "Uncategorised" for an unknown token, and substituting a real
+                // key like "category_neutral" here would silently suppress that.
+                token = chip?.colorToken,
                 lowConfidence = transaction.confidence == Confidence.LOW,
             )
             Column(Modifier.weight(1f).padding(start = spacing.sm, end = spacing.sm)) {
@@ -329,9 +342,11 @@ private fun TransactionRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                // Colour is never the sole signal: low confidence is a ring on
-                // the dot and the word here.
+                // Colour is never the sole signal: the category name is always
+                // present in words, and low confidence is a ring on the dot
+                // plus the word here.
                 val meta = buildList {
+                    chip?.name?.let { add(it) }
                     transaction.note?.let { add(it) }
                     if (transaction.confidence == Confidence.LOW) add("low confidence")
                 }.joinToString(" · ")

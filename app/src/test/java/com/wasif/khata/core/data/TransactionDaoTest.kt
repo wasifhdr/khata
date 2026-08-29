@@ -251,16 +251,22 @@ class TransactionDaoTest {
         val dao = db.transactionDao()
         val august = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
         val july = Instant.parse("2026-07-10T06:00:00Z").toEpochMilli()
+        val fromInclusive = august.dhakaMonthStart()
+        val toExclusive = august.dhakaNextMonthStart()
 
         dao.upsert(transaction(accountId, august, "aug"))
         dao.upsert(transaction(accountId, july, "jul"))
+        // Exactly on the boundaries: a > / <= bug (or the reverse) would pass
+        // the whole-month-apart fixtures above without ever being caught.
+        dao.upsert(transaction(accountId, fromInclusive, "at-from-inclusive"))
+        dao.upsert(transaction(accountId, toExclusive, "at-to-exclusive"))
 
         val pager = TestPager(
             PagingConfig(pageSize = 10),
-            dao.pagingSourceBetween(august.dhakaMonthStart(), august.dhakaNextMonthStart()),
+            dao.pagingSourceBetween(fromInclusive, toExclusive),
         )
         val page = pager.refresh() as PagingSource.LoadResult.Page
 
-        assertEquals(listOf("aug"), page.data.map { it.uuid })
+        assertEquals(setOf("aug", "at-from-inclusive"), page.data.map { it.uuid }.toSet())
     }
 }

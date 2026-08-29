@@ -2,7 +2,13 @@ package com.wasif.khata.feature.ledger
 
 import androidx.paging.LoadState
 import androidx.paging.LoadStates
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.PagingDataEvent
+import androidx.paging.PagingDataPresenter
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
 import androidx.paging.testing.asSnapshot
 import app.cash.turbine.test
 import com.wasif.khata.core.model.Confidence
@@ -23,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -107,6 +114,36 @@ class LedgerViewModelTest {
         ): Flow<PagingData<Transaction>> {
             requestedWindow = fromInclusive to toExclusive
             return pagedTransactions()
+        }
+        override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
+        override suspend fun save(draft: TransactionDraft) = Result.success(0L)
+        override suspend fun delete(id: Long) = Result.success(Unit)
+        override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
+        override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
+        override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
+        override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+            flowOf(Money.ZERO)
+    }
+
+    // PagingData.from() (used by repositoryReturning above) builds a plain,
+    // freely re-collectable flow -- it never exercises the single-collect
+    // pageEventFlow that a real Pager produces, so it cannot reproduce C1's
+    // crash. This fake goes through an actual Pager/PagingSource instead, the
+    // same object shape combine() re-wraps on every observeDayTotals() tick.
+    private fun repositoryWithRealPaging(vararg transactions: Transaction) = object : TransactionRepository {
+        override fun pagedTransactions(): Flow<PagingData<Transaction>> = pagedTransactionsBetween(0, 0)
+        override fun pagedTransactionsBetween(
+            fromInclusive: Long,
+            toExclusive: Long,
+        ): Flow<PagingData<Transaction>> {
+            requestedWindow = fromInclusive to toExclusive
+            return Pager(PagingConfig(pageSize = 20, enablePlaceholders = false)) {
+                object : PagingSource<Int, Transaction>() {
+                    override fun getRefreshKey(state: PagingState<Int, Transaction>): Int? = null
+                    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Transaction> =
+                        LoadResult.Page(data = transactions.toList(), prevKey = null, nextKey = null)
+                }
+            }.flow
         }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
@@ -234,30 +271,43 @@ class LedgerViewModelTest {
         }
         // 1 July 00:00 Dhaka is 30 June 18:00 UTC.
         assertEquals(Instant.parse("2026-06-30T18:00:00Z").toEpochMilli(), requestedWindow?.first)
+        // 1 August 00:00 Dhaka is 31 July 18:00 UTC -- the exclusive upper bound
+        // of the July window, which nothing else here checks.
+        assertEquals(Instant.parse("2026-07-31T18:00:00Z").toEpochMilli(), requestedWindow?.second)
     }
 
     @Test
     fun `a past month has no days left, and the future is unreachable`() = runTest(dispatcher) {
         val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
 
-        viewModel.canGoForward.test {
+        // header is subscribed alongside canGoForward throughout, so every
+        // canGoForward assertion is paired with proof -- via monthLabel -- that
+        // an emission actually happened, rather than just matching the flow's
+        // initial default (false for canGoForward, null for daysLeft).
+        viewModel.header.test {
             advanceUntilIdle()
-            // The current month is the newest that can hold anything; an empty
-            // future month is a dead end.
-            assertEquals(false, expectMostRecentItem())
+            assertEquals("August 2026", expectMostRecentItem().monthLabel)
+
+            viewModel.canGoForward.test {
+                advanceUntilIdle()
+                // The current month is the newest that can hold anything; an
+                // empty future month is a dead end.
+                assertEquals(false, expectMostRecentItem())
+                cancelAndIgnoreRemainingEvents()
+            }
 
             viewModel.onPreviousMonth()
             advanceUntilIdle()
+            val h = expectMostRecentItem()
+            assertEquals("July 2026", h.monthLabel)
+            assertEquals(null, h.daysLeft)
 
-            assertEquals(true, expectMostRecentItem())
-            cancelAndIgnoreRemainingEvents()
-        }
+            viewModel.canGoForward.test {
+                advanceUntilIdle()
+                assertEquals(true, expectMostRecentItem())
+                cancelAndIgnoreRemainingEvents()
+            }
 
-        // _viewedMonth is itself a StateFlow, so header replays the month that
-        // was already stepped back to as soon as something subscribes.
-        viewModel.header.test {
-            advanceUntilIdle()
-            assertEquals(null, expectMostRecentItem().daysLeft)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -268,8 +318,61 @@ class LedgerViewModelTest {
 
         viewModel.categoryTokens.test {
             advanceUntilIdle()
-            assertEquals("category_green", expectMostRecentItem()[11L])
+            val chip = expectMostRecentItem()[11L]
+            assertEquals("category_green", chip?.colorToken)
+            assertEquals("Groceries", chip?.name)
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // C1/C2: cachedIn must run before the combine with observeDayTotals(), or
+    // Paging throws IllegalStateException: Attempt to collect twice from
+    // pageEventFlow the moment dayTotals re-emits mid-collection -- exactly
+    // what happens in the app every time a write lands while Ledger is open.
+    // Setting dayTotals before the ViewModel exists (as every other test in
+    // this file does) can never exercise this: it is consumed before
+    // collection of `items` even starts, and PagingData.from() (the fake used
+    // by repositoryReturning) is freely re-collectable and can't reproduce
+    // the crash either -- only a real Pager's pageEventFlow enforces
+    // single-collection. This drives `items` the way LazyPagingItems does in
+    // production: a PagingDataPresenter that calls collectFrom() on every new
+    // PagingData the flow emits, while the previous generation is still
+    // being actively collected.
+    @Test
+    fun `items keeps collecting when dayTotals emits while paging is actively being collected`() =
+        runTest(dispatcher) {
+            val aug26 = Instant.parse("2026-08-26T06:00:00Z").toEpochMilli()
+            val viewModel = LedgerViewModel(
+                repositoryWithRealPaging(transaction(1, aug26)),
+                referenceData,
+                clock,
+            )
+            val presenter = object : PagingDataPresenter<LedgerItem>() {
+                override suspend fun presentPagingDataEvent(event: PagingDataEvent<LedgerItem>) = Unit
+            }
+
+            viewModel.items.test {
+                val first = awaitItem()
+                val firstCollection = backgroundScope.launch { presenter.collectFrom(first) }
+                advanceUntilIdle()
+
+                // A write landing while Ledger is on screen: dayTotals re-emits
+                // while `firstCollection` is still actively collecting.
+                dayTotals.value = mapOf(aug26.toDhakaLocalDate() to Money(500_00))
+                val second = awaitItem()
+
+                // Wrong cachedIn placement means `second` wraps the same
+                // pageEventFlow `first` is already collecting, and this throws.
+                // A real paging flow never completes on its own, so this must
+                // run in the background rather than being awaited directly --
+                // launch surfaces the exception the same way collectFrom being
+                // called from a live LazyPagingItems collector would.
+                val secondCollection = backgroundScope.launch { presenter.collectFrom(second) }
+                advanceUntilIdle()
+
+                firstCollection.cancel()
+                secondCollection.cancel()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

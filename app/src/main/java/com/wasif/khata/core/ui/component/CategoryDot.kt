@@ -15,12 +15,12 @@ import com.wasif.khata.core.ui.theme.LocalCategoryColors
 
 @Composable
 fun CategoryDot(
-    token: String,
+    token: String?,
     modifier: Modifier = Modifier,
     lowConfidence: Boolean = false,
 ) {
     val colours = LocalCategoryColors.current
-    val known = colours[token]
+    val known = token?.let { colours[it] }
     val colour = known ?: KhataPalette.categories.getValue("category_neutral")
 
     // Two independent signals, because colour is never load-bearing alone: the

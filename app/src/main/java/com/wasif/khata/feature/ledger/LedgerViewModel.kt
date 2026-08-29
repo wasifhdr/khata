@@ -29,6 +29,12 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
+/** A category's row-facing identity: the dot's colour and the name that must always sit beside it. */
+data class CategoryChip(
+    val name: String,
+    val colorToken: String,
+)
+
 data class LedgerHeaderState(
     val monthLabel: String = "",
     val monthSpend: Money = Money.ZERO,
@@ -64,9 +70,9 @@ class LedgerViewModel @Inject constructor(
         }
     }
 
-    /** categoryId -> colorToken, so a row resolves its dot without a per-row query. */
-    val categoryTokens: StateFlow<Map<Long, String>> = referenceData.observeCategories()
-        .map { categories -> categories.associate { it.id to it.colorToken } }
+    /** categoryId -> chip, so a row resolves its dot and name without a per-row query. */
+    val categoryTokens: StateFlow<Map<Long, CategoryChip>> = referenceData.observeCategories()
+        .map { categories -> categories.associate { it.id to CategoryChip(it.name, it.colorToken) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -95,6 +101,13 @@ class LedgerViewModel @Inject constructor(
             val (from, to) = month.dhakaWindow()
             repository.pagedTransactionsBetween(from, to)
         }
+        // cachedIn goes BEFORE the combine, not after. observeDayTotals() is a
+        // Room flow that re-emits on every write to transactions; with the cache
+        // last, each of those emissions re-derives a PagingData wrapping the same
+        // pageEventFlow and Paging throws "Attempt to collect twice". Caching
+        // first makes the result re-collectable, which is what lets a second flow
+        // be combined into it at all.
+        .cachedIn(viewModelScope)
         .combine(repository.observeDayTotals()) { paging, totals ->
             paging.map { LedgerItem.Row(it) }
                 // insertSeparators<T, R> widens Row to LedgerItem, so the generator
@@ -116,7 +129,6 @@ class LedgerViewModel @Inject constructor(
                     }
                 }
         }
-        .cachedIn(viewModelScope)
 }
 
 /** The month's half-open bounds in epoch millis, computed in Dhaka. */
