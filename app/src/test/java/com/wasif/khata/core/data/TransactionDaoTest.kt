@@ -244,4 +244,23 @@ class TransactionDaoTest {
 
         assertEquals(100_00L, totals[day.toDhakaDayIndex()])
     }
+
+    @Test
+    fun `paging is scoped to a half-open window`() = runTest {
+        val accountId = insertAccount()
+        val dao = db.transactionDao()
+        val august = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+        val july = Instant.parse("2026-07-10T06:00:00Z").toEpochMilli()
+
+        dao.upsert(transaction(accountId, august, "aug"))
+        dao.upsert(transaction(accountId, july, "jul"))
+
+        val pager = TestPager(
+            PagingConfig(pageSize = 10),
+            dao.pagingSourceBetween(august.dhakaMonthStart(), august.dhakaNextMonthStart()),
+        )
+        val page = pager.refresh() as PagingSource.LoadResult.Page
+
+        assertEquals(listOf("aug"), page.data.map { it.uuid })
+    }
 }

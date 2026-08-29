@@ -56,6 +56,7 @@ fun KhataNavHost(homeView: HomeView) {
 
         composable(KhataRoutes.Ledger) {
             LedgerScreen(
+                onBack = { navController.popBackStack() },
                 onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
             )

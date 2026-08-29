@@ -38,6 +38,14 @@ class TransactionRepositoryImpl @Inject constructor(
             transactionDao.pagingSource()
         }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
+    override fun pagedTransactionsBetween(
+        fromInclusive: Long,
+        toExclusive: Long,
+    ): Flow<PagingData<Transaction>> =
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
+            transactionDao.pagingSourceBetween(fromInclusive, toExclusive)
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
     override fun observe(id: Long): Flow<Transaction?> =
         transactionDao.observeById(id).map { it?.toDomain() }
 

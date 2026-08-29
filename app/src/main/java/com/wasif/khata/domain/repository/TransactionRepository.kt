@@ -20,6 +20,9 @@ data class TransactionDraft(
 
 interface TransactionRepository {
     fun pagedTransactions(): Flow<PagingData<Transaction>>
+
+    /** One month of the ledger. The half-open window is the caller's to compute in Dhaka. */
+    fun pagedTransactionsBetween(fromInclusive: Long, toExclusive: Long): Flow<PagingData<Transaction>>
     fun observe(id: Long): Flow<Transaction?>
     suspend fun save(draft: TransactionDraft): Result<Long>
     suspend fun delete(id: Long): Result<Unit>

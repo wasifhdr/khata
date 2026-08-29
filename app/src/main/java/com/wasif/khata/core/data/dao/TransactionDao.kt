@@ -23,6 +23,17 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY occurredAt DESC, id DESC")
     fun pagingSource(): PagingSource<Int, TransactionEntity>
 
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE deletedAt IS NULL
+          AND occurredAt >= :fromInclusive
+          AND occurredAt < :toExclusive
+        ORDER BY occurredAt DESC, id DESC
+        """,
+    )
+    fun pagingSourceBetween(fromInclusive: Long, toExclusive: Long): PagingSource<Int, TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE id = :id AND deletedAt IS NULL")
     fun observeById(id: Long): Flow<TransactionEntity?>
 
