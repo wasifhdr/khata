@@ -115,6 +115,8 @@ class LedgerViewModelTest {
             requestedWindow = fromInclusive to toExclusive
             return pagedTransactions()
         }
+        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
+            pagedTransactions()
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
@@ -145,6 +147,8 @@ class LedgerViewModelTest {
                 }
             }.flow
         }
+        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
+            pagedTransactions()
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)

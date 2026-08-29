@@ -34,6 +34,19 @@ interface TransactionDao {
     )
     fun pagingSourceBetween(fromInclusive: Long, toExclusive: Long): PagingSource<Int, TransactionEntity>
 
+    // ESCAPE '\' with the caller pre-escaping % and _ : an unescaped wildcard
+    // turns a search that should find nothing into one that returns the whole
+    // ledger, which is the worst possible answer to "find that one thing".
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE deletedAt IS NULL
+          AND (merchantRaw LIKE :pattern ESCAPE '\' OR note LIKE :pattern ESCAPE '\')
+        ORDER BY occurredAt DESC, id DESC
+        """,
+    )
+    fun pagingSourceMatchingPattern(pattern: String): PagingSource<Int, TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE id = :id AND deletedAt IS NULL")
     fun observeById(id: Long): Flow<TransactionEntity?>
 
@@ -77,4 +90,13 @@ interface TransactionDao {
         """,
     )
     fun observeDayTotals(): Flow<List<DayTotalRow>>
+}
+
+/** Escapes LIKE wildcards, then wraps in % so the term matches anywhere. */
+fun TransactionDao.pagingSourceMatching(query: String): PagingSource<Int, TransactionEntity> {
+    val escaped = query
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    return pagingSourceMatchingPattern("%$escaped%")
 }

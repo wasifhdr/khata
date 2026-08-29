@@ -38,6 +38,7 @@ class LedgerScreenTest {
         items: List<LedgerItem> = emptyList(),
         header: LedgerHeaderState = LedgerHeaderState(monthLabel = "August 2026", daysLeft = 3),
         canGoForward: Boolean = false,
+        query: String = "",
         onPreviousMonth: () -> Unit = {},
         onNextMonth: () -> Unit = {},
         onAddTransaction: () -> Unit = {},
@@ -55,6 +56,8 @@ class LedgerScreenTest {
                 header = header,
                 categoryTokens = mapOf(11L to CategoryChip(name = "Groceries", colorToken = "category_green")),
                 canGoForward = canGoForward,
+                query = query,
+                onQueryChange = {},
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
                 onBack = {},
@@ -113,6 +116,15 @@ class LedgerScreenTest {
         compose.setContent(content(header = LedgerHeaderState(monthLabel = "July 2026")))
 
         compose.onNodeWithText("Nothing in July 2026").assertIsDisplayed()
+    }
+
+    @Test
+    fun aSearchWithNoMatchesDoesNotClaimTheMonthIsEmpty() {
+        // Without this branch the screen would say "Nothing in August 2026",
+        // which is a claim about the month rather than about the search.
+        compose.setContent(content(query = "zzzz"))
+
+        compose.onNodeWithText("Nothing matches that").assertIsDisplayed()
     }
 
     @Test

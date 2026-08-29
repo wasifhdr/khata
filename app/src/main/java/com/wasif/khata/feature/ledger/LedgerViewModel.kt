@@ -93,13 +93,27 @@ class LedgerViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LedgerHeaderState())
 
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query.asStateFlow()
+
+    fun onQueryChange(value: String) {
+        _query.value = value
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val items: Flow<PagingData<LedgerItem>> = _viewedMonth
-        // flatMapLatest cancels the previous month's page stream rather than
-        // stacking one per tap on the arrows.
-        .flatMapLatest { month ->
-            val (from, to) = month.dhakaWindow()
-            repository.pagedTransactionsBetween(from, to)
+    val items: Flow<PagingData<LedgerItem>> = combine(_viewedMonth, _query) { month, q -> month to q }
+        // Search spans all time: hunting for one past transaction is a distinct
+        // job from reviewing a month, and confining it to the viewed month would
+        // make the common case -- "I know I bought it, I forget when" -- fail.
+        // flatMapLatest cancels the previous stream rather than stacking one page
+        // load per keystroke.
+        .flatMapLatest { (month, q) ->
+            if (q.isBlank()) {
+                val (from, to) = month.dhakaWindow()
+                repository.pagedTransactionsBetween(from, to)
+            } else {
+                repository.pagedTransactions(q)
+            }
         }
         // cachedIn goes BEFORE the combine, not after. observeDayTotals() is a
         // Room flow that re-emits on every write to transactions; with the cache

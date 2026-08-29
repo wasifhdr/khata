@@ -44,6 +44,8 @@ class ModulesViewModelTest {
             fromInclusive: Long,
             toExclusive: Long,
         ): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
+        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
+            pagedTransactions()
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)

@@ -8,6 +8,7 @@ import androidx.room.withTransaction
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.TransactionDao
+import com.wasif.khata.core.data.dao.pagingSourceMatching
 import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
@@ -44,6 +45,15 @@ class TransactionRepositoryImpl @Inject constructor(
     ): Flow<PagingData<Transaction>> =
         Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
             transactionDao.pagingSourceBetween(fromInclusive, toExclusive)
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
+    override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
+            if (query.isBlank()) {
+                transactionDao.pagingSource()
+            } else {
+                transactionDao.pagingSourceMatching(query)
+            }
         }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
     override fun observe(id: Long): Flow<Transaction?> =

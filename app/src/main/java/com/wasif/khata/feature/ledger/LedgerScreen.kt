@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -65,6 +66,8 @@ fun LedgerScreen(
         header = viewModel.header.collectAsStateWithLifecycle().value,
         categoryTokens = viewModel.categoryTokens.collectAsStateWithLifecycle().value,
         canGoForward = viewModel.canGoForward.collectAsStateWithLifecycle().value,
+        query = viewModel.query.collectAsStateWithLifecycle().value,
+        onQueryChange = viewModel::onQueryChange,
         onPreviousMonth = viewModel::onPreviousMonth,
         onNextMonth = viewModel::onNextMonth,
         onBack = onBack,
@@ -79,6 +82,8 @@ fun LedgerContent(
     header: LedgerHeaderState,
     categoryTokens: Map<Long, CategoryChip>,
     canGoForward: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onBack: () -> Unit,
@@ -86,6 +91,7 @@ fun LedgerContent(
     onOpenTransaction: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val isSearching = query.isNotBlank()
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
@@ -109,12 +115,24 @@ fun LedgerContent(
             MonthHeader(
                 header = header,
                 canGoForward = canGoForward,
+                isSearching = isSearching,
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
                 modifier = Modifier.fillMaxWidth().height(spacing.headspaceLedger),
             )
 
             MonthStrip(header = header)
+
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                placeholder = { Text("Search merchants and notes") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+            )
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -159,7 +177,11 @@ fun LedgerContent(
         // enablePlaceholders = false drops itemCount to 0 during every refresh, so
         // itemCount alone would flash this on each month step before rows arrive.
         if (items.itemCount == 0 && items.loadState.refresh !is LoadState.Loading) {
-            EmptyLedger(Modifier.align(Alignment.Center), monthLabel = header.monthLabel)
+            EmptyLedger(
+                modifier = Modifier.align(Alignment.Center),
+                monthLabel = header.monthLabel,
+                isSearching = isSearching,
+            )
         }
 
         Box(
@@ -186,6 +208,7 @@ fun LedgerContent(
 private fun MonthHeader(
     header: LedgerHeaderState,
     canGoForward: Boolean,
+    isSearching: Boolean,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     modifier: Modifier = Modifier,
@@ -195,7 +218,7 @@ private fun MonthHeader(
         MonthArrow(
             icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
             description = "Previous month",
-            enabled = true,
+            enabled = !isSearching,
             onClick = onPreviousMonth,
         )
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -225,7 +248,7 @@ private fun MonthHeader(
         MonthArrow(
             icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             description = "Next month",
-            enabled = canGoForward,
+            enabled = canGoForward && !isSearching,
             onClick = onNextMonth,
         )
     }
@@ -369,21 +392,30 @@ private fun TransactionRow(
 }
 
 @Composable
-private fun EmptyLedger(modifier: Modifier = Modifier, monthLabel: String) {
+private fun EmptyLedger(
+    modifier: Modifier = Modifier,
+    monthLabel: String,
+    isSearching: Boolean,
+) {
     val spacing = LocalSpacing.current
     Column(
         modifier = modifier.padding(horizontal = spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            // Names the month, so an empty past month does not read as an empty app.
-            text = "Nothing in $monthLabel",
+            // A failed search is not an empty month, and saying so would be a
+            // claim about the wrong thing.
+            text = if (isSearching) "Nothing matches that" else "Nothing in $monthLabel",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Use the arrows to look at another month, or tap + to record something.",
+            text = if (isSearching) {
+                "Search covers every month, so try a shorter word."
+            } else {
+                "Use the arrows to look at another month, or tap + to record something."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center,
