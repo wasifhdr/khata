@@ -4,6 +4,7 @@ import androidx.paging.PagingData
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.domain.model.Transaction
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
 data class TransactionDraft(
@@ -27,4 +28,10 @@ interface TransactionRepository {
     fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money>
 
     fun observeMostRecent(): Flow<Transaction?>
+
+    /** Credits only, over a half-open window. */
+    fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money>
+
+    /** Spending per Dhaka calendar day, for ledger day headers. */
+    fun observeDayTotals(): Flow<Map<LocalDate, Money>>
 }

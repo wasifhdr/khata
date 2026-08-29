@@ -40,3 +40,17 @@ fun Long.dhakaNextMonthStart(): Long =
         .atStartOfDay(DHAKA)
         .toInstant()
         .toEpochMilli()
+
+/**
+ * Dhaka is UTC+6 with no daylight saving, so shifting by six hours before
+ * integer-dividing by a day yields the local calendar day directly. SQLite gets
+ * the same arithmetic inline, which is why the grouped day-total query needs no
+ * timezone function.
+ */
+const val DHAKA_OFFSET_MILLIS: Long = 6 * 60 * 60 * 1000L
+private const val DAY_MILLIS: Long = 24 * 60 * 60 * 1000L
+
+fun Long.toDhakaDayIndex(): Long = (this + DHAKA_OFFSET_MILLIS) / DAY_MILLIS
+
+fun Long.dhakaDayIndexToLocalDate(): LocalDate =
+    LocalDate.ofEpochDay(this)

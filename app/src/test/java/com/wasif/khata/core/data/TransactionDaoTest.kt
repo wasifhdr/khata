@@ -13,6 +13,7 @@ import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.dhakaMonthStart
 import com.wasif.khata.core.time.dhakaNextMonthStart
+import com.wasif.khata.core.time.toDhakaDayIndex
 import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -198,5 +199,49 @@ class TransactionDaoTest {
 
         dao.softDelete(newestId, deletedAt = newer)
         assertEquals("Chaldal", dao.observeMostRecent().first()?.merchantRaw)
+    }
+
+    @Test
+    fun `day totals group debits by Dhaka day and ignore credits`() = runTest {
+        val accountId = insertAccount()
+        val dao = db.transactionDao()
+        // Both are 29 August in Dhaka: 18:01 UTC on the 28th is 00:01 on the 29th.
+        val justAfterDhakaMidnight = Instant.parse("2026-08-28T18:01:00Z").toEpochMilli()
+        val laterSameDhakaDay = Instant.parse("2026-08-29T10:00:00Z").toEpochMilli()
+        // 17:59 UTC on the 28th is still 28 August in Dhaka.
+        val previousDhakaDay = Instant.parse("2026-08-28T17:59:00Z").toEpochMilli()
+
+        dao.upsert(transaction(accountId, justAfterDhakaMidnight, "a", amountMinor = 100_00))
+        dao.upsert(transaction(accountId, laterSameDhakaDay, "b", amountMinor = 250_00))
+        dao.upsert(transaction(accountId, previousDhakaDay, "c", amountMinor = 900_00))
+        dao.upsert(
+            transaction(
+                accountId,
+                laterSameDhakaDay,
+                "d",
+                amountMinor = 5_000_00,
+                direction = TransactionDirection.CREDIT,
+            ),
+        )
+
+        val totals = dao.observeDayTotals().first().associate { it.dhakaDayIndex to it.spentMinor }
+
+        assertEquals(100_00L + 250_00L, totals[justAfterDhakaMidnight.toDhakaDayIndex()])
+        assertEquals(900_00L, totals[previousDhakaDay.toDhakaDayIndex()])
+    }
+
+    @Test
+    fun `day totals exclude soft-deleted rows`() = runTest {
+        val accountId = insertAccount()
+        val dao = db.transactionDao()
+        val day = Instant.parse("2026-08-29T10:00:00Z").toEpochMilli()
+
+        dao.upsert(transaction(accountId, day, "keep", amountMinor = 100_00))
+        val goneId = dao.upsert(transaction(accountId, day, "gone", amountMinor = 700_00))
+        dao.softDelete(goneId, deletedAt = day)
+
+        val totals = dao.observeDayTotals().first().associate { it.dhakaDayIndex to it.spentMinor }
+
+        assertEquals(100_00L, totals[day.toDhakaDayIndex()])
     }
 }

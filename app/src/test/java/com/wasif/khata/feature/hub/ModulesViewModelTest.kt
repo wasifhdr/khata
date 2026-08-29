@@ -12,6 +12,7 @@ import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,9 @@ class ModulesViewModelTest {
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
+        override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+            flowOf(Money.ZERO)
+        override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = flowOf(emptyMap())
     }
 
     private val preferences = object : PreferencesRepository {

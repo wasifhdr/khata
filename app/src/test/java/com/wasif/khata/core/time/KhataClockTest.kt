@@ -70,4 +70,35 @@ class KhataClockTest {
 
         assertEquals(42L, clock.now())
     }
+
+    @Test
+    fun `the Dhaka day index rolls at Dhaka midnight, not UTC midnight`() {
+        // 23:59 Dhaka on 28 August is 17:59 UTC the same day.
+        val lateEvening = Instant.parse("2026-08-28T17:59:00Z").toEpochMilli()
+        // 00:01 Dhaka on 29 August is 18:01 UTC on the 28th.
+        val justAfterMidnight = Instant.parse("2026-08-28T18:01:00Z").toEpochMilli()
+
+        assertEquals(
+            lateEvening.toDhakaDayIndex() + 1,
+            justAfterMidnight.toDhakaDayIndex(),
+        )
+    }
+
+    @Test
+    fun `the day index round-trips to the Dhaka calendar date`() {
+        val millis = Instant.parse("2026-08-28T18:01:00Z").toEpochMilli()
+
+        assertEquals(
+            LocalDate.of(2026, 8, 29),
+            millis.toDhakaDayIndex().dhakaDayIndexToLocalDate(),
+        )
+    }
+
+    @Test
+    fun `two instants on the same Dhaka day share an index`() {
+        val morning = Instant.parse("2026-08-29T02:00:00Z").toEpochMilli()
+        val evening = Instant.parse("2026-08-29T17:00:00Z").toEpochMilli()
+
+        assertEquals(morning.toDhakaDayIndex(), evening.toDhakaDayIndex())
+    }
 }

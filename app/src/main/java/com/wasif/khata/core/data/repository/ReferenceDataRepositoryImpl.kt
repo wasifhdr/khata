@@ -2,6 +2,7 @@ package com.wasif.khata.core.data.repository
 
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.CategoryDao
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.domain.model.Account
 import com.wasif.khata.domain.model.Category
 import com.wasif.khata.domain.repository.ReferenceDataRepository
@@ -19,4 +20,7 @@ class ReferenceDataRepositoryImpl @Inject constructor(
 
     override fun observeCategories(): Flow<List<Category>> =
         categoryDao.observeAll().map { entities -> entities.map { it.toDomain() } }
+
+    override fun observeNetWorth(): Flow<Money> =
+        accountDao.observeNetWorthMinor().map { Money(it) }
 }

@@ -8,6 +8,12 @@ import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.TransactionDirection
 import kotlinx.coroutines.flow.Flow
 
+/** One row per Dhaka day that has any spending. */
+data class DayTotalRow(
+    val dhakaDayIndex: Long,
+    val spentMinor: Long,
+)
+
 @Dao
 interface TransactionDao {
 
@@ -45,4 +51,19 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY occurredAt DESC, id DESC LIMIT 1")
     fun observeMostRecent(): Flow<TransactionEntity?>
+
+    // Grouped rather than accumulated during paging: insertSeparators only sees
+    // adjacent items, so a day spanning a page boundary would be under-reported.
+    // The +21600000 shifts UTC to Dhaka before the day division, which is exact
+    // because Dhaka is UTC+6 year-round.
+    @Query(
+        """
+        SELECT ((occurredAt + 21600000) / 86400000) AS dhakaDayIndex,
+               SUM(amountMinor) AS spentMinor
+        FROM transactions
+        WHERE deletedAt IS NULL AND direction = 'DEBIT'
+        GROUP BY dhakaDayIndex
+        """,
+    )
+    fun observeDayTotals(): Flow<List<DayTotalRow>>
 }

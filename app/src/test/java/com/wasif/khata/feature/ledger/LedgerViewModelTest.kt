@@ -60,6 +60,9 @@ class LedgerViewModelTest {
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
+        override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+            flowOf(Money.ZERO)
+        override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = flowOf(emptyMap())
     }
 
     @Test

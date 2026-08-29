@@ -13,6 +13,7 @@ import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -46,6 +47,9 @@ class TransactionEditorViewModelTest {
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
+        override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+            flowOf(Money.ZERO)
+        override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = flowOf(emptyMap())
     }
 
     private val bkash = Account(
@@ -70,6 +74,7 @@ class TransactionEditorViewModelTest {
     private val referenceData = object : ReferenceDataRepository {
         override fun observeAccounts(): Flow<List<Account>> = flowOf(listOf(bkash))
         override fun observeCategories(): Flow<List<Category>> = flowOf(listOf(groceries))
+        override fun observeNetWorth(): Flow<Money> = flowOf(Money.ZERO)
     }
 
     private val clock = object : KhataClock {

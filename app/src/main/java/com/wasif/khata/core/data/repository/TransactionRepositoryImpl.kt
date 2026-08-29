@@ -14,10 +14,12 @@ import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
+import com.wasif.khata.core.time.dhakaDayIndexToLocalDate
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
+import java.time.LocalDate
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -48,6 +50,18 @@ class TransactionRepositoryImpl @Inject constructor(
 
     override fun observeMostRecent(): Flow<Transaction?> =
         transactionDao.observeMostRecent().map { it?.toDomain() }
+
+    override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+        transactionDao.observeTotalMinorBetween(
+            direction = TransactionDirection.CREDIT,
+            fromInclusive = fromInclusive,
+            toExclusive = toExclusive,
+        ).map { Money(it) }
+
+    override fun observeDayTotals(): Flow<Map<LocalDate, Money>> =
+        transactionDao.observeDayTotals().map { rows ->
+            rows.associate { it.dhakaDayIndex.dhakaDayIndexToLocalDate() to Money(it.spentMinor) }
+        }
 
     override suspend fun save(draft: TransactionDraft): Result<Long> = runCatchingData {
         db.withTransaction {
