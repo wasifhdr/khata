@@ -1025,92 +1025,119 @@ drill-down is hub -> module -> list as designed."
 
 ---
 
-### Task 3: The Ledger rebuild
+### Task 3: The Ledger rebuild, month-scoped
 
-The screen that has to survive 3,000 rows. Everything lush stops at the top strip.
+The screen that has to survive 3,000 rows. It shows **one month at a time**, with arrows to move
+between months — the heading says "August 2026" and "6 days left", and both have to be true.
 
 **Files:**
+- Modify: `app/src/main/java/com/wasif/khata/core/data/dao/TransactionDao.kt`
+- Modify: `app/src/main/java/com/wasif/khata/domain/repository/TransactionRepository.kt`
+- Modify: `app/src/main/java/com/wasif/khata/core/data/repository/TransactionRepositoryImpl.kt`
 - Modify: `app/src/main/java/com/wasif/khata/feature/ledger/LedgerItem.kt`
 - Modify: `app/src/main/java/com/wasif/khata/feature/ledger/LedgerViewModel.kt`
 - Modify: `app/src/main/java/com/wasif/khata/feature/ledger/LedgerScreen.kt`
+- Test: `app/src/test/java/com/wasif/khata/core/data/TransactionDaoTest.kt`
 - Test: `app/src/test/java/com/wasif/khata/feature/ledger/LedgerViewModelTest.kt`
 - Test: `app/src/androidTest/java/com/wasif/khata/feature/ledger/LedgerScreenTest.kt`
 
 **Interfaces:**
-- Consumes: `TransactionRepository.observeDayTotals()`, `observeSpentBetween` (Task 1); `CategoryDot`, `ContextHeader`, `MoneyText`, `AmountTextStyle`, `Spacing.headspaceLedger` from Plans A and B.
+- Consumes: `TransactionRepository.observeDayTotals()`, `observeSpentBetween` (Task 1); `DHAKA`, `dhakaNextMonthStart`, `toDhakaLocalDate` from `core/time/KhataClock.kt`; `CategoryDot`, `MoneyText`, `AmountTextStyle`, `PageHeadingStyle`, `PageSublineStyle`, `Spacing.headspaceLedger` from Plans A and B.
 - Produces:
+  - `TransactionDao.pagingSourceBetween(fromInclusive: Long, toExclusive: Long): PagingSource<Int, TransactionEntity>`
+  - `TransactionRepository.pagedTransactionsBetween(fromInclusive: Long, toExclusive: Long): Flow<PagingData<Transaction>>`
   - `LedgerItem.DayHeader(date: LocalDate, total: Money)`
-  - `data class LedgerHeaderState(monthLabel: String, entryCount: Int, monthSpend: Money)`
-  - `LedgerViewModel.header: StateFlow<LedgerHeaderState>`
-  - `LedgerViewModel.categoryTokens: StateFlow<Map<Long, String>>`
+  - `data class LedgerHeaderState(monthLabel: String, monthSpend: Money, daysLeft: Int?)`
+  - `LedgerViewModel.header`, `.categoryTokens`, `.canGoForward`, `.onPreviousMonth()`, `.onNextMonth()`
 
-- [ ] **Step 1: Write the failing ViewModel test**
+- [ ] **Step 1: Write the failing DAO test**
 
-Replace the day-header assertions in `app/src/test/java/com/wasif/khata/feature/ledger/LedgerViewModelTest.kt` by adding these tests to the existing class:
+Append inside the existing class in `app/src/test/java/com/wasif/khata/core/data/TransactionDaoTest.kt`:
 
 ```kotlin
     @Test
-    fun `a day header carries that day's spending total`() = runTest {
-        val aug26 = Instant.parse("2026-08-26T06:00:00Z").toEpochMilli()
-        dayTotals.value = mapOf(aug26.toDhakaLocalDate() to Money(3_445_50))
+    fun `paging is scoped to a half-open window`() = runTest {
+        val accountId = insertAccount()
+        val dao = db.transactionDao()
+        val august = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+        val july = Instant.parse("2026-07-10T06:00:00Z").toEpochMilli()
 
-        val viewModel = LedgerViewModel(
-            repositoryReturning(transaction(1, aug26)),
-            referenceData,
-            clock,
+        dao.upsert(transaction(accountId, august, "aug"))
+        dao.upsert(transaction(accountId, july, "jul"))
+
+        val pager = TestPager(
+            PagingConfig(pageSize = 10),
+            dao.pagingSourceBetween(august.dhakaMonthStart(), august.dhakaNextMonthStart()),
         )
+        val page = pager.refresh() as PagingSource.LoadResult.Page
 
-        val header = viewModel.items.asSnapshot().filterIsInstance<LedgerItem.DayHeader>().single()
-        assertEquals(Money(3_445_50), header.total)
-    }
-
-    @Test
-    fun `a day with no total entry shows zero rather than crashing`() = runTest {
-        // The totals map and the paged rows are two independent queries. They can
-        // disagree for a frame, and a header must not blow up when they do.
-        val aug26 = Instant.parse("2026-08-26T06:00:00Z").toEpochMilli()
-        dayTotals.value = emptyMap()
-
-        val viewModel = LedgerViewModel(
-            repositoryReturning(transaction(1, aug26)),
-            referenceData,
-            clock,
-        )
-
-        val header = viewModel.items.asSnapshot().filterIsInstance<LedgerItem.DayHeader>().single()
-        assertEquals(Money.ZERO, header.total)
-    }
-
-    @Test
-    fun `the header names the month being viewed, not the screen`() = runTest {
-        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
-
-        viewModel.header.test {
-            advanceUntilIdle()
-            // "August 2026" rather than "Ledger": you know you are in the ledger
-            // because you tapped to get here; what you do not know is the month.
-            assertEquals("August 2026", expectMostRecentItem().monthLabel)
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `category tokens are keyed by id so a row can resolve its dot`() = runTest {
-        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
-
-        viewModel.categoryTokens.test {
-            advanceUntilIdle()
-            assertEquals("category_green", expectMostRecentItem()[11L])
-            cancelAndIgnoreRemainingEvents()
-        }
+        assertEquals(listOf("aug"), page.data.map { it.uuid })
     }
 ```
 
-Add to the top of that test class, alongside the existing fields:
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.wasif.khata.core.data.TransactionDaoTest"`
+Expected: compilation failure — `Unresolved reference: pagingSourceBetween`.
+
+- [ ] **Step 3: Add the windowed query and repository method**
+
+Add to `TransactionDao`:
+
+```kotlin
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE deletedAt IS NULL
+          AND occurredAt >= :fromInclusive
+          AND occurredAt < :toExclusive
+        ORDER BY occurredAt DESC, id DESC
+        """,
+    )
+    fun pagingSourceBetween(fromInclusive: Long, toExclusive: Long): PagingSource<Int, TransactionEntity>
+```
+
+Add to the `TransactionRepository` interface:
+
+```kotlin
+    /** One month of the ledger. The half-open window is the caller's to compute in Dhaka. */
+    fun pagedTransactionsBetween(fromInclusive: Long, toExclusive: Long): Flow<PagingData<Transaction>>
+```
+
+Implement in `TransactionRepositoryImpl`:
+
+```kotlin
+    override fun pagedTransactionsBetween(
+        fromInclusive: Long,
+        toExclusive: Long,
+    ): Flow<PagingData<Transaction>> =
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
+            transactionDao.pagingSourceBetween(fromInclusive, toExclusive)
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+```
+
+Then add the override to the three fakes named in Task 1 Step 10:
+
+```kotlin
+        override fun pagedTransactionsBetween(
+            fromInclusive: Long,
+            toExclusive: Long,
+        ): Flow<PagingData<Transaction>> = pagedTransactions()
+```
+
+- [ ] **Step 4: Run it to verify it passes**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.wasif.khata.core.data.TransactionDaoTest"`
+Expected: PASS.
+
+- [ ] **Step 5: Write the failing ViewModel tests**
+
+Add these fields to the existing class in `app/src/test/java/com/wasif/khata/feature/ledger/LedgerViewModelTest.kt`:
 
 ```kotlin
     private val dayTotals = MutableStateFlow(emptyMap<LocalDate, Money>())
     private val spend = MutableStateFlow(Money.ZERO)
+    private var requestedWindow: Pair<Long, Long>? = null
 
     private val clock = object : KhataClock {
         override fun now(): Long = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
@@ -1134,19 +1161,111 @@ Add to the top of that test class, alongside the existing fields:
     }
 ```
 
-And extend the existing `repositoryReturning` fake with the two flows the ViewModel now reads:
+Extend the existing `repositoryReturning` fake with:
 
 ```kotlin
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
+        override fun pagedTransactionsBetween(
+            fromInclusive: Long,
+            toExclusive: Long,
+        ): Flow<PagingData<Transaction>> {
+            requestedWindow = fromInclusive to toExclusive
+            return pagedTransactions()
+        }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+Then add these tests:
+
+```kotlin
+    @Test
+    fun `a day header carries that day's spending total`() = runTest {
+        val aug26 = Instant.parse("2026-08-26T06:00:00Z").toEpochMilli()
+        dayTotals.value = mapOf(aug26.toDhakaLocalDate() to Money(3_445_50))
+
+        val viewModel = LedgerViewModel(repositoryReturning(transaction(1, aug26)), referenceData, clock)
+
+        val header = viewModel.items.asSnapshot().filterIsInstance<LedgerItem.DayHeader>().single()
+        assertEquals(Money(3_445_50), header.total)
+    }
+
+    @Test
+    fun `a day with no total entry shows zero rather than crashing`() = runTest {
+        // The totals map and the paged rows are two independent queries. They can
+        // disagree for a frame, and a header must not blow up when they do.
+        val aug26 = Instant.parse("2026-08-26T06:00:00Z").toEpochMilli()
+        dayTotals.value = emptyMap()
+
+        val viewModel = LedgerViewModel(repositoryReturning(transaction(1, aug26)), referenceData, clock)
+
+        val header = viewModel.items.asSnapshot().filterIsInstance<LedgerItem.DayHeader>().single()
+        assertEquals(Money.ZERO, header.total)
+    }
+
+    @Test
+    fun `the ledger opens on the current month and says how much of it is left`() = runTest {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+
+        viewModel.header.test {
+            advanceUntilIdle()
+            val h = expectMostRecentItem()
+            // "August 2026" rather than "Ledger": you know you are in the ledger
+            // because you tapped to get here; what you do not know is the month.
+            assertEquals("August 2026", h.monthLabel)
+            // 28 August of a 31-day month.
+            assertEquals(3, h.daysLeft)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `stepping back a month re-windows the query and relabels the header`() = runTest {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+        advanceUntilIdle()
+
+        viewModel.onPreviousMonth()
+        advanceUntilIdle()
+        viewModel.items.asSnapshot()
+
+        assertEquals("July 2026", viewModel.header.value.monthLabel)
+        // 1 July 00:00 Dhaka is 30 June 18:00 UTC.
+        assertEquals(Instant.parse("2026-06-30T18:00:00Z").toEpochMilli(), requestedWindow?.first)
+    }
+
+    @Test
+    fun `a past month has no days left, and the future is unreachable`() = runTest {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+        advanceUntilIdle()
+
+        // The current month is the newest that can hold anything; an empty
+        // future month is a dead end.
+        assertEquals(false, viewModel.canGoForward.value)
+
+        viewModel.onPreviousMonth()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.header.value.daysLeft)
+        assertEquals(true, viewModel.canGoForward.value)
+    }
+
+    @Test
+    fun `category tokens are keyed by id so a row can resolve its dot`() = runTest {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+
+        viewModel.categoryTokens.test {
+            advanceUntilIdle()
+            assertEquals("category_green", expectMostRecentItem()[11L])
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+```
+
+- [ ] **Step 6: Run them to verify they fail**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.wasif.khata.feature.ledger.LedgerViewModelTest"`
 Expected: failure — `LedgerViewModel` takes one argument, and `DayHeader` has no `total`.
 
-- [ ] **Step 3: Give DayHeader a total**
+- [ ] **Step 7: Give DayHeader a total**
 
 Replace `app/src/main/java/com/wasif/khata/feature/ledger/LedgerItem.kt`:
 
@@ -1163,7 +1282,7 @@ sealed interface LedgerItem {
 }
 ```
 
-- [ ] **Step 4: Rewrite the ViewModel**
+- [ ] **Step 8: Rewrite the ViewModel**
 
 Replace `app/src/main/java/com/wasif/khata/feature/ledger/LedgerViewModel.kt`:
 
@@ -1177,58 +1296,95 @@ import androidx.paging.cachedIn
 import androidx.paging.insertSeparators
 import androidx.paging.map
 import com.wasif.khata.core.model.Money
+import com.wasif.khata.core.time.DHAKA
 import com.wasif.khata.core.time.KhataClock
-import com.wasif.khata.core.time.dhakaMonthStart
 import com.wasif.khata.core.time.dhakaNextMonthStart
 import com.wasif.khata.core.time.toDhakaLocalDate
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 data class LedgerHeaderState(
     val monthLabel: String = "",
     val monthSpend: Money = Money.ZERO,
+    /** Null for any month that is not the current one -- a past month has no days left. */
+    val daysLeft: Int? = null,
 )
 
 private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 
 @HiltViewModel
 class LedgerViewModel @Inject constructor(
-    repository: TransactionRepository,
+    private val repository: TransactionRepository,
     referenceData: ReferenceDataRepository,
-    clock: KhataClock,
+    private val clock: KhataClock,
 ) : ViewModel() {
 
-    private val now = clock.now()
+    private val currentMonth = YearMonth.from(clock.now().toDhakaLocalDate())
+
+    private val _viewedMonth = MutableStateFlow(currentMonth)
+
+    /** The current month is the newest that can hold anything, so forward stops there. */
+    val canGoForward: StateFlow<Boolean> = _viewedMonth
+        .map { it < currentMonth }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun onPreviousMonth() {
+        _viewedMonth.value = _viewedMonth.value.minusMonths(1)
+    }
+
+    fun onNextMonth() {
+        if (_viewedMonth.value < currentMonth) {
+            _viewedMonth.value = _viewedMonth.value.plusMonths(1)
+        }
+    }
 
     /** categoryId -> colorToken, so a row resolves its dot without a per-row query. */
     val categoryTokens: StateFlow<Map<Long, String>> = referenceData.observeCategories()
         .map { categories -> categories.associate { it.id to it.colorToken } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    val header: StateFlow<LedgerHeaderState> =
-        repository.observeSpentBetween(now.dhakaMonthStart(), now.dhakaNextMonthStart())
-            .map { spend ->
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val header: StateFlow<LedgerHeaderState> = _viewedMonth
+        .flatMapLatest { month ->
+            val (from, to) = month.dhakaWindow()
+            repository.observeSpentBetween(from, to).map { spend ->
                 LedgerHeaderState(
-                    monthLabel = now.toDhakaLocalDate().format(monthFormatter),
+                    monthLabel = month.format(monthFormatter),
                     monthSpend = spend,
+                    daysLeft = if (month == currentMonth) {
+                        month.lengthOfMonth() - clock.now().toDhakaLocalDate().dayOfMonth
+                    } else {
+                        null
+                    },
                 )
             }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LedgerHeaderState())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LedgerHeaderState())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val items: Flow<PagingData<LedgerItem>> =
-        combine(repository.pagedTransactions(), repository.observeDayTotals()) { paging, totals ->
+    val items: Flow<PagingData<LedgerItem>> = _viewedMonth
+        // flatMapLatest cancels the previous month's page stream rather than
+        // stacking one per tap on the arrows.
+        .flatMapLatest { month ->
+            val (from, to) = month.dhakaWindow()
+            repository.pagedTransactionsBetween(from, to)
+        }
+        .combine(repository.observeDayTotals()) { paging, totals ->
             paging.map { LedgerItem.Row(it) }
                 // insertSeparators<T, R> widens Row to LedgerItem, so the generator
                 // receives typed Rows and needs no casts.
@@ -1248,16 +1404,23 @@ class LedgerViewModel @Inject constructor(
                         }
                     }
                 }
-        }.cachedIn(viewModelScope)
+        }
+        .cachedIn(viewModelScope)
+}
+
+/** The month's half-open bounds in epoch millis, computed in Dhaka. */
+private fun YearMonth.dhakaWindow(): Pair<Long, Long> {
+    val start = atDay(1).atStartOfDay(DHAKA).toInstant().toEpochMilli()
+    return start to start.dhakaNextMonthStart()
 }
 ```
 
-- [ ] **Step 5: Run it to verify it passes**
+- [ ] **Step 9: Run them to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.wasif.khata.feature.ledger.LedgerViewModelTest"`
 Expected: PASS.
 
-- [ ] **Step 6: Rebuild the screen**
+- [ ] **Step 10: Rebuild the screen**
 
 Replace `app/src/main/java/com/wasif/khata/feature/ledger/LedgerScreen.kt`:
 
@@ -1285,6 +1448,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1294,6 +1459,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -1305,11 +1471,12 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.ui.component.CategoryDot
-import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import com.wasif.khata.core.ui.theme.PageHeadingStyle
+import com.wasif.khata.core.ui.theme.PageSublineStyle
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -1323,6 +1490,9 @@ fun LedgerScreen(
         items = viewModel.items.collectAsLazyPagingItems(),
         header = viewModel.header.collectAsStateWithLifecycle().value,
         categoryTokens = viewModel.categoryTokens.collectAsStateWithLifecycle().value,
+        canGoForward = viewModel.canGoForward.collectAsStateWithLifecycle().value,
+        onPreviousMonth = viewModel::onPreviousMonth,
+        onNextMonth = viewModel::onNextMonth,
         onBack = onBack,
         onAddTransaction = onAddTransaction,
         onOpenTransaction = onOpenTransaction,
@@ -1334,24 +1504,20 @@ fun LedgerContent(
     items: LazyPagingItems<LedgerItem>,
     header: LedgerHeaderState,
     categoryTokens: Map<Long, String>,
+    canGoForward: Boolean,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
     onBack: () -> Unit,
     onAddTransaction: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
                 Box(
-                    Modifier
-                        .size(spacing.minTouchTarget)
-                        .clip(CircleShape)
-                        .clickable(onClick = onBack),
+                    Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -1366,15 +1532,13 @@ fun LedgerContent(
             // a fixed headspace where the other screens get a flexible one --
             // enough to read as the same family, small enough that rows stay
             // visible before scrolling.
-            Box(
-                Modifier.fillMaxWidth().height(spacing.headspaceLedger),
-                contentAlignment = Alignment.Center,
-            ) {
-                ContextHeader(
-                    heading = header.monthLabel,
-                    subline = "${items.itemCount} shown · this month",
-                )
-            }
+            MonthHeader(
+                header = header,
+                canGoForward = canGoForward,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                modifier = Modifier.fillMaxWidth().height(spacing.headspaceLedger),
+            )
 
             MonthStrip(header = header)
 
@@ -1419,7 +1583,7 @@ fun LedgerContent(
         }
 
         if (items.itemCount == 0) {
-            EmptyLedger(Modifier.align(Alignment.Center))
+            EmptyLedger(Modifier.align(Alignment.Center), monthLabel = header.monthLabel)
         }
 
         Box(
@@ -1443,31 +1607,98 @@ fun LedgerContent(
 }
 
 @Composable
+private fun MonthHeader(
+    header: LedgerHeaderState,
+    canGoForward: Boolean,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    Row(modifier.padding(horizontal = spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+        MonthArrow(
+            icon = Icons.Filled.ChevronLeft,
+            description = "Previous month",
+            enabled = true,
+            onClick = onPreviousMonth,
+        )
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = header.monthLabel,
+                style = PageHeadingStyle,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                // A past month has no days left; "0 days left" would be a
+                // different and wrong claim.
+                text = header.daysLeft?.let { "$it days left" } ?: "Complete month",
+                style = PageSublineStyle,
+                color = MaterialTheme.colorScheme.outline,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = spacing.xs),
+            )
+        }
+        MonthArrow(
+            icon = Icons.Filled.ChevronRight,
+            description = "Next month",
+            enabled = canGoForward,
+            onClick = onNextMonth,
+        )
+    }
+}
+
+@Composable
+private fun MonthArrow(
+    icon: ImageVector,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Box(
+        Modifier
+            .size(spacing.minTouchTarget)
+            .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            // Disabled rather than hidden: a control that vanishes is harder to
+            // understand than one that is visibly unavailable.
+            tint = if (enabled) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
+        )
+    }
+}
+
+@Composable
 private fun MonthStrip(header: LedgerHeaderState) {
     val spacing = LocalSpacing.current
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = spacing.screenHorizontal)
             .clip(MaterialTheme.shapes.medium)
             .background(Brush.linearGradient(KhataPalette.heroStops))
             .padding(spacing.md),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
     ) {
-        Column {
-            Text(
-                text = "SPENT THIS MONTH",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = header.monthSpend.format(),
-                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = spacing.xs),
-            )
-        }
+        Text(
+            text = "SPENT",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = header.monthSpend.format(),
+            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = spacing.xs),
+        )
     }
 }
 
@@ -1517,11 +1748,7 @@ private fun TransactionRow(
                 token = token ?: "category_neutral",
                 lowConfidence = transaction.confidence == Confidence.LOW,
             )
-            Column(
-                Modifier
-                    .weight(1f)
-                    .padding(start = spacing.sm, end = spacing.sm),
-            ) {
+            Column(Modifier.weight(1f).padding(start = spacing.sm, end = spacing.sm)) {
                 Text(
                     text = transaction.merchantRaw ?: "Uncategorized",
                     style = MaterialTheme.typography.bodyLarge,
@@ -1554,20 +1781,21 @@ private fun TransactionRow(
 }
 
 @Composable
-private fun EmptyLedger(modifier: Modifier = Modifier) {
+private fun EmptyLedger(modifier: Modifier = Modifier, monthLabel: String) {
     val spacing = LocalSpacing.current
     Column(
         modifier = modifier.padding(horizontal = spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "No transactions yet",
+            // Names the month, so an empty past month does not read as an empty app.
+            text = "Nothing in $monthLabel",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
-            text = "Tap the button below to record your first one.",
+            text = "Use the arrows to look at another month, or tap + to record something.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center,
@@ -1577,7 +1805,7 @@ private fun EmptyLedger(modifier: Modifier = Modifier) {
 }
 ```
 
-- [ ] **Step 7: Update the navigation call**
+- [ ] **Step 11: Update the navigation call**
 
 `LedgerScreen` now takes `onBack`. In `KhataNavHost.kt`:
 
@@ -1591,31 +1819,68 @@ private fun EmptyLedger(modifier: Modifier = Modifier) {
         }
 ```
 
-- [ ] **Step 8: Update the screen test**
+- [ ] **Step 12: Write the screen tests**
 
-Replace the body of `app/src/androidTest/java/com/wasif/khata/feature/ledger/LedgerScreenTest.kt` so it drives the new signature. Keep the file's existing package and imports, adding what these need:
+Replace the test bodies in `app/src/androidTest/java/com/wasif/khata/feature/ledger/LedgerScreenTest.kt`. Keep the file's package; add imports as needed.
 
 ```kotlin
+    private fun content(
+        items: List<LedgerItem> = emptyList(),
+        header: LedgerHeaderState = LedgerHeaderState(monthLabel = "August 2026", daysLeft = 3),
+        canGoForward: Boolean = false,
+        onPreviousMonth: () -> Unit = {},
+        onNextMonth: () -> Unit = {},
+    ): @Composable () -> Unit = {
+        KhataTheme {
+            LedgerContent(
+                items = flowOf(PagingData.from(items)).collectAsLazyPagingItems(),
+                header = header,
+                categoryTokens = mapOf(11L to "category_green"),
+                canGoForward = canGoForward,
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                onBack = {},
+                onAddTransaction = {},
+                onOpenTransaction = {},
+            )
+        }
+    }
+
     @Test
     fun theHeadingNamesTheMonthNotTheScreen() {
-        compose.setContent {
-            KhataTheme {
-                LedgerContent(
-                    items = flowOf(PagingData.empty<LedgerItem>()).collectAsLazyPagingItems(),
-                    header = LedgerHeaderState(monthLabel = "August 2026", monthSpend = Money(47_382_50)),
-                    categoryTokens = emptyMap(),
-                    onBack = {},
-                    onAddTransaction = {},
-                    onOpenTransaction = {},
-                )
-            }
-        }
+        compose.setContent(content())
 
         compose.onNodeWithText("August 2026").assertIsDisplayed()
+        compose.onNodeWithText("3 days left").assertIsDisplayed()
         // "Ledger" as a title would spend the space telling the user what they
         // already know from having tapped to get here.
         val stale = compose.onAllNodesWithText("Ledger").fetchSemanticsNodes()
         assertTrue("the heading should be the period, not the screen name", stale.isEmpty())
+    }
+
+    @Test
+    fun aPastMonthSaysCompleteRatherThanZeroDaysLeft() {
+        compose.setContent(content(header = LedgerHeaderState(monthLabel = "July 2026", daysLeft = null)))
+
+        compose.onNodeWithText("Complete month").assertIsDisplayed()
+    }
+
+    @Test
+    fun theMonthArrowsAreReachable() {
+        var back = 0
+        compose.setContent(content(canGoForward = true, onPreviousMonth = { back++ }))
+
+        compose.onNodeWithContentDescription("Previous month").performClick()
+        compose.onNodeWithContentDescription("Next month").assertIsDisplayed()
+
+        assertEquals(1, back)
+    }
+
+    @Test
+    fun anEmptyMonthNamesTheMonthRatherThanClaimingTheAppIsEmpty() {
+        compose.setContent(content(header = LedgerHeaderState(monthLabel = "July 2026")))
+
+        compose.onNodeWithText("Nothing in July 2026").assertIsDisplayed()
     }
 
     @Test
@@ -1637,19 +1902,7 @@ Replace the body of `app/src/androidTest/java/com/wasif/khata/feature/ledger/Led
             updatedAt = 0,
         )
 
-        compose.setContent {
-            KhataTheme {
-                LedgerContent(
-                    items = flowOf(PagingData.from(listOf<LedgerItem>(LedgerItem.Row(low))))
-                        .collectAsLazyPagingItems(),
-                    header = LedgerHeaderState(monthLabel = "August 2026"),
-                    categoryTokens = mapOf(11L to "category_green"),
-                    onBack = {},
-                    onAddTransaction = {},
-                    onOpenTransaction = {},
-                )
-            }
-        }
+        compose.setContent(content(items = listOf(LedgerItem.Row(low))))
 
         compose.onNodeWithText("Pathao").assertIsDisplayed()
         compose.onNodeWithText("low confidence").assertIsDisplayed()
@@ -1657,7 +1910,7 @@ Replace the body of `app/src/androidTest/java/com/wasif/khata/feature/ledger/Led
     }
 ```
 
-- [ ] **Step 9: Run everything**
+- [ ] **Step 13: Run everything**
 
 ```bash
 ./gradlew :app:testDebugUnitTest
@@ -1666,25 +1919,24 @@ Replace the body of `app/src/androidTest/java/com/wasif/khata/feature/ledger/Led
 
 Expected: both `BUILD SUCCESSFUL`.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 14: Commit**
 
 ```bash
-git add app/src/main/java/com/wasif/khata/feature/ledger \
-        app/src/main/java/com/wasif/khata/navigation/KhataNavHost.kt \
-        app/src/test/java/com/wasif/khata/feature/ledger \
-        app/src/androidTest/java/com/wasif/khata/feature/ledger
-git commit -m "feat: rebuild the Ledger to the petrol design
+git add app/src/main/java/com/wasif/khata/core/data/dao/TransactionDao.kt app/src/main/java/com/wasif/khata/domain/repository/TransactionRepository.kt app/src/main/java/com/wasif/khata/core/data/repository/TransactionRepositoryImpl.kt app/src/main/java/com/wasif/khata/feature/ledger app/src/main/java/com/wasif/khata/navigation/KhataNavHost.kt app/src/test/java/com/wasif/khata app/src/androidTest/java/com/wasif/khata/feature/ledger
+git commit -m "feat: rebuild the Ledger as a month view
 
 The heading is the period rather than the word Ledger: you know where
-you are because you tapped to get here, but not which month.
+you are because you tapped to get here, but not which month. That only
+works if it is true, so the list is windowed to the month shown and
+arrows move between months.
 
-Day headers carry that day's total, from a grouped query rather than
-accumulated during paging. Category dots resolve from a single
-id-to-token map instead of a per-row lookup, and low confidence is a
-ring plus the word -- colour is never the sole signal.
+Forward stops at the current month -- nothing is recorded beyond it and
+an empty future month is a dead end. A past month says 'Complete month'
+rather than '0 days left', which would be a different and wrong claim.
 
-Rows stay flat with a hairline. Glass on a Paging list is one blur pass
-per row per frame."
+Day headers carry that day's total from a grouped query. Category dots
+resolve from one id-to-token map rather than a per-row lookup, and low
+confidence is a ring plus the word."
 ```
 
 ---
@@ -1820,21 +2072,37 @@ Then add the override to the three fakes named in Task 1 Step 10:
 
 - [ ] **Step 6: Wire the ViewModel**
 
-In `LedgerViewModel`, replace the `items` declaration and add the query state:
+In `LedgerViewModel`, add the query state and replace the `items` declaration so a search
+**escapes the month window**:
 
 ```kotlin
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
+
+    /** True while a search is showing results from outside the viewed month. */
+    val isSearching: StateFlow<Boolean> = _query
+        .map { it.isNotBlank() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun onQueryChange(value: String) {
         _query.value = value
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val items: Flow<PagingData<LedgerItem>> = _query
-        // Re-paging on every keystroke would throw away a page load per
-        // character; flatMapLatest cancels the previous stream instead.
-        .flatMapLatest { q -> repository.pagedTransactions(q) }
+    val items: Flow<PagingData<LedgerItem>> = combine(_viewedMonth, _query) { month, q -> month to q }
+        // Search spans all time: hunting for one past transaction is a distinct
+        // job from reviewing a month, and confining it to the viewed month would
+        // make the common case -- "I know I bought it, I forget when" -- fail.
+        // flatMapLatest cancels the previous stream rather than stacking one page
+        // load per keystroke.
+        .flatMapLatest { (month, q) ->
+            if (q.isBlank()) {
+                val (from, to) = month.dhakaWindow()
+                repository.pagedTransactionsBetween(from, to)
+            } else {
+                repository.pagedTransactions(q)
+            }
+        }
         .combine(repository.observeDayTotals()) { paging, totals ->
             paging.map { LedgerItem.Row(it) }
                 .insertSeparators<LedgerItem.Row, LedgerItem> { before, after ->
@@ -1874,38 +2142,45 @@ In `LedgerScreen.kt`, extend `LedgerScreen` and `LedgerContent` with `query: Str
 
 Add `import androidx.compose.material3.OutlinedTextField`.
 
-Update the empty state so a search that finds nothing does not read as an empty app:
+Update the empty state so a search that finds nothing does not make a claim about the month:
 
 ```kotlin
         if (items.itemCount == 0) {
             EmptyLedger(
                 modifier = Modifier.align(Alignment.Center),
+                monthLabel = header.monthLabel,
                 isSearching = query.isNotBlank(),
             )
         }
 ```
 
-And in `EmptyLedger`:
+And replace `EmptyLedger`:
 
 ```kotlin
 @Composable
-private fun EmptyLedger(modifier: Modifier = Modifier, isSearching: Boolean) {
+private fun EmptyLedger(
+    modifier: Modifier = Modifier,
+    monthLabel: String,
+    isSearching: Boolean,
+) {
     val spacing = LocalSpacing.current
     Column(
         modifier = modifier.padding(horizontal = spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = if (isSearching) "Nothing matches that" else "No transactions yet",
+            // A failed search is not an empty month, and saying so would be a
+            // claim about the wrong thing.
+            text = if (isSearching) "Nothing matches that" else "Nothing in $monthLabel",
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
             text = if (isSearching) {
-                "Try a shorter word, or part of a merchant name."
+                "Search covers every month, so try a shorter word."
             } else {
-                "Tap the button below to record your first one."
+                "Use the arrows to look at another month, or tap + to record something."
             },
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline,
@@ -1916,35 +2191,52 @@ private fun EmptyLedger(modifier: Modifier = Modifier, isSearching: Boolean) {
 }
 ```
 
+Because search escapes the month window, the month arrows would be misleading while a search is
+active. Disable both while `query` is non-blank — pass `enabled = !isSearching` through
+`MonthHeader` to each `MonthArrow`, alongside the existing `canGoForward` rule for the right-hand
+one.
+
 - [ ] **Step 8: Update the Task 3 screen tests for the new signature**
 
-Adding `query` and `onQueryChange` to `LedgerContent` breaks both tests written in Task 3. Add the two arguments to each `LedgerContent(...)` call in
-`app/src/androidTest/java/com/wasif/khata/feature/ledger/LedgerScreenTest.kt`:
+`LedgerContent` gained `query` and `onQueryChange`, which breaks every call in
+`app/src/androidTest/java/com/wasif/khata/feature/ledger/LedgerScreenTest.kt`. Task 3 routed
+them all through one `content(...)` helper, so add two parameters there and pass them through:
 
 ```kotlin
-                    query = "",
-                    onQueryChange = {},
+    private fun content(
+        items: List<LedgerItem> = emptyList(),
+        header: LedgerHeaderState = LedgerHeaderState(monthLabel = "August 2026", daysLeft = 3),
+        canGoForward: Boolean = false,
+        query: String = "",
+        onPreviousMonth: () -> Unit = {},
+        onNextMonth: () -> Unit = {},
+    ): @Composable () -> Unit = {
+        KhataTheme {
+            LedgerContent(
+                items = flowOf(PagingData.from(items)).collectAsLazyPagingItems(),
+                header = header,
+                categoryTokens = mapOf(11L to "category_green"),
+                canGoForward = canGoForward,
+                query = query,
+                onQueryChange = {},
+                onPreviousMonth = onPreviousMonth,
+                onNextMonth = onNextMonth,
+                onBack = {},
+                onAddTransaction = {},
+                onOpenTransaction = {},
+            )
+        }
+    }
 ```
 
 Then add one test for the case the new empty state exists for:
 
 ```kotlin
     @Test
-    fun aSearchWithNoMatchesDoesNotClaimTheAppIsEmpty() {
-        compose.setContent {
-            KhataTheme {
-                LedgerContent(
-                    items = flowOf(PagingData.empty<LedgerItem>()).collectAsLazyPagingItems(),
-                    header = LedgerHeaderState(monthLabel = "August 2026"),
-                    categoryTokens = emptyMap(),
-                    query = "zzzz",
-                    onQueryChange = {},
-                    onBack = {},
-                    onAddTransaction = {},
-                    onOpenTransaction = {},
-                )
-            }
-        }
+    fun aSearchWithNoMatchesDoesNotClaimTheMonthIsEmpty() {
+        // Without this branch the screen would say "Nothing in August 2026",
+        // which is a claim about the month rather than about the search.
+        compose.setContent(content(query = "zzzz"))
 
         compose.onNodeWithText("Nothing matches that").assertIsDisplayed()
     }
