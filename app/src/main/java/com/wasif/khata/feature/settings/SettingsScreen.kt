@@ -38,8 +38,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wasif.khata.core.prefs.HomeView
+import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.theme.FieldIntensity
+import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
 
@@ -48,7 +51,31 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val prefs = viewModel.state.collectAsStateWithLifecycle().value
+    SettingsContent(
+        prefs = viewModel.state.collectAsStateWithLifecycle().value,
+        onBack = onBack,
+        onHomeViewSelected = viewModel::onHomeViewSelected,
+        onMonthlyBudgetChanged = viewModel::onMonthlyBudgetChanged,
+        onFieldSelected = viewModel::onFieldSelected,
+        onGroundSelected = viewModel::onGroundSelected,
+        onAccentSelected = viewModel::onAccentSelected,
+        onIntensitySelected = viewModel::onIntensitySelected,
+        onResetTheme = viewModel::onResetTheme,
+    )
+}
+
+@Composable
+fun SettingsContent(
+    prefs: KhataPreferences,
+    onBack: () -> Unit,
+    onHomeViewSelected: (HomeView) -> Unit,
+    onMonthlyBudgetChanged: (Long?) -> Unit,
+    onFieldSelected: (FieldPalette) -> Unit,
+    onGroundSelected: (Color) -> Unit,
+    onAccentSelected: (Color) -> Unit,
+    onIntensitySelected: (FieldIntensity) -> Unit,
+    onResetTheme: () -> Unit,
+) {
     val spacing = LocalSpacing.current
 
     Column(
@@ -74,33 +101,68 @@ fun SettingsScreen(
         }
 
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
-            ContextHeader(heading = "Settings", subline = "Theme and budget")
+            ContextHeader(heading = "Settings", subline = "Home · theme · budget")
+
+            Section("Home view")
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                HomeView.entries.forEach { view ->
+                    val selected = prefs.homeView == view
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(spacing.minTouchTarget)
+                            .clip(MaterialTheme.shapes.small)
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainer
+                                },
+                            )
+                            .clickable { onHomeViewSelected(view) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = view.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            }
 
             Section("Monthly budget")
             MonthlyBudgetField(
                 current = prefs.monthlyBudgetMinor,
-                onChange = viewModel::onMonthlyBudgetChanged,
+                onChange = onMonthlyBudgetChanged,
             )
 
             Section("Field")
             SwatchGrid(
                 colours = KhataPalette.fields.map { it.keyStop },
                 selectedIndex = KhataPalette.fields.indexOf(prefs.themeSpec.field),
-                onSelect = { viewModel.onFieldSelected(KhataPalette.fields[it]) },
+                onSelect = { onFieldSelected(KhataPalette.fields[it]) },
             )
 
             Section("Ground")
             SwatchGrid(
                 colours = KhataPalette.grounds,
                 selectedIndex = KhataPalette.grounds.indexOf(prefs.themeSpec.ground),
-                onSelect = { viewModel.onGroundSelected(KhataPalette.grounds[it]) },
+                onSelect = { onGroundSelected(KhataPalette.grounds[it]) },
             )
 
             Section("Accent")
             SwatchGrid(
                 colours = KhataPalette.accents,
                 selectedIndex = KhataPalette.accents.indexOf(prefs.themeSpec.accent),
-                onSelect = { viewModel.onAccentSelected(KhataPalette.accents[it]) },
+                onSelect = { onAccentSelected(KhataPalette.accents[it]) },
             )
 
             Section("Field intensity")
@@ -122,7 +184,7 @@ fun SettingsScreen(
                                     MaterialTheme.colorScheme.surfaceContainer
                                 },
                             )
-                            .clickable { viewModel.onIntensitySelected(level) },
+                            .clickable { onIntensitySelected(level) },
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -145,7 +207,7 @@ fun SettingsScreen(
                     .height(spacing.minTouchTarget)
                     .clip(MaterialTheme.shapes.small)
                     .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small)
-                    .clickable { viewModel.onResetTheme() },
+                    .clickable { onResetTheme() },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

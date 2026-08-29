@@ -48,8 +48,13 @@ fun KhataNavHost(homeView: HomeView) {
         }
 
         composable(KhataRoutes.Wallet) {
+            val isRoot = homeView == HomeView.Wallet
             WalletScreen(
-                onBack = { navController.popBackStack() },
+                // Back only exists when something pushed this screen. At the
+                // root it would exit the app, which is not what a back arrow
+                // promises.
+                onBack = if (isRoot) null else ({ navController.popBackStack() }),
+                onOpenHub = if (isRoot) ({ navController.navigate(KhataRoutes.Modules) }) else null,
                 onOpenLedger = { navController.navigate(KhataRoutes.Ledger) },
             )
         }

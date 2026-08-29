@@ -2,7 +2,9 @@ package com.wasif.khata.feature.wallet
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.wasif.khata.core.model.AccountType
@@ -43,6 +45,7 @@ class WalletScreenTest {
                     ),
                     {},
                     {},
+                    {},
                 )
             }
         }
@@ -59,6 +62,7 @@ class WalletScreenTest {
                     WalletUiState(accounts = listOf(account("EBL", 2_98_606_00, 2_98_846_00))),
                     {},
                     {},
+                    {},
                 )
             }
         }
@@ -69,10 +73,26 @@ class WalletScreenTest {
     @Test
     fun theAppNameNeverAppearsOnAModulePage() {
         compose.setContent {
-            KhataTheme { WalletContent(WalletUiState(), {}, {}) }
+            KhataTheme { WalletContent(WalletUiState(), {}, {}, {}) }
         }
 
         val wordmark = compose.onAllNodesWithText("খাতা").fetchSemanticsNodes()
         assertTrue("the wordmark belongs to the hub alone", wordmark.isEmpty())
+    }
+
+    @Test
+    fun asTheRootItOffersTheHubRatherThanBack() {
+        compose.setContent {
+            KhataTheme {
+                // onBack null means this screen is the root. Without a hub glyph
+                // here the user cannot reach Settings again, because the gear
+                // lives only on the hub.
+                WalletContent(WalletUiState(), null, {}, {})
+            }
+        }
+
+        compose.onNodeWithContentDescription("All modules").assertIsDisplayed()
+        val back = compose.onAllNodesWithContentDescription("Back").fetchSemanticsNodes()
+        assertTrue("a root screen must not show a back arrow", back.isEmpty())
     }
 }

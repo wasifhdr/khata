@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.model.Money
@@ -36,13 +38,15 @@ import com.wasif.khata.core.ui.theme.LocalSpacing
 
 @Composable
 fun WalletScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
+    onOpenHub: (() -> Unit)?,
     onOpenLedger: () -> Unit,
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     WalletContent(
         state = viewModel.state.collectAsStateWithLifecycle().value,
         onBack = onBack,
+        onOpenHub = onOpenHub,
         onOpenLedger = onOpenLedger,
     )
 }
@@ -50,12 +54,10 @@ fun WalletScreen(
 @Composable
 fun WalletContent(
     state: WalletUiState,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
+    onOpenHub: (() -> Unit)?,
     onOpenLedger: () -> Unit,
 ) {
-    // Task 6 widens this to (state, onBack: (() -> Unit)?, onOpenHub, onOpenLedger)
-    // when a module can be the app's root. Kept narrow here so this task stands
-    // on its own.
     val spacing = LocalSpacing.current
 
     Column(
@@ -68,17 +70,20 @@ fun WalletContent(
         // gesture-back is the primary way out, so this is an affordance rather
         // than a control anyone should have to stretch for.
         Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-            Box(
-                Modifier
-                    .size(spacing.minTouchTarget)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onSurface,
+            // Back when this screen was pushed; a hub glyph when it is the root.
+            // Without the second case, choosing Wallet as home would strand the
+            // user: the settings gear lives only on the hub, and back from a
+            // root exits the app.
+            when {
+                onBack != null -> NavCircle(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    description = "Back",
+                    onClick = onBack,
+                )
+                onOpenHub != null -> NavCircle(
+                    icon = Icons.Filled.Home,
+                    description = "All modules",
+                    onClick = onOpenHub,
                 )
             }
         }
@@ -247,5 +252,24 @@ private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun NavCircle(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Box(
+        Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
