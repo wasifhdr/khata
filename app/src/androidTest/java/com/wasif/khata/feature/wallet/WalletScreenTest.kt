@@ -95,4 +95,19 @@ class WalletScreenTest {
         val back = compose.onAllNodesWithContentDescription("Back").fetchSemanticsNodes()
         assertTrue("a root screen must not show a back arrow", back.isEmpty())
     }
+
+    @Test
+    fun asAPushedScreenItOffersBackRatherThanTheHub() {
+        compose.setContent {
+            KhataTheme {
+                // non-null onBack, null onOpenHub means this screen was pushed onto
+                // something, mirroring the isRoot=false branch in KhataNavHost.
+                WalletContent(WalletUiState(), {}, null, {})
+            }
+        }
+
+        compose.onNodeWithContentDescription("Back").assertIsDisplayed()
+        val hub = compose.onAllNodesWithContentDescription("All modules").fetchSemanticsNodes()
+        assertTrue("a pushed screen must not show the hub glyph", hub.isEmpty())
+    }
 }

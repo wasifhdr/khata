@@ -42,13 +42,25 @@ fun KhataNavHost(homeView: HomeView) {
     NavHost(navController = navController, startDestination = start) {
         composable(KhataRoutes.Modules) {
             ModulesScreen(
-                onOpenWallet = { navController.navigate(KhataRoutes.Wallet) },
+                onOpenWallet = {
+                    // A Wallet entry already sits beneath Modules whenever Modules was
+                    // reached via the hub glyph (Wallet-as-root case). Popping up to it
+                    // instead of pushing a second one keeps that entry the sole owner of
+                    // "root", so isRoot below stays true for it instead of drifting false.
+                    navController.navigate(KhataRoutes.Wallet) {
+                        popUpTo(KhataRoutes.Wallet) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
                 onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
             )
         }
 
         composable(KhataRoutes.Wallet) {
-            val isRoot = homeView == HomeView.Wallet
+            // Root-ness is where the user is, not how they got here: a preference only
+            // decides the *start* destination, but this entry can also be reached by a
+            // push (hub -> Wallet card), which the preference can't distinguish.
+            val isRoot = navController.previousBackStackEntry == null
             WalletScreen(
                 // Back only exists when something pushed this screen. At the
                 // root it would exit the app, which is not what a back arrow
