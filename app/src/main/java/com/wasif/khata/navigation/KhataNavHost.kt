@@ -13,9 +13,11 @@ import com.wasif.khata.feature.editor.TransactionEditorViewModel
 import com.wasif.khata.feature.hub.ModulesScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
 import com.wasif.khata.feature.settings.SettingsScreen
+import com.wasif.khata.feature.wallet.WalletScreen
 
 object KhataRoutes {
     const val Modules = "modules"
+    const val Wallet = "wallet"
     const val Ledger = "ledger"
     const val Settings = "settings"
     const val EditorNew = "editor/new"
@@ -34,17 +36,21 @@ fun KhataNavHost(homeView: HomeView) {
     // be changed once the graph is built.
     val start = when (homeView) {
         HomeView.Modules -> KhataRoutes.Modules
-        // Routes to the Ledger until Plan C builds the Wallet dashboard. The
-        // preference and the routing are correct; only the destination is
-        // provisional -- which is also why nothing in Settings sets this yet.
-        HomeView.Wallet -> KhataRoutes.Ledger
+        HomeView.Wallet -> KhataRoutes.Wallet
     }
 
     NavHost(navController = navController, startDestination = start) {
         composable(KhataRoutes.Modules) {
             ModulesScreen(
-                onOpenWallet = { navController.navigate(KhataRoutes.Ledger) },
+                onOpenWallet = { navController.navigate(KhataRoutes.Wallet) },
                 onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
+            )
+        }
+
+        composable(KhataRoutes.Wallet) {
+            WalletScreen(
+                onBack = { navController.popBackStack() },
+                onOpenLedger = { navController.navigate(KhataRoutes.Ledger) },
             )
         }
 
