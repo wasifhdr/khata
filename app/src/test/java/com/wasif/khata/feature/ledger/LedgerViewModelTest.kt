@@ -58,6 +58,7 @@ class LedgerViewModelTest {
     private val dayTotals = MutableStateFlow(emptyMap<LocalDate, Money>())
     private val spend = MutableStateFlow(Money.ZERO)
     private var requestedWindow: Pair<Long, Long>? = null
+    private var requestedQuery: String? = null
 
     private val clock = object : KhataClock {
         override fun now(): Long = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
@@ -115,8 +116,10 @@ class LedgerViewModelTest {
             requestedWindow = fromInclusive to toExclusive
             return pagedTransactions()
         }
-        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
-            pagedTransactions()
+        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> {
+            requestedQuery = query
+            return pagedTransactions()
+        }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
@@ -147,8 +150,10 @@ class LedgerViewModelTest {
                 }
             }.flow
         }
-        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
-            pagedTransactions()
+        override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> {
+            requestedQuery = query
+            return pagedTransactions()
+        }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
@@ -327,6 +332,45 @@ class LedgerViewModelTest {
             assertEquals("Groceries", chip?.name)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun `a blank query pages the viewed month rather than searching all time`() = runTest(dispatcher) {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+
+        viewModel.items.asSnapshot()
+
+        assertEquals(true, requestedWindow != null)
+        assertEquals(null, requestedQuery)
+    }
+
+    @Test
+    fun `a non-blank query searches all time rather than the viewed month`() = runTest(dispatcher) {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+        viewModel.items.asSnapshot()
+        // Cleared so the assertion below can only pass if the search path,
+        // not a fresh windowed load, is what actually ran next.
+        requestedWindow = null
+
+        viewModel.onQueryChange("coffee")
+        viewModel.items.asSnapshot()
+
+        assertEquals("coffee", requestedQuery)
+        assertEquals(null, requestedWindow)
+    }
+
+    @Test
+    fun `clearing the query returns to the windowed path`() = runTest(dispatcher) {
+        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
+        viewModel.onQueryChange("coffee")
+        viewModel.items.asSnapshot()
+        requestedWindow = null
+        requestedQuery = null
+
+        viewModel.onQueryChange("")
+        viewModel.items.asSnapshot()
+
+        assertEquals(true, requestedWindow != null)
     }
 
     // C1/C2: cachedIn must run before the combine with observeDayTotals(), or

@@ -121,7 +121,11 @@ fun LedgerContent(
                 modifier = Modifier.fillMaxWidth().height(spacing.headspaceLedger),
             )
 
-            MonthStrip(header = header)
+            // A month-spend figure beside all-time search results would claim a
+            // total that has nothing to do with what is on screen.
+            if (!isSearching) {
+                MonthStrip(header = header)
+            }
 
             OutlinedTextField(
                 value = query,
@@ -223,7 +227,10 @@ private fun MonthHeader(
         )
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = header.monthLabel,
+                // Search spans all time, so the viewed month is not what is on
+                // screen -- asserting it here would be the same false claim the
+                // month-scoping work existed to remove.
+                text = if (isSearching) "Search" else header.monthLabel,
                 style = PageHeadingStyle,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
@@ -233,11 +240,15 @@ private fun MonthHeader(
                 // different and wrong claim. 0 and 1 need their own words too:
                 // "0 days left" is wrong on the last day, and "1 days left" is
                 // ungrammatical on the second-to-last.
-                text = when (val daysLeft = header.daysLeft) {
-                    null -> "Complete month"
-                    0 -> "Last day"
-                    1 -> "1 day left"
-                    else -> "$daysLeft days left"
+                text = if (isSearching) {
+                    "All months"
+                } else {
+                    when (val daysLeft = header.daysLeft) {
+                        null -> "Complete month"
+                        0 -> "Last day"
+                        1 -> "1 day left"
+                        else -> "$daysLeft days left"
+                    }
                 },
                 style = PageSublineStyle,
                 color = MaterialTheme.colorScheme.outline,

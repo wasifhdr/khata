@@ -2,6 +2,7 @@ package com.wasif.khata.feature.ledger
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -116,6 +117,44 @@ class LedgerScreenTest {
         compose.setContent(content(header = LedgerHeaderState(monthLabel = "July 2026")))
 
         compose.onNodeWithText("Nothing in July 2026").assertIsDisplayed()
+    }
+
+    @Test
+    fun searchingReplacesTheMonthHeadingRatherThanAssertingAMonthTheResultsIgnore() {
+        // Search spans all time, so a heading naming the viewed month would be
+        // a false claim about results that have nothing to do with that month.
+        compose.setContent(content(query = "coffee"))
+
+        compose.onNodeWithText("Search").assertIsDisplayed()
+        compose.onNodeWithText("All months").assertIsDisplayed()
+        val monthLabel = compose.onAllNodesWithText("August 2026").fetchSemanticsNodes()
+        assertTrue("the month label should not appear while searching", monthLabel.isEmpty())
+    }
+
+    @Test
+    fun searchingHidesTheMonthStrip() {
+        // A month-spend total beside all-time search results would name a
+        // figure that has nothing to do with what is on screen.
+        compose.setContent(content(query = "coffee"))
+
+        val spent = compose.onAllNodesWithText("SPENT").fetchSemanticsNodes()
+        assertTrue("the month strip should not appear while searching", spent.isEmpty())
+    }
+
+    @Test
+    fun aBlankQueryShowsTheMonthLabelAndStripAsBefore() {
+        compose.setContent(content(query = ""))
+
+        compose.onNodeWithText("August 2026").assertIsDisplayed()
+        compose.onNodeWithText("SPENT").assertIsDisplayed()
+    }
+
+    @Test
+    fun theMonthArrowsAreDisabledWhileSearching() {
+        compose.setContent(content(query = "coffee", canGoForward = true))
+
+        compose.onNodeWithContentDescription("Previous month").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Next month").assertIsNotEnabled()
     }
 
     @Test
