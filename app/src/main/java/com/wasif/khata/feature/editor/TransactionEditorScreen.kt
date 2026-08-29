@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -170,15 +169,6 @@ fun TransactionEditorContent(
                                 ),
                             )
                             Box(Modifier.weight(1f)) { inner() }
-                            // Semantics-only: the symbol and the typed digits are
-                            // two separate nodes for layout, but assistive tech
-                            // (and anything asserting on displayed text) should
-                            // still be able to find the amount as one string.
-                            Text(
-                                text = "৳${state.amountInput}",
-                                style = MaterialTheme.typography.displayLarge,
-                                modifier = Modifier.size(0.dp),
-                            )
                         }
                     },
                 )
@@ -300,12 +290,9 @@ fun TransactionEditorContent(
                         if (state.canSave) {
                             Brush.linearGradient(KhataPalette.heroStops)
                         } else {
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surfaceContainer,
-                                    MaterialTheme.colorScheme.surfaceContainer,
-                                ),
-                            )
+                            // A flat fill, not a gradient with matching stops:
+                            // the disabled state has no accent to blend.
+                            SolidColor(MaterialTheme.colorScheme.surfaceContainer)
                         },
                     )
                     .clickable(enabled = state.canSave, onClick = actions::onSave)

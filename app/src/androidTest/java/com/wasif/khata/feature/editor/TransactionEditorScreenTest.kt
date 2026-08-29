@@ -3,6 +3,7 @@ package com.wasif.khata.feature.editor
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -81,13 +82,20 @@ class TransactionEditorScreenTest {
     fun theAmountIsTheLargestThingOnScreen() {
         // The old build made the amount a labelled OutlinedTextField the same
         // size as everything else, which is most of what "everything is the same
-        // size" was pointing at.
+        // size" was pointing at. The amount is rendered as a currency symbol
+        // Text next to a BasicTextField, two separate nodes in the real tree —
+        // assert each rather than requiring them to be reshaped into one string.
+        // assertTextEquals fails here: the merged node carries both
+        // Text = ["৳"] (from the decorationBox symbol) and EditableText = "540"
+        // (the typed value), so "Text + EditableText" is ["৳", "540"], not
+        // ["540"] alone. assertTextContains checks membership instead.
         setContent(
             TransactionEditorUiState(amountInput = "540", accountId = 1),
             NoopActions,
         )
 
-        composeRule.onNodeWithText("৳540").assertIsDisplayed()
+        composeRule.onNodeWithTag("amountField").assertTextContains("540")
+        composeRule.onNodeWithText("৳").assertIsDisplayed()
     }
 
     @Test
