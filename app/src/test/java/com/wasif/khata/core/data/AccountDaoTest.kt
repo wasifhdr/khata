@@ -29,15 +29,20 @@ class AccountDaoTest {
     @After
     fun tearDown() = db.close()
 
-    private fun account(name: String, uuid: String) = AccountEntity(
+    private fun account(
+        name: String,
+        uuid: String,
+        balanceMinor: Long = 0,
+        include: Boolean = true,
+    ) = AccountEntity(
         uuid = uuid,
         name = name,
         type = AccountType.MFS,
         openingBalanceMinor = 0,
-        currentBalanceMinor = 0,
+        currentBalanceMinor = balanceMinor,
         reportedBalanceMinor = null,
         reportedBalanceAt = null,
-        includeInNetWorth = true,
+        includeInNetWorth = include,
         smsIdentifiers = name,
         createdAt = 1000,
         updatedAt = 1000,
@@ -52,5 +57,22 @@ class AccountDaoTest {
         val names = db.accountDao().observeAll().first().map { it.name }
 
         assertEquals(listOf("bKash", "Cash", "EBL"), names)
+    }
+
+    @Test
+    fun `net worth sums only accounts flagged for inclusion`() = runTest {
+        val dao = db.accountDao()
+        dao.upsert(account(uuid = "in-1", name = "bKash", balanceMinor = 8_214_30, include = true))
+        dao.upsert(account(uuid = "in-2", name = "EBL", balanceMinor = 2_98_606_00, include = true))
+        // A credit card or a tracked-but-excluded pot must not inflate net worth.
+        dao.upsert(account(uuid = "out", name = "Excluded", balanceMinor = 99_999_00, include = false))
+
+        assertEquals(8_214_30L + 2_98_606_00L, dao.observeNetWorthMinor().first())
+    }
+
+    @Test
+    fun `net worth is zero rather than null on an empty database`() = runTest {
+        // Runs on every first launch, before any account exists.
+        assertEquals(0L, db.accountDao().observeNetWorthMinor().first())
     }
 }

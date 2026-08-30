@@ -1,3 +1,8 @@
+> **SUPERSEDED 2026-08-28** by `2026-08-28-khata-petrol-design.md`.
+> Kept for history. Nothing in this file is current: the warm-editorial world,
+> the ink-orange accent, the hairline rules and the `minSdk 30` justification
+> were all replaced by the petrol direction. Do not implement from this file.
+
 # Khata — Design Tokens & Direction
 
 **Date:** 2026-08-27

@@ -1,34 +1,102 @@
 package com.wasif.khata.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
+import com.wasif.khata.feature.hub.ModulesScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
+import com.wasif.khata.feature.settings.SettingsScreen
+import com.wasif.khata.feature.wallet.WalletScreen
 
-private const val ROUTE_LEDGER = "ledger"
-private const val ROUTE_EDITOR_NEW = "editor/new"
-private const val ROUTE_EDITOR_EDIT = "editor/edit/{transactionId}"
-private const val ARG_TRANSACTION_ID = "transactionId"
+object KhataRoutes {
+    const val Modules = "modules"
+    const val Wallet = "wallet"
+    const val Ledger = "ledger"
+    const val Settings = "settings"
+    const val EditorNew = "editor/new"
+    const val EditorEdit = "editor/edit/{transactionId}"
+    const val ArgTransactionId = "transactionId"
+
+    fun editorEdit(id: Long): String = "editor/edit/$id"
+}
 
 @Composable
-fun KhataNavHost() {
+fun KhataNavHost(homeView: HomeView) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = ROUTE_LEDGER) {
-        composable(ROUTE_LEDGER) {
-            LedgerScreen(
-                onAddTransaction = { navController.navigate(ROUTE_EDITOR_NEW) },
-                onOpenTransaction = { id -> navController.navigate("editor/edit/$id") },
+    // The preference IS the back-stack root, which is why it has to be resolved
+    // before this composes: back from the root exits the app, and that cannot
+    // be changed once the graph is built.
+    //
+    // I6: `homeView` is a live parameter -- MainActivity recomposes this on
+    // every DataStore emission, including the one the user just caused by
+    // changing the very preference read here. NavHost rebuilds its graph
+    // whenever `startDestination` changes and calls `setGraph` unconditionally,
+    // which pops the live back stack and ejects the user to the new root
+    // mid-interaction (confirmed against navigation-compose 2.10.0). `remember`
+    // with no keys captures `homeView` only on this composable's first
+    // composition and ignores every later value, so the graph -- and the
+    // comment's promise above -- both hold for the rest of the process.
+    // Settings tells the user the new value takes effect next launch.
+    val frozenHomeView = remember { homeView }
+    val start = when (frozenHomeView) {
+        HomeView.Modules -> KhataRoutes.Modules
+        HomeView.Wallet -> KhataRoutes.Wallet
+    }
+
+    NavHost(navController = navController, startDestination = start) {
+        composable(KhataRoutes.Modules) {
+            ModulesScreen(
+                onOpenWallet = {
+                    // A Wallet entry already sits beneath Modules whenever Modules was
+                    // reached via the hub glyph (Wallet-as-root case). Popping up to it
+                    // instead of pushing a second one keeps that entry the sole owner of
+                    // "root", so isRoot below stays true for it instead of drifting false.
+                    navController.navigate(KhataRoutes.Wallet) {
+                        popUpTo(KhataRoutes.Wallet) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                },
+                onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
             )
         }
 
-        composable(ROUTE_EDITOR_NEW) {
+        composable(KhataRoutes.Wallet) {
+            // Root-ness is where the user is, not how they got here: a preference only
+            // decides the *start* destination, but this entry can also be reached by a
+            // push (hub -> Wallet card), which the preference can't distinguish.
+            val isRoot = navController.previousBackStackEntry == null
+            WalletScreen(
+                // Back only exists when something pushed this screen. At the
+                // root it would exit the app, which is not what a back arrow
+                // promises.
+                onBack = if (isRoot) null else ({ navController.popBackStack() }),
+                onOpenHub = if (isRoot) ({ navController.navigate(KhataRoutes.Modules) }) else null,
+                onOpenLedger = { navController.navigate(KhataRoutes.Ledger) },
+            )
+        }
+
+        composable(KhataRoutes.Ledger) {
+            LedgerScreen(
+                onBack = { navController.popBackStack() },
+                onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
+                onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+            )
+        }
+
+        composable(KhataRoutes.Settings) {
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(KhataRoutes.EditorNew) {
             TransactionEditorScreen(
                 onDone = { navController.popBackStack() },
                 viewModel = editorViewModel(transactionId = null),
@@ -36,12 +104,12 @@ fun KhataNavHost() {
         }
 
         composable(
-            route = ROUTE_EDITOR_EDIT,
-            arguments = listOf(navArgument(ARG_TRANSACTION_ID) { type = NavType.LongType }),
+            route = KhataRoutes.EditorEdit,
+            arguments = listOf(navArgument(KhataRoutes.ArgTransactionId) { type = NavType.LongType }),
         ) { entry ->
             TransactionEditorScreen(
                 onDone = { navController.popBackStack() },
-                viewModel = editorViewModel(entry.arguments?.getLong(ARG_TRANSACTION_ID)),
+                viewModel = editorViewModel(entry.arguments?.getLong(KhataRoutes.ArgTransactionId)),
             )
         }
     }

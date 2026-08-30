@@ -2,82 +2,181 @@ package com.wasif.khata.core.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 import kotlin.math.pow
 
-val LightColors: ColorScheme = lightColorScheme(
-    primary = Color(0xFFB23E06),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFE0CC),
-    onPrimaryContainer = Color(0xFF431300),
-    secondary = Color(0xFF5C5445),
-    onSecondary = Color(0xFFFFFFFF),
-    background = Color(0xFFF5F0E8),
-    onBackground = Color(0xFF241E17),
-    surface = Color(0xFFFFFCF6),
-    onSurface = Color(0xFF241E17),
-    surfaceVariant = Color(0xFFE8E0D2),
-    onSurfaceVariant = Color(0xFF554B3D),
-    outline = Color(0xFF8A7D6B),
-    outlineVariant = Color(0xFFD6CCBB),
-    error = Color(0xFFA32116),
-    onError = Color(0xFFFFFFFF),
+/** One palette option for the mesh field behind the glass. */
+data class FieldPalette(
+    val name: String,
+    /**
+     * The lightest stop in the mesh. Contrast is only ever at risk against the
+     * lightest point a gradient reaches, so that is the one worth asserting --
+     * every darker stop clears by construction.
+     */
+    val keyStop: Color,
 )
 
+/**
+ * One named colour option on the ground or accent axis of the tuner. The name
+ * used to live only in a `//` comment next to the hex, which is how it ended
+ * up displayed nowhere -- a parallel `List<String>` is one insertion away from
+ * mislabelling every swatch, so the name travels with the colour instead.
+ */
+data class NamedSwatch(val name: String, val color: Color)
+
+object KhataPalette {
+
+    val ground: Color = Color(0xFF061214)
+    val onSurface: Color = Color(0xFFEDF2F1)
+    val onSurfaceDim: Color = Color(0xFFA8B8B8)
+    val onSurfaceFaint: Color = Color(0xFF6E8180)
+
+    val accent: Color = Color(0xFF8FE0CE)
+    val accentDeep: Color = Color(0xFF5FC9B2)
+
+    val alert: Color = Color(0xFFFF7A6B)
+    val warn: Color = Color(0xFFF2A63E)
+
+    /** Petrol. The gradient the active module card is filled with. */
+    val heroStops: List<Color> = listOf(
+        Color(0xFF12403F),
+        Color(0xFF0C2E30),
+        Color(0xFF08211F),
+    )
+
+    val grounds: List<NamedSwatch> = listOf(
+        NamedSwatch("Teal black", Color(0xFF061214)), // default
+        NamedSwatch("Indigo black", Color(0xFF0B0C18)),
+        NamedSwatch("Navy black", Color(0xFF08111C)),
+        NamedSwatch("Cool black", Color(0xFF0A0D0F)),
+    )
+
+    val accents: List<NamedSwatch> = listOf(
+        NamedSwatch("Pale aqua", Color(0xFF8FE0CE)), // default
+        NamedSwatch("Marigold", Color(0xFFFFB627)),
+        NamedSwatch("Chartreuse", Color(0xFFB6E24A)),
+        NamedSwatch("Warm sand", Color(0xFFE8C9A0)),
+    )
+
+    /**
+     * Key stops are **composited** values -- the colour that actually reaches
+     * the screen once the mesh stop is drawn at its own alpha over the ground,
+     * not the raw gradient colour. Asserting the raw colour would test a pixel
+     * that is never rendered, and would fail the default theme for no reason.
+     */
+    val fields: List<FieldPalette> = listOf(
+        FieldPalette("Verdigris", Color(0xFF185F56)), // default
+        FieldPalette("Abyss", Color(0xFF155159)),
+        FieldPalette("Counterpoint", Color(0xFF12555B)),
+        // Cyan is deliberately darker than the concept's swatch. At the value it
+        // was drawn, paper text over it lands at 2.78:1 -- unreadable. Being the
+        // brightest field is not worth being the one nothing can sit on.
+        FieldPalette("Cyan", Color(0xFF186A70)),
+        FieldPalette("Violet", Color(0xFF452F76)),
+        FieldPalette("Monochrome", Color(0xFF155553)),
+        FieldPalette("Deep sea", Color(0xFF105057)),
+        FieldPalette("Mist", Color(0xFF334B58)),
+    )
+
+    /**
+     * Quarantined: these appear only inside an 8dp dot or a chip, never as a
+     * background or a text colour, and the category name is always present so
+     * colour is never the sole signal.
+     *
+     * Keys are the tokens already seeded in DefaultData.kt and are deliberately
+     * left alone -- renaming them would need a data migration to buy nothing.
+     * The names no longer describe the hues; the category each token is
+     * attached to is what the hue was chosen for.
+     */
+    val categories: Map<String, Color> = mapOf(
+        // Living -- warm arc
+        "category_green" to Color(0xFFE8C15A), // Groceries
+        "category_orange" to Color(0xFFFF8A6B), // Eating Out
+        "category_indigo" to Color(0xFFF2A63E), // Education
+        // Recurring -- cool blues
+        "category_amber" to Color(0xFF9DB4C8), // Bills & Utilities
+        "category_teal" to Color(0xFF7FB8EC), // Mobile & Internet
+        "category_blue" to Color(0xFF93A9F2), // Transport
+        // Discretionary -- pink to violet
+        "category_violet" to Color(0xFFF293A8), // Shopping
+        "category_pink" to Color(0xFFB7A2EF), // Entertainment
+        "category_rose" to Color(0xFFDF8CCC), // Family & Gifts
+        // Place -- earth
+        "category_slate" to Color(0xFFDCC099), // Fuel
+        "category_bronze" to Color(0xFFC9A6BC), // Car & Maintenance
+        // Body
+        "category_red" to Color(0xFFEE6F80), // Health
+        // System -- neutral
+        "category_grey" to Color(0xFFB3B0A8), // Fees & Charges
+        "category_neutral" to Color(0xFF98A6B8), // Transfer, Uncategorized
+        // Income keeps a green: the ledger encodes credit as green, so this is
+        // the one place the reserved hue belongs.
+        "category_emerald" to Color(0xFF7FD4A8), // Income
+    )
+}
+
+/**
+ * Dark is the product, not a mode. There is deliberately no light scheme here:
+ * light mode is deferred, and the no-hardcoded-colour rule is what keeps adding
+ * one later an addition rather than a rewrite.
+ */
+/**
+ * Every role is set explicitly, including the ones this app never reads by
+ * name. Material's defaults are purple, and any role left unset leaks that
+ * purple into a teal world through whichever component happens to read it --
+ * FilterChip reads secondaryContainer, and got Material's #4A4458 until this
+ * was completed. `noRoleKeepsItsMaterialDefault` in ContrastTest holds the line.
+ */
 val DarkColors: ColorScheme = darkColorScheme(
-    primary = Color(0xFFFF9A62),
-    onPrimary = Color(0xFF4A1600),
-    primaryContainer = Color(0xFF8A2F03),
-    onPrimaryContainer = Color(0xFFFFE0CC),
-    secondary = Color(0xFFD6C7AC),
-    onSecondary = Color(0xFF3A3223),
-    background = Color(0xFF16130F),
-    onBackground = Color(0xFFF0E8DA),
-    surface = Color(0xFF1E1A15),
-    onSurface = Color(0xFFF0E8DA),
-    surfaceVariant = Color(0xFF332D25),
-    onSurfaceVariant = Color(0xFFD3C8B6),
-    outline = Color(0xFF9A8D7B),
-    outlineVariant = Color(0xFF4A4237),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690006),
-)
+    primary = KhataPalette.accent,
+    onPrimary = KhataPalette.heroStops.last(),
+    primaryContainer = KhataPalette.heroStops.first(),
+    onPrimaryContainer = KhataPalette.onSurface,
+    inversePrimary = KhataPalette.heroStops.first(),
 
-val CategoryColorsLight: Map<String, Color> = mapOf(
-    "category_green" to Color(0xFF4A7C36),
-    "category_orange" to Color(0xFFC2611F),
-    "category_blue" to Color(0xFF2A5D8F),
-    "category_slate" to Color(0xFF4F5D68),
-    "category_amber" to Color(0xFF9C6F0A),
-    "category_teal" to Color(0xFF1C6E63),
-    "category_red" to Color(0xFFA32116),
-    "category_violet" to Color(0xFF6B4A9E),
-    "category_pink" to Color(0xFFA63A6B),
-    "category_indigo" to Color(0xFF3B4A8F),
-    "category_rose" to Color(0xFF9E3450),
-    "category_bronze" to Color(0xFF7D5522),
-    "category_grey" to Color(0xFF6B6255),
-    "category_emerald" to Color(0xFF17694E),
-    "category_neutral" to Color(0xFF756B5C),
-)
+    secondary = KhataPalette.accentDeep,
+    onSecondary = KhataPalette.heroStops.last(),
+    // The selected-chip pair: aqua on petrol, at 7.5:1.
+    secondaryContainer = KhataPalette.heroStops.first(),
+    onSecondaryContainer = KhataPalette.accent,
 
-val CategoryColorsDark: Map<String, Color> = mapOf(
-    "category_green" to Color(0xFF93C47D),
-    "category_orange" to Color(0xFFE9A06A),
-    "category_blue" to Color(0xFF8CB4DC),
-    "category_slate" to Color(0xFFA7B4BE),
-    "category_amber" to Color(0xFFDDB55E),
-    "category_teal" to Color(0xFF6FBDB0),
-    "category_red" to Color(0xFFEC9C93),
-    "category_violet" to Color(0xFFBCA3E0),
-    "category_pink" to Color(0xFFE29BBB),
-    "category_indigo" to Color(0xFFA3AEE0),
-    "category_rose" to Color(0xFFE09CAB),
-    "category_bronze" to Color(0xFFC9A472),
-    "category_grey" to Color(0xFFB9B1A3),
-    "category_emerald" to Color(0xFF6FC0A0),
-    "category_neutral" to Color(0xFFB3AA9B),
+    tertiary = KhataPalette.accentDeep,
+    onTertiary = KhataPalette.heroStops.last(),
+    tertiaryContainer = KhataPalette.heroStops[1],
+    onTertiaryContainer = KhataPalette.onSurface,
+
+    background = KhataPalette.ground,
+    onBackground = KhataPalette.onSurface,
+    surface = KhataPalette.ground,
+    onSurface = KhataPalette.onSurface,
+    surfaceVariant = KhataPalette.heroStops[1],
+    onSurfaceVariant = KhataPalette.onSurfaceDim,
+    surfaceTint = KhataPalette.accent,
+    inverseSurface = KhataPalette.onSurface,
+    inverseOnSurface = KhataPalette.ground,
+
+    // Petrol-tinted neutrals, so elevated Material surfaces stay in the world.
+    surfaceBright = Color(0xFF1C2E30),
+    surfaceDim = Color(0xFF040E10),
+    surfaceContainerLowest = Color(0xFF030B0C),
+    surfaceContainerLow = Color(0xFF0A1A1C),
+    surfaceContainer = Color(0xFF0E2022),
+    surfaceContainerHigh = Color(0xFF12282A),
+    surfaceContainerHighest = Color(0xFF173032),
+
+    outline = KhataPalette.onSurfaceFaint,
+    // Decorative only (the ledger row hairline): a disabled control is exempt
+    // from the border floor and uses `outline` instead, so this value only has
+    // to clear it as a border. The old #1C2E30 sat at 1.34:1 against every
+    // ground -- a "separator" nothing could see. #456865 clears 3.09:1 (the
+    // worst ground) while staying visibly quieter than `outline`'s 4.6:1+.
+    outlineVariant = Color(0xFF456865),
+    scrim = Color(0xFF000000),
+
+    error = KhataPalette.alert,
+    onError = Color(0xFF2A0A06),
+    errorContainer = Color(0xFF5C1A14),
+    onErrorContainer = Color(0xFFFFDAD5),
 )
 
 fun contrastRatio(a: Color, b: Color): Double {
@@ -94,4 +193,67 @@ private fun relativeLuminance(color: Color): Double {
     return 0.2126 * channel(color.red) +
         0.7152 * channel(color.green) +
         0.0722 * channel(color.blue)
+}
+
+/**
+ * True when a badge or icon drawn on top of [color] reads better dark than
+ * light. The tuner's own swatches span both a near-black ground/field and a
+ * pastel accent, so a single fixed "on swatch" colour cannot stay legible
+ * across all of them -- this is what lets one call site pick correctly for
+ * either.
+ */
+fun isLightColor(color: Color): Boolean = relativeLuminance(color) > 0.5
+
+private fun rgbToHsv(r: Float, g: Float, b: Float): Triple<Float, Float, Float> {
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val delta = max - min
+    val v = max
+    val s = if (max == 0f) 0f else delta / max
+    var h = 0f
+    if (delta != 0f) {
+        h = when (max) {
+            r -> ((g - b) / delta).mod(6f)
+            g -> (b - r) / delta + 2f
+            else -> (r - g) / delta + 4f
+        }
+        h *= 60f
+    }
+    return Triple(h, s, v)
+}
+
+private fun hsvToRgb(h: Float, s: Float, v: Float): Triple<Float, Float, Float> {
+    val c = v * s
+    val x = c * (1f - kotlin.math.abs((h / 60f).mod(2f) - 1f))
+    val m = v - c
+    val (r, g, b) = when {
+        h < 60f -> Triple(c, x, 0f)
+        h < 120f -> Triple(x, c, 0f)
+        h < 180f -> Triple(0f, c, x)
+        h < 240f -> Triple(0f, x, c)
+        h < 300f -> Triple(x, 0f, c)
+        else -> Triple(c, 0f, x)
+    }
+    return Triple(r + m, g + m, b + m)
+}
+
+/**
+ * The tuner exposes one accent stop, but several roles (the selected-chip
+ * pair, `secondary`/`tertiary`) need a second, deeper stop of the same hue --
+ * "this accent, pressed" rather than some unrelated colour. The relationship
+ * is fitted to the shipped pair (accent `#8FE0CE` -> `accentDeep` `#5FC9B2`):
+ * converted to HSV, value drops to 90% and saturation rises to 145% of the
+ * source, hue held fixed -- reproduces `accentDeep` within rounding
+ * (`#60CAB2` vs `#5FC9B2`). Applying the same transform to an arbitrary
+ * accent is what lets a tuned accent (e.g. Marigold) get a matching deep stop
+ * instead of inheriting the default's.
+ *
+ * Hand-rolled RGB<->HSV rather than `android.graphics.Color`: that class is
+ * an unmocked Android stub under plain JVM unit tests, and this needs to run
+ * there, not just on-device.
+ */
+fun deepenAccent(color: Color): Color {
+    val (h, s, v) = rgbToHsv(color.red, color.green, color.blue)
+    val (r2, g2, b2) = hsvToRgb(h, (s * 1.45f).coerceIn(0f, 1f), (v * 0.90f).coerceIn(0f, 1f))
+    return Color(red = r2, green = g2, blue = b2)
 }

@@ -8,15 +8,19 @@ import androidx.room.withTransaction
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.TransactionDao
+import com.wasif.khata.core.data.dao.pagingSourceMatching
 import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.Confidence
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
+import com.wasif.khata.core.time.dhakaDayIndexToLocalDate
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
+import java.time.LocalDate
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -35,8 +39,47 @@ class TransactionRepositoryImpl @Inject constructor(
             transactionDao.pagingSource()
         }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
+    override fun pagedTransactionsBetween(
+        fromInclusive: Long,
+        toExclusive: Long,
+    ): Flow<PagingData<Transaction>> =
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
+            transactionDao.pagingSourceBetween(fromInclusive, toExclusive)
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
+    override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
+            if (query.isBlank()) {
+                transactionDao.pagingSource()
+            } else {
+                transactionDao.pagingSourceMatching(query)
+            }
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
     override fun observe(id: Long): Flow<Transaction?> =
         transactionDao.observeById(id).map { it?.toDomain() }
+
+    override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+        transactionDao.observeTotalMinorBetween(
+            direction = TransactionDirection.DEBIT,
+            fromInclusive = fromInclusive,
+            toExclusive = toExclusive,
+        ).map { Money(it) }
+
+    override fun observeMostRecent(): Flow<Transaction?> =
+        transactionDao.observeMostRecent().map { it?.toDomain() }
+
+    override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
+        transactionDao.observeTotalMinorBetween(
+            direction = TransactionDirection.CREDIT,
+            fromInclusive = fromInclusive,
+            toExclusive = toExclusive,
+        ).map { Money(it) }
+
+    override fun observeDayTotals(): Flow<Map<LocalDate, Money>> =
+        transactionDao.observeDayTotals().map { rows ->
+            rows.associate { it.dhakaDayIndex.dhakaDayIndexToLocalDate() to Money(it.spentMinor) }
+        }
 
     override suspend fun save(draft: TransactionDraft): Result<Long> = runCatchingData {
         db.withTransaction {

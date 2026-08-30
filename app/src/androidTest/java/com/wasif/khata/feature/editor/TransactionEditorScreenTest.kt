@@ -1,8 +1,11 @@
 package com.wasif.khata.feature.editor
 
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -63,6 +66,62 @@ class TransactionEditorScreenTest {
         }
     }
 
+    private object NoopActions : TransactionEditorActions {
+        override fun onAmountChange(value: String) = Unit
+        override fun onMerchantChange(value: String) = Unit
+        override fun onNoteChange(value: String) = Unit
+        override fun onAccountSelected(id: Long) = Unit
+        override fun onCategorySelected(id: Long?) = Unit
+        override fun onDirectionChange(direction: TransactionDirection) = Unit
+        override fun onDateChange(epochMillis: Long) = Unit
+        override fun onSave() = Unit
+        override fun onDelete() = Unit
+    }
+
+    @Test
+    fun theAmountIsTheLargestThingOnScreen() {
+        // The old build made the amount a labelled OutlinedTextField the same
+        // size as everything else, which is most of what "everything is the same
+        // size" was pointing at. The amount is rendered as a currency symbol
+        // Text next to a BasicTextField, two separate nodes in the real tree —
+        // assert each rather than requiring them to be reshaped into one string.
+        // assertTextEquals fails here: the merged node carries both
+        // Text = ["৳"] (from the decorationBox symbol) and EditableText = "540"
+        // (the typed value), so "Text + EditableText" is ["৳", "540"], not
+        // ["540"] alone. assertTextContains checks membership instead.
+        setContent(
+            TransactionEditorUiState(amountInput = "540", accountId = 1),
+            NoopActions,
+        )
+
+        composeRule.onNodeWithTag("amountField").assertTextContains("540")
+        composeRule.onNodeWithText("৳").assertIsDisplayed()
+    }
+
+    @Test
+    fun directionIsTwoLabelledStatesRatherThanASwitch() {
+        // A switch hides which state is which.
+        setContent(
+            TransactionEditorUiState(accountId = 1),
+            NoopActions,
+        )
+
+        composeRule.onNodeWithText("Spent").assertIsDisplayed()
+        composeRule.onNodeWithText("Received").assertIsDisplayed()
+    }
+
+    @Test
+    fun theContextLineStatesWhatTheEditorAssumed() {
+        setContent(
+            TransactionEditorUiState(accountId = 1),
+            NoopActions,
+        )
+
+        // Defaults the editor picked on the user's behalf, stated where they can
+        // be corrected rather than left invisible.
+        composeRule.onNodeWithText("New entry").assertIsDisplayed()
+    }
+
     @Test
     fun `save is disabled while the form is incomplete`() {
         setContent(
@@ -70,7 +129,7 @@ class TransactionEditorScreenTest {
             RecordingActions(),
         )
 
-        composeRule.onNodeWithText("Save").assertIsNotEnabled()
+        composeRule.onNodeWithText("Save entry").assertIsNotEnabled()
     }
 
     @Test
@@ -85,7 +144,7 @@ class TransactionEditorScreenTest {
             RecordingActions(),
         )
 
-        composeRule.onNodeWithText("Save").assertIsEnabled()
+        composeRule.onNodeWithText("Save entry").assertIsEnabled()
     }
 
     @Test
@@ -93,7 +152,7 @@ class TransactionEditorScreenTest {
         val actions = RecordingActions()
         setContent(TransactionEditorUiState(accounts = listOf(bkash)), actions)
 
-        composeRule.onNodeWithText("Amount").performTextInput("250")
+        composeRule.onNodeWithTag("amountField").performTextInput("250")
 
         assertEquals("250", actions.amount)
     }
@@ -129,7 +188,7 @@ class TransactionEditorScreenTest {
             actions,
         )
 
-        composeRule.onNodeWithText("Save").performClick()
+        composeRule.onNodeWithText("Save entry").performClick()
 
         assertTrue(actions.saved)
     }

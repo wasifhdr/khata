@@ -12,7 +12,7 @@ android {
     compileSdk = 37
     defaultConfig {
         applicationId = "com.wasif.khata"
-        minSdk = 30
+        minSdk = 33
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -73,6 +73,9 @@ dependencies {
   implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.material.icons.core)
+  implementation(libs.haze)
+  implementation(libs.androidx.datastore.preferences)
+  implementation(libs.androidx.core.splashscreen)
   debugImplementation(libs.androidx.compose.ui.tooling)
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)
   debugImplementation(libs.androidx.compose.ui.test.manifest)

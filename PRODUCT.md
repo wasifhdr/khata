@@ -92,7 +92,10 @@ indoor use.
 - Fully functional offline. Network and AI are enhancements, never dependencies.
 - **Language:** English interface. Bengali script must render correctly wherever it
   appears — merchant names, user notes, text derived from SMS. Not bilingual; there
-  is no language toggle and no Bengali UI strings.
+  is no language toggle and no translation layer.
+  **One exception (user decision, 2026-08-28):** the brand lockup on the home screen is
+  Bengali — the wordmark খাতা and the tagline সব হিসাব, এক খাতায়. Two fixed strings,
+  never localised, never extended. Every other string in the interface is English.
 - **Explicitly undecided:** which module is built after the wallet. Restaurants,
   notes, deadlines, car servicing, movies, and a lending ledger are all candidates.
   The order will be chosen once the wallet module is finished, not before.
@@ -106,9 +109,18 @@ The name is binding; it is the one piece of identity that already exists.
 No logo, wordmark, icon, or brand asset exists. No voice or personality has been
 established. Neither may be treated as pre-existing.
 
-**Pinned visual constraint (user-stated, binding):** a simple interface, warm
-editorial hues, orange accents. Recorded as given and not expanded. This pin
-overrides the direction roll; it fixes the world, not its softest rendition.
+**Pinned visual constraint (user-stated, binding, revised 2026-08-28):** dark-first
+glassmorphism — a petrol card on a verdigris field over a teal-black ground, with a
+pale-aqua accent and a serif on the numerals. Light mode is deferred, not cancelled.
+
+The previous pin (a simple interface, warm editorial hues, orange accents) was reopened
+by the user and replaced after they reviewed worked alternatives. It is superseded, not
+merely unfulfilled. See `docs/superpowers/specs/2026-08-28-khata-petrol-design.md`.
+
+**Wordmark:** খাতা, set in Li Swarnali Okkhor. Never transliterated — no Latin "Khata"
+appears anywhere in the interface. It is shown on the home screen and no other.
+
+**Tagline:** সব হিসাব, এক খাতায় — "all accounts, in one book." Native-speaker reviewed.
 
 ## Evidence on Hand
 
