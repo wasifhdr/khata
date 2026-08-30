@@ -59,8 +59,8 @@ class PreferencesRepositoryTest {
     fun `a stored theme round-trips`() = runTest {
         val spec = ThemeSpec(
             field = KhataPalette.fields[3],
-            ground = KhataPalette.grounds[2],
-            accent = KhataPalette.accents[1],
+            ground = KhataPalette.grounds[2].color,
+            accent = KhataPalette.accents[1].color,
             intensity = FieldIntensity.Dim,
         )
 

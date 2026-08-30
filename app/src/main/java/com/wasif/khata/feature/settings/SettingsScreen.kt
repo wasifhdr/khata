@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,7 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +50,7 @@ import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import com.wasif.khata.core.ui.theme.isLightColor
 
 @Composable
 fun SettingsScreen(
@@ -146,23 +152,23 @@ fun SettingsContent(
 
             Section("Field")
             SwatchGrid(
-                colours = KhataPalette.fields.map { it.keyStop },
+                swatches = KhataPalette.fields.map { it.name to it.keyStop },
                 selectedIndex = KhataPalette.fields.indexOf(prefs.themeSpec.field),
                 onSelect = { onFieldSelected(KhataPalette.fields[it]) },
             )
 
             Section("Ground")
             SwatchGrid(
-                colours = KhataPalette.grounds,
-                selectedIndex = KhataPalette.grounds.indexOf(prefs.themeSpec.ground),
-                onSelect = { onGroundSelected(KhataPalette.grounds[it]) },
+                swatches = KhataPalette.grounds.map { it.name to it.color },
+                selectedIndex = KhataPalette.grounds.indexOfFirst { it.color == prefs.themeSpec.ground },
+                onSelect = { onGroundSelected(KhataPalette.grounds[it].color) },
             )
 
             Section("Accent")
             SwatchGrid(
-                colours = KhataPalette.accents,
-                selectedIndex = KhataPalette.accents.indexOf(prefs.themeSpec.accent),
-                onSelect = { onAccentSelected(KhataPalette.accents[it]) },
+                swatches = KhataPalette.accents.map { it.name to it.color },
+                selectedIndex = KhataPalette.accents.indexOfFirst { it.color == prefs.themeSpec.accent },
+                onSelect = { onAccentSelected(KhataPalette.accents[it].color) },
             )
 
             Section("Field intensity")
@@ -270,9 +276,20 @@ private fun Section(title: String) {
     )
 }
 
+/**
+ * Renders [swatches] (name to colour, kept as one pair so the label can never
+ * drift from the colour it names -- see `KhataPalette.NamedSwatch`).
+ *
+ * Selection was border colour alone: `primary` at 2dp vs `outlineVariant` at
+ * 1dp, and the unselected width barely reads as a border at all. That is
+ * exactly the "colour is never the sole signal" rule applied to the one
+ * screen whose subject is colour, so a checkmark badge is the second signal
+ * here -- its own two colours flip based on the swatch's lightness so it stays
+ * legible whether the swatch is a near-black ground or a pastel accent.
+ */
 @Composable
 private fun SwatchGrid(
-    colours: List<Color>,
+    swatches: List<Pair<String, Color>>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
 ) {
@@ -281,27 +298,79 @@ private fun SwatchGrid(
         Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        colours.chunked(4).forEachIndexed { rowIndex, row ->
+        swatches.chunked(4).forEachIndexed { rowIndex, row ->
             Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                row.forEachIndexed { colIndex, colour ->
+                row.forEachIndexed { colIndex, (name, colour) ->
                     val index = rowIndex * 4 + colIndex
-                    Box(
-                        Modifier
+                    val selected = index == selectedIndex
+                    Column(
+                        modifier = Modifier
                             .weight(1f)
-                            .height(56.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .background(colour)
-                            .border(
-                                width = if (index == selectedIndex) 2.dp else 1.dp,
-                                color = if (index == selectedIndex) {
-                                    MaterialTheme.colorScheme.primary
+                            .clickable { onSelect(index) }
+                            .semantics {
+                                contentDescription = if (selected) "$name, selected" else name
+                            },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(colour)
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant
+                                    },
+                                    shape = MaterialTheme.shapes.small,
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (selected) {
+                                // onSurface/heroStops is the pair ContrastTest
+                                // already proves clears 4.5:1 against each
+                                // other; isLightColor picks which one of the
+                                // two goes on the badge vs the checkmark so
+                                // the badge itself stays visible on the swatch.
+                                val badgeBg = if (isLightColor(colour)) {
+                                    KhataPalette.heroStops.last()
                                 } else {
-                                    MaterialTheme.colorScheme.outlineVariant
-                                },
-                                shape = MaterialTheme.shapes.small,
-                            )
-                            .clickable { onSelect(index) },
-                    )
+                                    KhataPalette.onSurface
+                                }
+                                val badgeIcon = if (isLightColor(colour)) {
+                                    KhataPalette.onSurface
+                                } else {
+                                    KhataPalette.heroStops.last()
+                                }
+                                Box(
+                                    Modifier
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(badgeBg),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = badgeIcon,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = spacing.xs).fillMaxWidth(),
+                        )
+                    }
                 }
                 // Keep a short last row's cells the same width as a full row's.
                 repeat(4 - row.size) { Box(Modifier.weight(1f)) }

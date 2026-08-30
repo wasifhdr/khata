@@ -284,11 +284,15 @@ private fun MonthArrow(
             imageVector = icon,
             contentDescription = description,
             // Disabled rather than hidden: a control that vanishes is harder to
-            // understand than one that is visibly unavailable.
+            // understand than one that is visibly unavailable. WCAG exempts a
+            // disabled control from the border floor, but "exempt from 3:1"
+            // is not "exempt from visible" -- outlineVariant (1.34:1 here) was
+            // both, which contradicted this very comment. `outline` is dimmer
+            // than the enabled tint but still plainly present, not a hairline.
             tint = if (enabled) {
                 MaterialTheme.colorScheme.onSurfaceVariant
             } else {
-                MaterialTheme.colorScheme.outlineVariant
+                MaterialTheme.colorScheme.outline
             },
         )
     }

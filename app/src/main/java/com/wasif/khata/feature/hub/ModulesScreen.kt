@@ -43,6 +43,7 @@ import com.wasif.khata.core.ui.component.rememberKhataHazeState
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import com.wasif.khata.core.ui.theme.LocalThemeSpec
+import com.wasif.khata.core.ui.theme.TaglineTextStyle
 import com.wasif.khata.core.ui.theme.WordmarkTextStyle
 import dev.chrisbanes.haze.HazeState
 
@@ -114,7 +115,7 @@ fun ModulesContent(
                 )
                 Text(
                     text = "সব হিসাব, এক খাতায়",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = TaglineTextStyle,
                     color = MaterialTheme.colorScheme.outline,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = spacing.md),
@@ -199,13 +200,16 @@ private fun WalletCard(state: ModulesUiState, onClick: () -> Unit) {
                 Text(
                     text = "spent this month",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    // outline is only 2.79:1 on this card's own gradient -- below
+                    // the text floor on the app's first viewport. onSurfaceVariant
+                    // (already used for WALLET above) clears every hero stop.
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 state.lastTransaction?.let { last ->
                     Text(
                         text = "Last · ${last.merchantRaw ?: "Uncategorized"}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = spacing.sm),
                     )
                 }

@@ -46,4 +46,13 @@ class TypeTest {
         // the ledger column breaks.
         assertTrue(AmountTextStyle.fontFamily != WordmarkTextStyle.fontFamily)
     }
+
+    @Test
+    fun `the tagline style resolves to the bundled Bengali family`() {
+        // I8: the tagline is the app's only Bengali UI string. bodyMedium is
+        // Instrument Sans, which has no Bengali glyphs, so it was silently
+        // falling through to whichever font the device happens to ship --
+        // the exact per-device variance the bundled Noto cut exists to remove.
+        assertEquals(KhataFonts.Bengali, TaglineTextStyle.fontFamily)
+    }
 }

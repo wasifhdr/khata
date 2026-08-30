@@ -10,8 +10,8 @@ class ThemeSpecTest {
     fun `the default is the one the design settled on`() {
         val d = ThemeSpec.Default
         assertEquals("Verdigris", d.field.name)
-        assertEquals(KhataPalette.grounds.first(), d.ground)
-        assertEquals(KhataPalette.accents.first(), d.accent)
+        assertEquals(KhataPalette.grounds.first().color, d.ground)
+        assertEquals(KhataPalette.accents.first().color, d.accent)
         assertEquals(FieldIntensity.Full, d.intensity)
     }
 
@@ -24,7 +24,7 @@ class ThemeSpecTest {
             KhataPalette.grounds.forEach { g ->
                 KhataPalette.accents.forEach { a ->
                     FieldIntensity.entries.forEach { i ->
-                        ThemeSpec(field = f, ground = g, accent = a, intensity = i)
+                        ThemeSpec(field = f, ground = g.color, accent = a.color, intensity = i)
                         built++
                     }
                 }

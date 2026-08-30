@@ -1,5 +1,6 @@
 package com.wasif.khata.core.ui.theme
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -45,8 +46,8 @@ data class ThemeSpec(
     companion object {
         val Default = ThemeSpec(
             field = KhataPalette.fields.first(),
-            ground = KhataPalette.grounds.first(),
-            accent = KhataPalette.accents.first(),
+            ground = KhataPalette.grounds.first().color,
+            accent = KhataPalette.accents.first().color,
             intensity = FieldIntensity.Full,
         )
     }
@@ -56,6 +57,39 @@ val LocalThemeSpec = staticCompositionLocalOf { ThemeSpec.Default }
 
 val LocalCategoryColors = staticCompositionLocalOf<Map<String, Color>> { emptyMap() }
 
+/**
+ * The scheme `KhataTheme` actually hands to `MaterialTheme` for a given
+ * [spec]. Kept as a plain function -- not inlined into the composable below --
+ * so a test can assert what the tuner *produces* for a non-default spec
+ * rather than only `DarkColors`, the pre-copy scheme it never ships (I5:
+ * `ContrastTest` used to assert `DarkColors` and could not see this at all).
+ *
+ * DarkColors only ever holds the *default* accent baked in by name, so
+ * copying just primary/background/surface here left every other
+ * accent-derived role (secondary, the selected-chip pair, the tint Material
+ * uses for elevation) pointing at the default aqua forever -- picking
+ * Marigold recoloured the primary button and nothing else. The whole accent
+ * family is re-derived from spec.accent below instead.
+ */
+fun composeScheme(spec: ThemeSpec): ColorScheme {
+    val accentDeep = deepenAccent(spec.accent)
+    return DarkColors.copy(
+        primary = spec.accent,
+        inversePrimary = accentDeep,
+
+        secondary = accentDeep,
+        tertiary = accentDeep,
+        // The selected-chip pair reads spec.accent on the fixed petrol
+        // container -- see ContrastTest for why that pairing holds for every
+        // shipped accent.
+        onSecondaryContainer = spec.accent,
+        surfaceTint = spec.accent,
+
+        background = spec.ground,
+        surface = spec.ground,
+    )
+}
+
 @Composable
 fun KhataTheme(
     spec: ThemeSpec = ThemeSpec.Default,
@@ -64,11 +98,7 @@ fun KhataTheme(
     // Dark is the product, not a mode. isSystemInDarkTheme is deliberately not
     // consulted: there is no light scheme to switch to yet, and pretending
     // otherwise would hide the fact when one is added.
-    val scheme = DarkColors.copy(
-        primary = spec.accent,
-        background = spec.ground,
-        surface = spec.ground,
-    )
+    val scheme = composeScheme(spec)
 
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),

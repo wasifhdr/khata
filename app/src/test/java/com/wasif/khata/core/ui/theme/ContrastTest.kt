@@ -35,7 +35,7 @@ class ContrastTest {
     @Test
     fun `paper text clears every ground, field and hero stop`() {
         KhataPalette.grounds.forEach { g ->
-            assertFloor("onSurface / ground $g", KhataPalette.onSurface, g, textFloor)
+            assertFloor("onSurface / ground ${g.name}", KhataPalette.onSurface, g.color, textFloor)
         }
         KhataPalette.fields.forEach { f ->
             assertFloor("onSurface / field ${f.name}", KhataPalette.onSurface, f.keyStop, textFloor)
@@ -52,10 +52,10 @@ class ContrastTest {
         // sits on one of these two). Text floor applies.
         KhataPalette.accents.forEach { a ->
             KhataPalette.grounds.forEach { g ->
-                assertFloor("accent $a / ground $g", a, g, textFloor)
+                assertFloor("accent ${a.name} / ground ${g.name}", a.color, g.color, textFloor)
             }
             KhataPalette.heroStops.forEach { h ->
-                assertFloor("accent $a / hero $h", a, h, textFloor)
+                assertFloor("accent ${a.name} / hero $h", a.color, h, textFloor)
             }
         }
     }
@@ -68,15 +68,72 @@ class ContrastTest {
         // petrol or the ground is always in between.
         KhataPalette.accents.forEach { a ->
             KhataPalette.fields.forEach { f ->
-                assertFloor("accent $a / field ${f.name}", a, f.keyStop, graphicFloor)
+                assertFloor("accent ${a.name} / field ${f.name}", a.color, f.keyStop, graphicFloor)
             }
+        }
+    }
+
+    @Test
+    fun `onSurfaceVariant -- the hero card's low-emphasis text -- clears every hero stop`() {
+        // I1: ModulesScreen painted "spent this month" and the last-transaction
+        // line in `outline`, which is only 2.79:1 on the lightest hero stop --
+        // below the text floor on the app's first viewport. Nothing asserted
+        // `outline` (or anything else) against the hero here, which is how it
+        // shipped. onSurfaceVariant is what the WALLET label two lines above it
+        // already used, and is the fix.
+        KhataPalette.heroStops.forEach { h ->
+            assertFloor("onSurfaceVariant / hero $h", KhataPalette.onSurfaceDim, h, textFloor)
+        }
+        // `outline` itself is documented as unfit for this job: if this ever
+        // stops failing, the reasoning above (and the fix it justifies) is
+        // stale and needs revisiting.
+        KhataPalette.heroStops.forEach { h ->
+            val ratio = contrastRatio(KhataPalette.onSurfaceFaint, h)
+            assertTrue(
+                "outline / hero $h is now $ratio, so it may no longer need routing around",
+                ratio < textFloor,
+            )
+        }
+    }
+
+    @Test
+    fun `outlineVariant -- the ledger row hairline -- clears every ground as a border`() {
+        // I2: outlineVariant was #1C2E30, 1.34:1 against every ground -- a
+        // "separator" that could not be seen, and nothing asserted it. It is
+        // now a decorative border only (the disabled month-arrow moved to
+        // `outline`, checked below), so the 3:1 graphical floor applies.
+        KhataPalette.grounds.forEach { g ->
+            assertFloor("outlineVariant / ground ${g.name}", DarkColors.outlineVariant, g.color, graphicFloor)
+        }
+    }
+
+    @Test
+    fun `the disabled month-arrow tint sits strictly between the hairline and the enabled tint`() {
+        // WCAG exempts a disabled control from the border floor, so `outline`
+        // does not have to clear 3:1 here the way the hairline above does --
+        // but the whole point of I2 was that "exempt from the floor" is not
+        // "exempt from visible". This locks in the ordering the fix relies on:
+        // clearly above the near-invisible hairline, clearly below the enabled
+        // tint, for every ground the disabled arrow can sit on.
+        KhataPalette.grounds.forEach { g ->
+            val hairline = contrastRatio(DarkColors.outlineVariant, g.color)
+            val disabled = contrastRatio(KhataPalette.onSurfaceFaint, g.color)
+            val enabled = contrastRatio(KhataPalette.onSurfaceDim, g.color)
+            assertTrue(
+                "disabled ratio $disabled against ${g.name} should exceed the hairline's $hairline",
+                disabled > hairline,
+            )
+            assertTrue(
+                "disabled ratio $disabled against ${g.name} should be below the enabled tint's $enabled",
+                disabled < enabled,
+            )
         }
     }
 
     @Test
     fun `the alert colour clears every ground`() {
         KhataPalette.grounds.forEach { g ->
-            assertFloor("alert / ground $g", KhataPalette.alert, g, textFloor)
+            assertFloor("alert / ground ${g.name}", KhataPalette.alert, g.color, textFloor)
         }
     }
 
@@ -84,7 +141,7 @@ class ContrastTest {
     fun `every category dot clears every ground`() {
         KhataPalette.categories.forEach { (token, colour) ->
             KhataPalette.grounds.forEach { g ->
-                assertFloor("category $token / ground $g", colour, g, graphicFloor)
+                assertFloor("category $token / ground ${g.name}", colour, g.color, graphicFloor)
             }
         }
     }
@@ -106,8 +163,23 @@ class ContrastTest {
         KhataPalette.categories.forEach { (token, colour) ->
             assertTrue("$token duplicates the alert colour", colour != KhataPalette.alert)
             KhataPalette.accents.forEach { a ->
-                assertTrue("$token duplicates accent $a", colour != a)
+                assertTrue("$token duplicates accent ${a.name}", colour != a.color)
             }
+        }
+    }
+
+    @Test
+    fun `every ground and accent swatch carries a name`() {
+        // I7: SwatchGrid rendered bare coloured Boxes -- no text, no
+        // contentDescription -- and the one axis with real names
+        // (FieldPalette) displayed them nowhere either. Names now live on the
+        // colour itself (NamedSwatch), not a parallel List<String>, so this is
+        // the floor that keeps one from being added blank.
+        (KhataPalette.grounds + KhataPalette.accents).forEach { swatch ->
+            assertTrue("a swatch has a blank name: $swatch", swatch.name.isNotBlank())
+        }
+        KhataPalette.fields.forEach { f ->
+            assertTrue("a field swatch has a blank name: $f", f.name.isNotBlank())
         }
     }
 
@@ -179,6 +251,44 @@ class ContrastTest {
         assertFloor("onErrorContainer", DarkColors.onErrorContainer, DarkColors.errorContainer, textFloor)
         assertFloor("onSurfaceVariant", DarkColors.onSurfaceVariant, DarkColors.surfaceVariant, textFloor)
         assertFloor("onSurface / containerHighest", DarkColors.onSurface, DarkColors.surfaceContainerHighest, textFloor)
+    }
+
+    @Test
+    fun `the composed scheme carries the tuned accent through every accent-derived role`() {
+        // I5: this suite used to assert DarkColors, the scheme *before*
+        // KhataTheme copies spec over it -- so it could not see that
+        // secondary, tertiary, onSecondaryContainer, surfaceTint and
+        // inversePrimary stayed hard-wired to the default aqua no matter what
+        // accent was picked. composeScheme is the exact function KhataTheme
+        // calls; this asserts what it actually produces for a non-default
+        // spec, not the pre-copy scheme.
+        val tuned = ThemeSpec.Default.copy(accent = KhataPalette.accents[1].color) // Marigold
+        val scheme = composeScheme(tuned)
+
+        assertEquals(tuned.accent, scheme.primary)
+        assertEquals(tuned.accent, scheme.onSecondaryContainer)
+        assertEquals(tuned.accent, scheme.surfaceTint)
+        assertTrue("secondary did not move off the default aqua", scheme.secondary != DarkColors.secondary)
+        assertTrue("tertiary did not move off the default aqua", scheme.tertiary != DarkColors.tertiary)
+        assertTrue(
+            "inversePrimary did not move off the default hero stop",
+            scheme.inversePrimary != DarkColors.inversePrimary,
+        )
+    }
+
+    @Test
+    fun `the composed selected-chip pair clears the text floor for every accent`() {
+        // Pairwise: every accent against the one secondaryContainer background
+        // it is ever composited on, not the 8x4x4x4 space.
+        KhataPalette.accents.forEach { a ->
+            val scheme = composeScheme(ThemeSpec.Default.copy(accent = a.color))
+            assertFloor(
+                "composed onSecondaryContainer / secondaryContainer for accent ${a.name}",
+                scheme.onSecondaryContainer,
+                scheme.secondaryContainer,
+                textFloor,
+            )
+        }
     }
 
     @Test

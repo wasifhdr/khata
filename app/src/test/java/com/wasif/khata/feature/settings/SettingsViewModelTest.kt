@@ -53,10 +53,10 @@ class SettingsViewModelTest {
         val vm = SettingsViewModel(repo)
         advanceUntilIdle()
 
-        vm.onAccentSelected(KhataPalette.accents[2])
+        vm.onAccentSelected(KhataPalette.accents[2].color)
         advanceUntilIdle()
 
-        assertEquals(KhataPalette.accents[2], lastSaved?.accent)
+        assertEquals(KhataPalette.accents[2].color, lastSaved?.accent)
         // The tuner edits one axis at a time; the rest must survive untouched.
         assertEquals(FieldIntensity.Dim, lastSaved?.intensity)
         assertEquals(ThemeSpec.Default.field, lastSaved?.field)

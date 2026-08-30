@@ -110,3 +110,15 @@ val BengaliBodyStyle = TextStyle(
     fontSize = 14.sp,
     lineHeight = 20.sp,
 )
+
+// The hub tagline is the app's only Bengali UI string. Instrument Sans (the
+// bodyMedium family) has no Bengali glyphs, so it was silently falling
+// through to whichever Bengali font the device happens to ship -- exactly
+// the per-device variance the bundled Noto cut was meant to remove. Same
+// size/weight as bodyMedium so the fix is only the family, not the layout.
+val TaglineTextStyle = TextStyle(
+    fontFamily = KhataFonts.Bengali,
+    fontWeight = FontWeight.Normal,
+    fontSize = 13.sp,
+    lineHeight = 18.sp,
+)

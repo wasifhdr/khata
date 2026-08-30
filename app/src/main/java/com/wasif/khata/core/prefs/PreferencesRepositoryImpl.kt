@@ -43,8 +43,10 @@ class PreferencesRepositoryImpl @Inject constructor(
                     // list it pointed into, and on first launch that would throw
                     // before any UI exists to report it.
                     field = KhataPalette.fields.getOrElse(p[Keys.Field] ?: -1) { ThemeSpec.Default.field },
-                    ground = KhataPalette.grounds.getOrElse(p[Keys.Ground] ?: -1) { ThemeSpec.Default.ground },
-                    accent = KhataPalette.accents.getOrElse(p[Keys.Accent] ?: -1) { ThemeSpec.Default.accent },
+                    ground = KhataPalette.grounds.getOrNull(p[Keys.Ground] ?: -1)?.color
+                        ?: ThemeSpec.Default.ground,
+                    accent = KhataPalette.accents.getOrNull(p[Keys.Accent] ?: -1)?.color
+                        ?: ThemeSpec.Default.accent,
                     intensity = p[Keys.Intensity]
                         ?.let { name -> FieldIntensity.entries.firstOrNull { it.name == name } }
                         ?: ThemeSpec.Default.intensity,
@@ -61,8 +63,8 @@ class PreferencesRepositoryImpl @Inject constructor(
     override suspend fun setTheme(spec: ThemeSpec) {
         store.edit { p ->
             p[Keys.Field] = KhataPalette.fields.indexOf(spec.field)
-            p[Keys.Ground] = KhataPalette.grounds.indexOf(spec.ground)
-            p[Keys.Accent] = KhataPalette.accents.indexOf(spec.accent)
+            p[Keys.Ground] = KhataPalette.grounds.indexOfFirst { it.color == spec.ground }
+            p[Keys.Accent] = KhataPalette.accents.indexOfFirst { it.color == spec.accent }
             p[Keys.Intensity] = spec.intensity.name
         }
     }
