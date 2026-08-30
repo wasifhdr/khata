@@ -33,6 +33,7 @@ class TypeTest {
             PageHeadingStyle,
             PageSublineStyle,
             BengaliBodyStyle,
+            TaglineTextStyle,
         )
         styles.forEach { s ->
             assertTrue("a style is using FontFamily.Default", s.fontFamily != FontFamily.Default)

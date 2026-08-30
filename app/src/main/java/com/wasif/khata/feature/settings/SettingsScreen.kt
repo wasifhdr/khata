@@ -323,7 +323,7 @@ private fun SwatchGrid(
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onSelect(index) }
-                            .semantics {
+                            .semantics(mergeDescendants = true) {
                                 contentDescription = if (selected) "$name, selected" else name
                             },
                         horizontalAlignment = Alignment.CenterHorizontally,

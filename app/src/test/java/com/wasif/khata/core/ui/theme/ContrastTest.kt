@@ -88,7 +88,7 @@ class ContrastTest {
         // stops failing, the reasoning above (and the fix it justifies) is
         // stale and needs revisiting.
         KhataPalette.heroStops.forEach { h ->
-            val ratio = contrastRatio(KhataPalette.onSurfaceFaint, h)
+            val ratio = contrastRatio(DarkColors.outline, h)
             assertTrue(
                 "outline / hero $h is now $ratio, so it may no longer need routing around",
                 ratio < textFloor,
@@ -117,8 +117,8 @@ class ContrastTest {
         // tint, for every ground the disabled arrow can sit on.
         KhataPalette.grounds.forEach { g ->
             val hairline = contrastRatio(DarkColors.outlineVariant, g.color)
-            val disabled = contrastRatio(KhataPalette.onSurfaceFaint, g.color)
-            val enabled = contrastRatio(KhataPalette.onSurfaceDim, g.color)
+            val disabled = contrastRatio(DarkColors.outline, g.color)
+            val enabled = contrastRatio(DarkColors.onSurfaceVariant, g.color)
             assertTrue(
                 "disabled ratio $disabled against ${g.name} should exceed the hairline's $hairline",
                 disabled > hairline,
@@ -268,12 +268,12 @@ class ContrastTest {
         assertEquals(tuned.accent, scheme.primary)
         assertEquals(tuned.accent, scheme.onSecondaryContainer)
         assertEquals(tuned.accent, scheme.surfaceTint)
-        assertTrue("secondary did not move off the default aqua", scheme.secondary != DarkColors.secondary)
-        assertTrue("tertiary did not move off the default aqua", scheme.tertiary != DarkColors.tertiary)
-        assertTrue(
-            "inversePrimary did not move off the default hero stop",
-            scheme.inversePrimary != DarkColors.inversePrimary,
-        )
+        // `!= DarkColors.x` is satisfied by any other colour, including a bug
+        // that landed on Color.Red -- assert the actual derived value instead.
+        val accentDeep = deepenAccent(tuned.accent)
+        assertEquals(accentDeep, scheme.secondary)
+        assertEquals(accentDeep, scheme.tertiary)
+        assertEquals(accentDeep, scheme.inversePrimary)
     }
 
     @Test
