@@ -19,6 +19,7 @@ import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.ui.theme.KhataTheme
 import com.wasif.khata.domain.model.Transaction
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -230,5 +231,41 @@ class LedgerScreenTest {
         compose.onNodeWithContentDescription("Add transaction").performClick()
 
         assertTrue(clicked)
+    }
+
+    @Test
+    fun aDayHeaderLabelsItsFigureRatherThanShowingAnUnlabelledTotal() {
+        // I3: observeDayTotals() is DEBIT-only by design, so an unlabelled
+        // figure would read as the day's activity when it is really just spend
+        // -- a day of pure income would show ৳0.00 beside a credit row. The
+        // header itself is a stand-in: what matters is that the total on screen
+        // always carries the SPENT label, never bare.
+        val header = LedgerItem.DayHeader(date = LocalDate.of(2026, 8, 3), total = Money(50_000_00))
+        compose.setContent(content(items = listOf(header)))
+
+        compose.onNodeWithText("Monday, 3 August").assertIsDisplayed()
+        compose.onNodeWithText("৳50,000.00").assertIsDisplayed()
+        // Two SPENT labels are expected here: the month strip's and this day
+        // header's. Both must be present -- if either goes missing, one of the
+        // two figures on screen would be unlabelled again.
+        val spentLabels = compose.onAllNodesWithText("SPENT").fetchSemanticsNodes()
+        assertEquals(2, spentLabels.size)
+    }
+
+    @Test
+    fun aDayHeaderDropsItsFigureWhileSearchingRatherThanShowingAnAllTimeTotal() {
+        // I4: observeDayTotals() stays an unfiltered, all-time aggregate while
+        // search narrows the rows on screen to whatever matches the query, so
+        // the day header's total can no longer agree with the rows beneath it.
+        // The date is still true under search; the figure is not, so only the
+        // figure disappears.
+        val header = LedgerItem.DayHeader(date = LocalDate.of(2026, 8, 3), total = Money(50_000_00))
+        compose.setContent(content(items = listOf(header), query = "shwapno"))
+
+        compose.onNodeWithText("Monday, 3 August").assertIsDisplayed()
+        val total = compose.onAllNodesWithText("৳50,000.00").fetchSemanticsNodes()
+        assertTrue("the day-header total should not appear while searching", total.isEmpty())
+        val spentLabels = compose.onAllNodesWithText("SPENT").fetchSemanticsNodes()
+        assertTrue("no SPENT label should appear while searching", spentLabels.isEmpty())
     }
 }

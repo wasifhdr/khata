@@ -166,7 +166,7 @@ fun LedgerContent(
                     },
                 ) { index ->
                     when (val item = items[index]) {
-                        is LedgerItem.DayHeader -> DayHeaderRow(item)
+                        is LedgerItem.DayHeader -> DayHeaderRow(item, isSearching = isSearching)
                         is LedgerItem.Row -> TransactionRow(
                             item = item,
                             chip = item.transaction.categoryId?.let { categoryTokens[it] },
@@ -326,7 +326,7 @@ private fun MonthStrip(header: LedgerHeaderState) {
 private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, d MMMM")
 
 @Composable
-private fun DayHeaderRow(header: LedgerItem.DayHeader) {
+private fun DayHeaderRow(header: LedgerItem.DayHeader, isSearching: Boolean) {
     val spacing = LocalSpacing.current
     Row(
         Modifier.fillMaxWidth().padding(top = spacing.md, bottom = spacing.xs),
@@ -338,11 +338,33 @@ private fun DayHeaderRow(header: LedgerItem.DayHeader) {
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.outline,
         )
-        Text(
-            text = header.total.format(),
-            style = AmountTextStyle,
-            color = MaterialTheme.colorScheme.outline,
-        )
+        // Search matches rows from every month, but observeDayTotals() stays a
+        // month-agnostic, all-time aggregate either way -- under search it no
+        // longer describes the rows beneath this header (I4), the same shape of
+        // mismatch Task 4 already removed from the heading and the month strip.
+        // Suppressing the figure keeps the date, which is still true, and drops
+        // the number, which would not be.
+        if (!isSearching) {
+            Column(horizontalAlignment = Alignment.End) {
+                // I3: observeDayTotals() is DEBIT-only by design (see
+                // TransactionDaoTest), so an unlabelled figure reads as "this day
+                // totalled X" when it only ever totals spend -- a day of pure
+                // income showed ৳0.00 beside a credit row. Labelling it, the way
+                // the month strip already labels the same DEBIT-only figure,
+                // makes it a true claim about spend instead of a false one about
+                // the day.
+                Text(
+                    text = "SPENT",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                Text(
+                    text = header.total.format(),
+                    style = AmountTextStyle,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
     }
 }
 

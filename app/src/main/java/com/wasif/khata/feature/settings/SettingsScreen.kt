@@ -143,6 +143,22 @@ fun SettingsContent(
                     }
                 }
             }
+            // I6: KhataNavHost freezes its start destination for the process
+            // lifetime -- back from the root has to keep exiting the app, which
+            // stops being true the instant the graph could be rebuilt under a
+            // live back stack. So this control cannot take effect immediately;
+            // saying so here is the other half of that fix; freezing alone
+            // would make the control look broken instead.
+            Text(
+                text = "Takes effect the next time you open Khata",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(
+                    start = spacing.screenHorizontal,
+                    end = spacing.screenHorizontal,
+                    top = spacing.xs,
+                ),
+            )
 
             Section("Monthly budget")
             MonthlyBudgetField(

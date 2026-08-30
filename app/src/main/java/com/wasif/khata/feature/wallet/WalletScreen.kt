@@ -109,11 +109,20 @@ fun WalletContent(
 }
 
 private fun walletSubline(state: WalletUiState): String {
-    val accounts = "${state.accounts.size} accounts"
+    // M12: neither count singularises -- "1 accounts" and "1 need checking"
+    // are both ungrammatical, and a one-account wallet or a single drifting
+    // account are ordinary states this screen must render correctly, not
+    // edge cases.
+    val accounts = if (state.accounts.size == 1) "1 account" else "${state.accounts.size} accounts"
     // The subline answers "is this current?" -- the question the glance job is
     // actually asking -- rather than restating the heading.
     return if (state.driftingAccounts > 0) {
-        "$accounts · ${state.driftingAccounts} need checking"
+        val needsChecking = if (state.driftingAccounts == 1) {
+            "1 needs checking"
+        } else {
+            "${state.driftingAccounts} need checking"
+        }
+        "$accounts · $needsChecking"
     } else {
         "$accounts · all reconciled"
     }

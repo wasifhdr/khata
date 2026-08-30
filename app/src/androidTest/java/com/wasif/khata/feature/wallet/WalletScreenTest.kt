@@ -51,7 +51,29 @@ class WalletScreenTest {
         }
 
         compose.onNodeWithText("Wallet").assertIsDisplayed()
-        compose.onNodeWithText("2 accounts · 1 need checking").assertIsDisplayed()
+        // M12: "1 need checking" was ungrammatical -- the drifting count is 1
+        // here, so this is the singular form the fix owes.
+        compose.onNodeWithText("2 accounts · 1 needs checking").assertIsDisplayed()
+    }
+
+    @Test
+    fun theSublineSingularisesBothCountsRatherThanAlwaysReadingAsPlural() {
+        // M12: "${size} accounts" didn't singularise ("1 accounts"), and
+        // neither did the drifting count ("1 need checking"). A one-account
+        // wallet with its one account drifting exercises both singulars at
+        // once.
+        compose.setContent {
+            KhataTheme {
+                WalletContent(
+                    WalletUiState(accounts = listOf(account("EBL", 2_98_606_00, 2_98_846_00))),
+                    {},
+                    {},
+                    {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("1 account · 1 needs checking").assertIsDisplayed()
     }
 
     @Test

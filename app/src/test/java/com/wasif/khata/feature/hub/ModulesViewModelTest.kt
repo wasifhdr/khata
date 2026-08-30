@@ -7,6 +7,8 @@ import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.time.KhataClock
+import com.wasif.khata.core.time.dhakaMonthStart
+import com.wasif.khata.core.time.dhakaNextMonthStart
 import com.wasif.khata.core.ui.theme.ThemeSpec
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
@@ -33,6 +35,7 @@ class ModulesViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val spend = MutableStateFlow(Money.ZERO)
     private val prefs = MutableStateFlow(KhataPreferences.Default)
+    private var requestedSpendWindow: Pair<Long, Long>? = null
 
     private val clock = object : KhataClock {
         override fun now(): Long = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
@@ -49,7 +52,10 @@ class ModulesViewModelTest {
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
-        override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
+        override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> {
+            requestedSpendWindow = fromInclusive to toExclusive
+            return spend
+        }
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
         override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
@@ -83,6 +89,20 @@ class ModulesViewModelTest {
             assertEquals(Money(47_382_50), expectMostRecentItem().monthSpend)
             cancelAndIgnoreRemainingEvents()
         }
+
+        // I9: the fake above used to discard fromInclusive/toExclusive
+        // entirely, so this name asserted nothing about the window -- replacing
+        // the ViewModel's window computation with 0L to 0L still passed. The
+        // clock is fixed at 28 August 2026, so the half-open bounds below are
+        // the exact Dhaka month edges, not epoch-0 placeholders: a window off
+        // by even an hour would fail this.
+        val now = clock.now()
+        val expectedWindow = now.dhakaMonthStart() to now.dhakaNextMonthStart()
+        // 1 August 00:00 Dhaka is 31 July 18:00 UTC.
+        assertEquals(Instant.parse("2026-07-31T18:00:00Z").toEpochMilli(), expectedWindow.first)
+        // 1 September 00:00 Dhaka is 31 August 18:00 UTC.
+        assertEquals(Instant.parse("2026-08-31T18:00:00Z").toEpochMilli(), expectedWindow.second)
+        assertEquals(expectedWindow, requestedSpendWindow)
     }
 
     @Test

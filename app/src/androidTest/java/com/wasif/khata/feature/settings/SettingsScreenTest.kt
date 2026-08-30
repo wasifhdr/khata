@@ -39,4 +39,30 @@ class SettingsScreenTest {
         compose.onNodeWithText("Modules").assertIsDisplayed()
         compose.onNodeWithText("Wallet").assertIsDisplayed()
     }
+
+    @Test
+    fun theHomeViewControlSaysItTakesEffectNextLaunch() {
+        // I6: KhataNavHost freezes its start destination for the process
+        // lifetime, so selecting a new home view here cannot move the user
+        // there mid-interaction the way it used to. Freezing without saying so
+        // would make the control look unresponsive; this is the other half of
+        // that fix -- the part reachable without Hilt navigation test infra.
+        compose.setContent {
+            KhataTheme {
+                SettingsContent(
+                    prefs = KhataPreferences.Default,
+                    onBack = {},
+                    onHomeViewSelected = {},
+                    onMonthlyBudgetChanged = {},
+                    onFieldSelected = {},
+                    onGroundSelected = {},
+                    onAccentSelected = {},
+                    onIntensitySelected = {},
+                    onResetTheme = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("Takes effect the next time you open Khata").assertIsDisplayed()
+    }
 }

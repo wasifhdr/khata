@@ -1,6 +1,7 @@
 package com.wasif.khata.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -34,7 +35,19 @@ fun KhataNavHost(homeView: HomeView) {
     // The preference IS the back-stack root, which is why it has to be resolved
     // before this composes: back from the root exits the app, and that cannot
     // be changed once the graph is built.
-    val start = when (homeView) {
+    //
+    // I6: `homeView` is a live parameter -- MainActivity recomposes this on
+    // every DataStore emission, including the one the user just caused by
+    // changing the very preference read here. NavHost rebuilds its graph
+    // whenever `startDestination` changes and calls `setGraph` unconditionally,
+    // which pops the live back stack and ejects the user to the new root
+    // mid-interaction (confirmed against navigation-compose 2.10.0). `remember`
+    // with no keys captures `homeView` only on this composable's first
+    // composition and ignores every later value, so the graph -- and the
+    // comment's promise above -- both hold for the rest of the process.
+    // Settings tells the user the new value takes effect next launch.
+    val frozenHomeView = remember { homeView }
+    val start = when (frozenHomeView) {
         HomeView.Modules -> KhataRoutes.Modules
         HomeView.Wallet -> KhataRoutes.Wallet
     }

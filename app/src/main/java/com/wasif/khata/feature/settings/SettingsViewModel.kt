@@ -41,10 +41,12 @@ class SettingsViewModel @Inject constructor(
     fun onResetTheme() = viewModelScope.launch { repository.resetTheme() }
 
     /**
-     * Built and tested, but nothing in the UI calls it yet. Setting a module as
-     * home makes it the back-stack root, and the Ledger cannot yet carry a way
-     * back to the hub — the settings gear lives only there. Offering this before
-     * Plan C adds that glyph would let the user lock themselves out of Settings.
+     * Wired to the HOME VIEW control in Settings since Task 6. Writing here
+     * only changes what `KhataNavHost` resolves as its start destination on the
+     * *next* process launch (I6) — it freezes that value for the lifetime of
+     * the current one, because rebuilding the graph under a live back stack
+     * would pop it and eject the user out of Settings mid-interaction. The
+     * supporting text under HOME VIEW says as much.
      */
     fun onHomeViewSelected(view: HomeView) = viewModelScope.launch { repository.setHomeView(view) }
 
