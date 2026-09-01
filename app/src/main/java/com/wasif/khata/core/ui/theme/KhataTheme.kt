@@ -102,7 +102,7 @@ fun KhataTheme(
 
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
-        LocalMotion provides Motion(),
+        LocalMotion provides rememberSystemMotion(),
         LocalThemeSpec provides spec,
         LocalCategoryColors provides KhataPalette.categories,
     ) {

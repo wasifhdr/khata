@@ -106,7 +106,7 @@ class MotionTest {
 
 ```bash
 export JAVA_HOME="/e/Android/Android Studio/jbr"
-./gradlew.bat test --tests '*MotionTest*'
+./gradlew.bat testDebugUnitTest --tests '*MotionTest*'
 ```
 
 Expected: FAIL to compile — `Unresolved reference: forDurationScale`.
@@ -289,7 +289,7 @@ Note what is deliberately **not** tested here: there is no "an instant motion pr
 
 ```bash
 export JAVA_HOME="/e/Android/Android Studio/jbr"
-./gradlew.bat test --tests '*KhataTransitionsTest*'
+./gradlew.bat testDebugUnitTest --tests '*KhataTransitionsTest*'
 ```
 
 Expected: FAIL to compile — `Unresolved reference: isHubTransition`.
@@ -721,7 +721,7 @@ Ledger rows now render over the mesh, whose lightest reachable colour is a field
 
 ```bash
 export JAVA_HOME="/e/Android/Android Studio/jbr"
-./gradlew.bat test --tests '*ContrastTest*'
+./gradlew.bat testDebugUnitTest --tests '*ContrastTest*'
 ```
 
 Expected: this may PASS already — the existing "paper text on field" assertions cover some of these roles, and `outline` was raised in the merge-gate fix wave. **If it passes, that is a real result, not a reason to skip the test**: it is now pinned against future field or role changes, which is exactly the hole that let `outline`-on-petrol ship. If it fails, the failing role's value must be raised in `DarkColors` and re-verified against the grounds too — never lower the assertion.
