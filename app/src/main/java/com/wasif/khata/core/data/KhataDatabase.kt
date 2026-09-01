@@ -10,6 +10,8 @@ import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.entity.CategoryEntity
 import com.wasif.khata.core.data.entity.MerchantAliasEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
+import com.wasif.khata.core.data.entity.ParsingRuleEntity
+import com.wasif.khata.core.data.entity.RawMessageEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
 
 @Database(
@@ -19,8 +21,10 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         TransactionEntity::class,
         MerchantEntity::class,
         MerchantAliasEntity::class,
+        RawMessageEntity::class,
+        ParsingRuleEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {

@@ -25,6 +25,13 @@ android {
         }
     }
 
+    // MigrationTestHelper reads the exported schema from the variant's merged assets.
+    // Robolectric runs against debug, so putting them here reaches the migration
+    // tests while keeping release APKs free of schema JSON.
+    sourceSets {
+        getByName("debug").assets.srcDir("$projectDir/schemas")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
