@@ -12,3 +12,6 @@ captures/
 
 # Impeccable session scratch (machine-local)
 .impeccable/
+
+# Worktrees created for parallel sessions
+.claude/worktrees/
