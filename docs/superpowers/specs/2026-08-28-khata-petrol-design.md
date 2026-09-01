@@ -111,14 +111,25 @@ dark room too.
 
 ### The density rule
 
-**Field intensity is inversely proportional to content density.** The verdigris mesh ships at
-three fixed levels, chosen per screen, so the ground never competes with a column of numbers.
+**Field intensity is one global user setting, applied identically on every screen.**
 
-| Level | Used on | Approx. opacity |
-|---|---|---|
-| Full | Home, module hub | 100% |
-| Mid | Wallet, editor | ~65% |
-| Quiet | Ledger | ~35% |
+An earlier draft of this section shipped the mesh at three fixed levels chosen per screen --
+Full on the hub, Mid on Wallet and editor, Quiet on the Ledger -- on the reasoning that the
+ground should never compete with a column of numbers. That contradicted §9, which makes
+intensity one of the four axes the tuner moves, and §9 is what was built and what the user
+chose. The per-screen rule is withdrawn rather than left as a second, unimplemented source
+of truth.
+
+The legibility concern behind it survives as a test obligation, not a design rule: because
+Ledger rows now sit over the mesh at whatever level the user picks, every text role the
+Ledger renders is asserted against the field key stops at Full intensity, which is the
+lightest the mesh can ever reach. See `ContrastTest`.
+
+The mesh also carries grain, for the same reason the glass does (ingredient 4 below): it is a
+large, dark, smooth gradient, which is exactly what bands on OLED. The grain is generated per
+pixel by an AGSL shader rather than tiled from a bitmap, so there is no asset resident and no
+visible repeat, and it is drawn over the flat ground as well as the pools -- otherwise Off
+would be the one setting that bands.
 
 ### Why not Material You dynamic colour
 

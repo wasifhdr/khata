@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -36,13 +35,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.MoneyText
-import com.wasif.khata.core.ui.component.khataFieldSource
-import com.wasif.khata.core.ui.component.rememberKhataHazeState
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
-import com.wasif.khata.core.ui.theme.LocalThemeSpec
 import com.wasif.khata.core.ui.theme.TaglineTextStyle
 import com.wasif.khata.core.ui.theme.WordmarkTextStyle
 import dev.chrisbanes.haze.HazeState
@@ -67,13 +64,8 @@ fun ModulesContent(
     onOpenSettings: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
-    val spec = LocalThemeSpec.current
-    val haze = rememberKhataHazeState()
 
-    Box(Modifier.fillMaxSize().background(spec.ground)) {
-        // The field is the backdrop the glass samples. It is a static surface,
-        // which is why glass is affordable here and forbidden on a Paging list.
-        FieldBackdrop(Modifier.fillMaxSize().khataFieldSource(haze))
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
 
         // enableEdgeToEdge draws behind the system bars, so the content insets
         // itself or the wordmark sits under the status bar.
@@ -135,42 +127,6 @@ fun ModulesContent(
             }
         }
     }
-}
-
-/**
- * Soft radial pools, not a full-bleed sweep. The ground stays dominant and the
- * field reads as atmosphere -- a linear gradient across the whole screen floods
- * it, and the petrol wallet card then has nothing to sit against.
- *
- * Each pool is capped well below full opacity even at Full intensity, because
- * the key stop is already the lightest colour the mesh should ever reach.
- */
-@Composable
-private fun FieldBackdrop(modifier: Modifier = Modifier) {
-    val spec = LocalThemeSpec.current
-    val strength = spec.intensity.alpha
-
-    Box(
-        modifier.drawBehind {
-            drawRect(spec.ground)
-            if (strength <= 0f) return@drawBehind
-
-            fun pool(colour: Color, alpha: Float, cx: Float, cy: Float, r: Float) {
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(colour.copy(alpha = alpha * strength), Color.Transparent),
-                        center = Offset(size.width * cx, size.height * cy),
-                        radius = size.minDimension * r,
-                    ),
-                )
-            }
-
-            pool(spec.field.keyStop, 0.85f, 0.14f, 0.02f, 1.15f)
-            pool(spec.field.keyStop, 0.55f, 0.92f, 0.16f, 0.95f)
-            pool(KhataPalette.heroStops.first(), 0.60f, 0.70f, 0.78f, 1.00f)
-            pool(spec.ground, 0.70f, 0.10f, 0.95f, 0.90f)
-        },
-    )
 }
 
 @Composable
