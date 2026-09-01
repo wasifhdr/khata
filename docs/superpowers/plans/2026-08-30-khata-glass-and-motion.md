@@ -418,7 +418,7 @@ export JAVA_HOME="/e/Android/Android Studio/jbr"
 ./gradlew.bat test
 ```
 
-Expected: BUILD SUCCESSFUL, 139 tests (134 + 5 new).
+Expected: BUILD SUCCESSFUL, 138 tests (134 + 4 new).
 
 - [ ] **Step 6: Verify on device**
 
@@ -658,7 +658,7 @@ export ANDROID_AVD_HOME="D:\android-avd"
 ./gradlew.bat test connectedDebugAndroidTest
 ```
 
-Expected: BUILD SUCCESSFUL. Unit 139 as before; instrumented 47 (45 baseline + 2 new).
+Expected: BUILD SUCCESSFUL. Unit 138 as before; instrumented 47 (45 baseline + 2 new).
 
 - [ ] **Step 7: Confirm the hub is visually unchanged**
 
@@ -779,7 +779,7 @@ export ANDROID_AVD_HOME="D:\android-avd"
 ./gradlew.bat test connectedDebugAndroidTest
 ```
 
-Expected: BUILD SUCCESSFUL, unit 140, instrumented 47.
+Expected: BUILD SUCCESSFUL, unit 139, instrumented 47.
 
 - [ ] **Step 7: Check the Ledger at Full intensity on device**
 
@@ -941,7 +941,7 @@ export ANDROID_AVD_HOME="D:\android-avd"
 ./gradlew.bat test connectedDebugAndroidTest
 ```
 
-Expected: BUILD SUCCESSFUL, unit 140, instrumented 48.
+Expected: BUILD SUCCESSFUL, unit 139, instrumented 48.
 
 - [ ] **Step 6: Check the zero-intensity fallback on device**
 
@@ -1055,7 +1055,7 @@ export ANDROID_AVD_HOME="D:\android-avd"
 ./gradlew.bat test connectedDebugAndroidTest
 ```
 
-Expected: BUILD SUCCESSFUL, unit 140, instrumented 49.
+Expected: BUILD SUCCESSFUL, unit 139, instrumented 49.
 
 - [ ] **Step 5: Measure it on device**
 
