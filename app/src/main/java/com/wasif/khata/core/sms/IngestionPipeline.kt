@@ -24,6 +24,15 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Whether this account's identifiers name the sender outright, as bKash's do.
+ * EBL's identifiers are account tails that only appear in the body, so an EBL
+ * message says nothing about which account it is until the tail is captured --
+ * which is why a rule for one has to label the account.
+ */
+fun namesSender(smsIdentifiers: String, sender: String): Boolean =
+    smsIdentifiers.split(",").any { it.isNotBlank() && it.trim().equals(sender, ignoreCase = true) }
+
 sealed interface IngestResult {
     data class Recorded(val transactionId: Long) : IngestResult
     data class Updated(val transactionId: Long) : IngestResult
@@ -178,10 +187,7 @@ class IngestionPipeline @Inject constructor(
         if (tail != null) {
             accounts.firstOrNull { accountTail(it.smsIdentifiers) == tail }?.let { return it }
         }
-        return accounts.firstOrNull { account ->
-            account.smsIdentifiers.split(",")
-                .any { it.isNotBlank() && it.trim().equals(sender, ignoreCase = true) }
-        }
+        return accounts.firstOrNull { namesSender(it.smsIdentifiers, sender) }
     }
 
     private suspend fun resolveMerchant(raw: String?, now: Long): MerchantEntity? {

@@ -2,6 +2,7 @@ package com.wasif.khata.feature.ruleeditor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.entity.ParsingRuleEntity
@@ -12,6 +13,7 @@ import com.wasif.khata.core.sms.FieldKind
 import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.LabelledSpan
+import com.wasif.khata.core.sms.namesSender
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.derivePattern
 import com.wasif.khata.core.time.KhataClock
@@ -37,6 +39,12 @@ data class RuleEditorUiState(
     val kind: RuleKind = RuleKind.NORMAL,
     val name: String = "",
     val isSaving: Boolean = false,
+    /**
+     * False when the sender alone cannot say which account a message is about, as
+     * with EBL. Such a rule matches and is then thrown away at the account lookup,
+     * so it must not be saveable.
+     */
+    val senderNamesAccount: Boolean = true,
     val progress: IngestProgress? = null,
     val savedRuleId: Long? = null,
     val reparseSummary: String? = null,
@@ -55,11 +63,27 @@ data class RuleEditorUiState(
             else -> "Save and re-read history"
         }
 
+    private val hasAccount: Boolean get() = spans.any { it.kind == FieldKind.ACCOUNT }
+
     val derived: DerivedRule
-        get() = if (spans.isEmpty() && pending == null) {
-            DerivedRule("", emptyMap(), "Tap the amount in the message, then say what it is.")
-        } else {
-            derivePattern(body, spans)
+        get() = when {
+            spans.isEmpty() && pending == null ->
+                DerivedRule("", emptyMap(), "Tap the amount in the message, then say what it is.")
+
+            else -> {
+                val rule = derivePattern(body, spans)
+                // Caught here rather than after saving: without an account this rule
+                // would match every message it was written for and record none of
+                // them, and the only sign would be "0 recorded".
+                if (rule.error == null && !senderNamesAccount && !hasAccount) {
+                    rule.copy(
+                        error = "Tap the account number too — Khata cannot tell which " +
+                            "account $sender means without it.",
+                    )
+                } else {
+                    rule
+                }
+            }
         }
 
     /** True while a run of words is selected but not yet labelled. */
@@ -78,6 +102,7 @@ data class RuleEditorUiState(
 class RuleEditorViewModel @AssistedInject constructor(
     private val rawMessageDao: RawMessageDao,
     private val ruleDao: ParsingRuleDao,
+    private val accountDao: AccountDao,
     private val reparse: ReparseUseCase,
     private val clock: KhataClock,
     @Assisted private val rawMessageId: Long,
@@ -94,11 +119,13 @@ class RuleEditorViewModel @AssistedInject constructor(
     init {
         viewModelScope.launch {
             val raw = rawMessageDao.findById(rawMessageId) ?: return@launch
+            val named = accountDao.getAll().any { namesSender(it.smsIdentifiers, raw.sender) }
             _state.update {
                 it.copy(
                     sender = raw.sender,
                     body = raw.body,
                     tokens = tokenise(raw.body),
+                    senderNamesAccount = named,
                     name = "${raw.sender} rule",
                 )
             }

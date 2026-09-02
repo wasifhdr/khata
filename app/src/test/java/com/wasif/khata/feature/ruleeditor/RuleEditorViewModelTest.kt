@@ -91,6 +91,7 @@ class RuleEditorViewModelTest {
     private fun viewModel() = RuleEditorViewModel(
         rawMessageDao = db.rawMessageDao(),
         ruleDao = db.parsingRuleDao(),
+        accountDao = db.accountDao(),
         reparse = ReparseUseCase(db.rawMessageDao(), pipeline, clock),
         clock = clock,
         rawMessageId = rawId,
@@ -301,5 +302,83 @@ class RuleEditorViewModelTest {
         advanceUntilIdle()
 
         assertNull(vm.state.value.progress)
+    }
+
+    // --- A rule that could never record anything -----------------------------
+    //
+    // Written on a real EBL transfer, a rule with the amount labelled and no
+    // account matched eight stored messages and recorded none of them: EBL's
+    // account identifiers are body tails, not the sender, so every match was
+    // thrown away at the account lookup. The only sign was "0 recorded".
+
+    private suspend fun eblMessage(): Long = db.rawMessageDao().insertIgnoringDuplicate(
+        RawMessageEntity(
+            uuid = "ebl", sender = "EBL",
+            body = "AC 115***352 is debited with BDT 244 as Own Account Transfer " +
+                "on 25-JUL-26 01:20:52 PM Balance is BDT .56 Thanks.",
+            receivedAt = 1000, bodyHash = "ebl", status = RawMessageStatus.UNMATCHED,
+            matchedRuleId = null, createdAt = 1000, updatedAt = 1000,
+        )
+    )
+
+    private fun eblViewModel(id: Long) = RuleEditorViewModel(
+        rawMessageDao = db.rawMessageDao(),
+        ruleDao = db.parsingRuleDao(),
+        accountDao = db.accountDao(),
+        reparse = ReparseUseCase(db.rawMessageDao(), pipeline, clock),
+        clock = clock,
+        rawMessageId = id,
+    )
+
+    @Test
+    fun `a sender that cannot name an account demands the account be labelled`() = runTest(dispatcher) {
+        val vm = eblViewModel(eblMessage())
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("244"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+
+        assertFalse("this rule would match and record nothing", vm.state.value.canSave)
+        assertTrue(vm.state.value.derived.error!!.contains("account number"))
+    }
+
+    @Test
+    fun `labelling the account makes it saveable`() = runTest(dispatcher) {
+        val vm = eblViewModel(eblMessage())
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("244"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+        vm.onTokenTapped(vm.tokenIndex("115***352"))
+        vm.onFieldChosen(FieldKind.ACCOUNT)
+
+        assertNull(vm.state.value.derived.error)
+        assertTrue(vm.state.value.canSave)
+    }
+
+    @Test
+    fun `and then it actually records the message`() = runTest(dispatcher) {
+        val id = eblMessage()
+        val vm = eblViewModel(id)
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("244"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+        vm.onTokenTapped(vm.tokenIndex("115***352"))
+        vm.onFieldChosen(FieldKind.ACCOUNT)
+
+        vm.onSave()
+        advanceUntilIdle()
+
+        assertEquals(1, db.transactionDao().allActive().size)
+        assertEquals(24400L, db.transactionDao().allActive().single().amountMinor)
+    }
+
+    @Test
+    fun `a sender that does name an account needs no account label`() = runTest(dispatcher) {
+        // bKash's identifier is the sender itself, so this stays a two-tap job.
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("1,240.50"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+
+        assertTrue(vm.state.value.canSave)
     }
 }

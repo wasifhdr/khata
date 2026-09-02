@@ -204,7 +204,10 @@ private fun MessageTokens(state: RuleEditorUiState, onTokenTapped: (Int) -> Unit
                         },
                     )
                     .clickable { onTokenTapped(index) }
-                    .padding(horizontal = spacing.xs, vertical = spacing.xs)
+                    // These are tap targets, not running text. 4dp all round left
+                    // them smaller than a fingertip and hard to aim at in a
+                    // three-line message.
+                    .padding(horizontal = spacing.sm, vertical = spacing.sm)
                     // semantics, not clearAndSetSemantics: clearing would replace the
                     // word's own text, so the message would be unreadable to a screen
                     // reader and unfindable by text.
@@ -215,7 +218,9 @@ private fun MessageTokens(state: RuleEditorUiState, onTokenTapped: (Int) -> Unit
             ) {
                 Text(
                     text = token.text,
-                    style = MaterialTheme.typography.bodyMedium,
+                    // The same size the message is read at everywhere else; being
+                    // tappable is no reason for it to be smaller.
+                    style = MaterialTheme.typography.bodyLarge,
                     color = if (labelled != null || pending) {
                         MaterialTheme.colorScheme.onSecondaryContainer
                     } else {
@@ -284,6 +289,9 @@ private fun DirectionChoice(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FlowRow(
+            // The pills paint a background, so without this the label's descenders
+            // sit on their top edge.
+            Modifier.padding(top = spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
@@ -311,13 +319,14 @@ private fun KindChoice(selected: RuleKind, onChanged: (RuleKind) -> Unit) {
         RuleKind.ATM_WITHDRAWAL to "Cash out",
         RuleKind.FEE to "Fee",
     )
-    Column(Modifier.padding(horizontal = spacing.screenHorizontal)) {
+    Column(Modifier.padding(horizontal = spacing.screenHorizontal, vertical = spacing.md)) {
         Text(
             text = "Kind",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FlowRow(
+            Modifier.padding(top = spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
             verticalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
