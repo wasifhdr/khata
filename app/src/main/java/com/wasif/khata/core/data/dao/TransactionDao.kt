@@ -95,6 +95,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE rawMessageId = :rawMessageId AND deletedAt IS NULL")
     suspend fun findByRawMessageId(rawMessageId: Long): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE uuid = :uuid LIMIT 1")
+    suspend fun findByUuid(uuid: String): TransactionEntity?
+
     @Query(
         "SELECT * FROM transactions WHERE deletedAt IS NULL AND transferGroupId IS NULL " +
             "AND amountMinor = :amountMinor AND accountId != :notAccountId AND direction = :direction " +
@@ -114,6 +117,12 @@ interface TransactionDao {
     )
     suspend fun markAsTransfer(ids: List<Long>, groupId: String, updatedAt: Long)
 
+    // Paired rows are excluded: money that left one of your accounts and arrived
+    // in another was never spent. Keyed on transferGroupId rather than on kind,
+    // because a rule can only guess -- an EBL fund transfer is labelled a transfer
+    // whether it went to your own wallet or to a university, and only a matching
+    // opposite side proves it stayed with you.
+    //
     // COALESCE, because SUM over no rows is NULL and this runs against an empty
     // database on every first launch.
     @Query(
@@ -121,6 +130,7 @@ interface TransactionDao {
         SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
         WHERE deletedAt IS NULL
           AND direction = :direction
+          AND transferGroupId IS NULL
           AND occurredAt >= :fromInclusive
           AND occurredAt < :toExclusive
         """,
@@ -143,7 +153,7 @@ interface TransactionDao {
         SELECT ((occurredAt + 21600000) / 86400000) AS dhakaDayIndex,
                SUM(amountMinor) AS spentMinor
         FROM transactions
-        WHERE deletedAt IS NULL AND direction = 'DEBIT'
+        WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
         GROUP BY dhakaDayIndex
         """,
     )

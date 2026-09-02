@@ -12,6 +12,7 @@ import com.wasif.khata.core.data.entity.MerchantAliasEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
 import com.wasif.khata.core.data.entity.RawMessageEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
+import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.model.RuleKind
@@ -189,9 +190,70 @@ class IngestionPipeline @Inject constructor(
             rawMessageDao.markStatus(rawId, RawMessageStatus.PARSED, parsed.ruleId, now)
 
             // Inside the same database transaction, so a half-formed pair is impossible.
-            pairing.pair(transactionId)
+            if (parsed.kind == RuleKind.ATM_WITHDRAWAL) {
+                depositIntoCash(transactionId, parsed, occurredAt, now)
+            } else {
+                pairing.pair(transactionId)
+            }
 
             if (existing != null) IngestResult.Updated(transactionId) else IngestResult.Recorded(transactionId)
+        }
+    }
+
+    /**
+     * Cash out of an ATM or an agent is not spending -- it is the same money in a
+     * different pocket. Without the other half it left the ledger entirely: on a
+     * real phone, 31 withdrawals worth Tk 162,100 debited the bank and arrived
+     * nowhere, and every one of them was counted as money spent.
+     *
+     * The pair is written explicitly rather than left to [TransferPairing], whose
+     * time window would not know these two belong together.
+     */
+    private suspend fun depositIntoCash(
+        withdrawalId: Long,
+        parsed: ParsedMessage,
+        occurredAt: Long,
+        now: Long,
+    ) {
+        val accounts = accountDao.getAll()
+        val cash = accounts.firstOrNull { it.type == AccountType.CASH } ?: return
+        val withdrawal = transactionDao.findById(withdrawalId) ?: return
+        val from = accounts.firstOrNull { it.id == withdrawal.accountId }?.name ?: "your account"
+
+        // Derived from the withdrawal, so re-reading the same message finds this
+        // row again instead of paying the cash in a second time.
+        val uuid = "cash-${withdrawal.uuid}"
+        val existing = transactionDao.findByUuid(uuid)
+
+        val cashId = transactionDao.upsert(
+            TransactionEntity(
+                id = existing?.id ?: 0,
+                uuid = uuid,
+                accountId = cash.id,
+                amountMinor = parsed.amount.minor,
+                direction = TransactionDirection.CREDIT,
+                occurredAt = occurredAt,
+                merchantRaw = parsed.merchant,
+                merchantId = null,
+                categoryId = null,
+                note = "Withdrawn from $from",
+                source = TransactionSource.SMS,
+                confidence = Confidence.HIGH,
+                rawMessageId = null,
+                transferGroupId = withdrawal.transferGroupId,
+                feeMinor = null,
+                referenceNumber = null,
+                providerTxnId = null,
+                kind = TransactionKind.TRANSFER,
+                createdAt = existing?.createdAt ?: now,
+                updatedAt = now,
+            )
+        )
+        val id = if (cashId == -1L) existing!!.id else cashId
+
+        if (existing == null) accountDao.adjustBalance(cash.id, parsed.amount.minor, now)
+        if (withdrawal.transferGroupId == null) {
+            transactionDao.markAsTransfer(listOf(withdrawalId, id), UUID.randomUUID().toString(), now)
         }
     }
 

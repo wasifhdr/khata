@@ -229,7 +229,11 @@ class IngestionPipelineTest {
             receivedAt = 1000,
         )
 
-        assertEquals(TransactionKind.TRANSFER, transactions().single().kind)
+        // Two halves now: the bank loses it, the cash account gains it.
+        val all = transactions()
+        assertEquals(2, all.size)
+        assertTrue(all.all { it.kind == TransactionKind.TRANSFER })
+        assertEquals(1, all.mapNotNull { it.transferGroupId }.toSet().size)
     }
 
     // --- The balance is what the bank last said it was ----------------------
