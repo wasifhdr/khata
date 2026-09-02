@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.wasif.khata.core.model.RuleKind
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.sms.FieldKind
@@ -129,7 +130,7 @@ class RuleEditorScreenTest {
     fun saving_is_blocked_until_an_amount_is_labelled() {
         setContent(baseState())
 
-        composeRule.onNodeWithText("Save and re-read history").assertIsNotEnabled()
+        composeRule.onNodeWithText("Save and re-read history").performScrollTo().assertIsNotEnabled()
     }
 
     @Test
@@ -137,7 +138,7 @@ class RuleEditorScreenTest {
         var saved = false
         setContent(baseState(spans = listOf(amountSpan())), onSave = { saved = true })
 
-        composeRule.onNodeWithText("Save and re-read history").performClick()
+        composeRule.onNodeWithText("Save and re-read history").performScrollTo().performClick()
 
         assertEquals(true, saved)
     }
@@ -146,8 +147,9 @@ class RuleEditorScreenTest {
     fun after_saving_the_reparse_outcome_is_shown_rather_than_the_save_button() {
         setContent(baseState(spans = listOf(amountSpan()), reparseSummary = "1 recorded · 0 still unread"))
 
-        composeRule.onNodeWithText("Rule saved").assertIsDisplayed()
-        composeRule.onNodeWithText("History re-read · 1 recorded · 0 still unread").assertIsDisplayed()
+        composeRule.onNodeWithText("Rule saved").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("History re-read · 1 recorded · 0 still unread")
+            .performScrollTo().assertIsDisplayed()
     }
 
     @Test

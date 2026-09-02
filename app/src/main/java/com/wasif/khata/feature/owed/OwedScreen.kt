@@ -8,9 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,10 +31,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.time.DHAKA
-import com.wasif.khata.core.ui.component.ContextHeader
+import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
+import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.hazeSource
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -58,31 +62,22 @@ fun OwedContent(
     onOpenTransaction: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val scroll = rememberScrollState()
 
-    FieldScaffold(Modifier.fillMaxSize()) { _ ->
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-                Box(
-                    Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Box(Modifier.fillMaxSize()) {
 
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
-                ContextHeader(
-                    heading = "Owed",
-                    subline = when {
-                        !state.isLoaded -> "Counting"
-                        state.isSettled -> "You are square with everyone"
-                        else -> "${state.owedToYou.format()} out · ${state.owedByYou.format()} in"
-                    },
-                )
+            // A Haze source, padded down by the header's height: the page passes
+            // blurred under the bar rather than stopping at it.
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .hazeSource(haze)
+                    .imePadding()
+                    .verticalScroll(scroll)
+                    .padding(top = CollapsingHeaderHeight, bottom = spacing.xxl)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+            ) {
 
                 if (state.owesYou.isNotEmpty()) {
                     SectionTitle("Owes you")
@@ -122,6 +117,18 @@ fun OwedContent(
                     )
                 }
             }
+
+            CollapsingTopBar(
+                heading = "Owed",
+                subline = when {
+                    !state.isLoaded -> "Counting"
+                    state.isSettled -> "You are square with everyone"
+                    else -> "${state.owedToYou.format()} out · ${state.owedByYou.format()} in"
+                },
+                collapse = scroll.collapseFraction(),
+                hazeState = haze,
+                onBack = onBack,
+            )
         }
     }
 }

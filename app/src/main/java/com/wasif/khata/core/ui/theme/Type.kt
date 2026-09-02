@@ -95,6 +95,17 @@ val PageHeadingStyle = TextStyle(
     lineHeight = 39.sp,
 )
 
+/**
+ * The same heading once a page has been scrolled and its air spent. Same family and
+ * weight as [PageHeadingStyle] deliberately: a page that changes typeface halfway
+ * down reads as a different page, and the heading is the one thing meant to stay
+ * constant the whole way.
+ */
+val PageHeadingCollapsedStyle = PageHeadingStyle.copy(
+    fontSize = 20.sp,
+    lineHeight = 24.sp,
+)
+
 val PageSublineStyle = TextStyle(
     fontFamily = KhataFonts.Text,
     fontWeight = FontWeight.Normal,

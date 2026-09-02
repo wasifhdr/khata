@@ -9,10 +9,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -33,10 +34,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.data.repository.BalanceDrift
 import com.wasif.khata.core.time.DHAKA
-import com.wasif.khata.core.ui.component.ContextHeader
+import com.wasif.khata.core.ui.component.collapseFraction
+import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
+import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.hazeSource
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -64,38 +68,20 @@ fun DriftContent(
     onRecordAdjustment: (BalanceDrift) -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val scroll = rememberScrollState()
 
-    FieldScaffold(Modifier.fillMaxSize()) { _ ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-                Box(
-                    Modifier
-                        .size(spacing.minTouchTarget)
-                        .clip(CircleShape)
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Box(Modifier.fillMaxSize()) {
 
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
-                ContextHeader(
-                    heading = "Reconcile",
-                    subline = if (state.isReconciled) {
-                        "Every taka is accounted for"
-                    } else {
-                        "${state.drifts.size} account${if (state.drifts.size == 1) "" else "s"} with money unaccounted for"
-                    },
-                )
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .hazeSource(haze)
+                    .imePadding()
+                    .verticalScroll(scroll)
+                    .padding(top = CollapsingHeaderHeight, bottom = spacing.xxl)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+            ) {
 
                 state.error?.let { message ->
                     Text(
@@ -120,6 +106,18 @@ fun DriftContent(
                     }
                 }
             }
+
+            CollapsingTopBar(
+                heading = "Reconcile",
+                subline = if (state.isReconciled) {
+                    "Every taka is accounted for"
+                } else {
+                    "${state.drifts.size} account${if (state.drifts.size == 1) "" else "s"} with money unaccounted for"
+                },
+                collapse = scroll.collapseFraction(),
+                hazeState = haze,
+                onBack = onBack,
+            )
         }
     }
 }

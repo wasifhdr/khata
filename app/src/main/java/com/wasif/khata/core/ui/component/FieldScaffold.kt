@@ -21,7 +21,9 @@ import dev.chrisbanes.haze.HazeState
  * Ground, mesh field, and the [HazeState] the field registers itself against --
  * the stack every screen needs and none of them should own.
  *
- * The field is deliberately the *only* Haze source in the app. Blur cost scales
+ * The field is one of only two Haze sources; the other is a page's own scrolling
+ * content, registered so the collapsed top bar can blur what passes under it.
+ * Never a list *row*. Blur cost scales
  * with how often the backdrop changes, so sampling a static mesh is affordable
  * on every screen while sampling a Paging list would not be affordable on any.
  * Glass drawn over this therefore refracts the field, never the content.

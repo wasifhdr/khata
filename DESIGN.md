@@ -24,7 +24,9 @@ These are enforced by tests. Breaking one fails the build, not a review.
 3. **Colour is never the only signal.** Anything colour says, a shape and a word also say.
 4. **Only two text tiers exist over the field.** Paper and one dim. See §3.3 — this is the
    constraint most likely to be violated by accident.
-5. **The field is the only Haze source.** Never a list, never a scrolling surface.
+5. **Two Haze sources, and only two.** The field, and a page's own scrolling content — the second
+   exists so the collapsed top bar can blur what passes under it. Never a list *row*, never a
+   per-item surface.
 6. **Every Material role is set explicitly.** An unset role is Material purple, and it leaks in
    through whichever component happens to read it.
 
@@ -143,6 +145,22 @@ FieldScaffold(Modifier.fillMaxSize()) { haze ->
 **Every screen root uses this.** A screen that paints `colorScheme.background` itself is a bug —
 it will be the only screen without the field.
 
+**The system bars get nothing of their own.** The field runs edge to edge behind both of them, so
+only the status icons and the gesture handle sit on it. This needs two things and misses without
+either: `enableEdgeToEdge` called with explicit transparent styles — the no-argument form paints a
+translucent scrim behind the navigation bar, which reads as a band of different colour across the
+foot of every screen — and `window.isNavigationBarContrastEnforced = false`, or Android adds its own
+scrim back. Content is kept clear of the bars with `windowInsetsPadding` on the screen's own
+column — status bar inside the top bar, navigation bar on the content — never by shrinking the
+scaffold.
+
+**The keyboard resizes the page; it never pans the window.** Two halves, and it is broken without
+either: `android:windowSoftInputMode="adjustResize"` on the **activity** — on `<application>` the
+attribute is silently ignored, which is a bug that looks like a layout bug — and `Modifier.imePadding()`
+on each page's scrolling viewport, since under edge-to-edge nothing consumes the IME inset for you.
+Miss either and the window pans: the top bar rides off the screen and the page draws over the status
+bar.
+
 ### Composition
 
 Four soft radial pools rather than a full-bleed gradient. A linear wash covers every pixel at its
@@ -214,13 +232,28 @@ switches glass to a solid fill. One conditional; it makes "Off" a deliberate fla
 
 ### Cost
 
-Blur cost scales with blurred area × how often the backdrop changes. Because the field is the only
-Haze source, glass anywhere samples a **static** backdrop — that is what makes it affordable on
-every screen. Registering a list as a source would break this for the whole app.
+Blur cost scales with blurred area × how often the backdrop changes, and the second term is the one
+that bites. Glass over the field alone samples a **static** backdrop and is free at any size.
 
-> **Unmeasured:** the Ledger search field's cost is argued structurally, not measured. The emulator
-> is jank-bound at ~94% on the baseline with identical percentiles, so it cannot discriminate.
-> Needs a physical device.
+The collapsed top bar is the one place that samples moving content, and it is affordable for a
+reason worth stating precisely: it is **one** blurred rectangle per frame, of fixed height, at the
+top of the screen. Glass on list rows would be N of them, growing with the list — which is the thing
+this rule has always been protecting against, and still forbids.
+
+**Measured**, on a Pixel 6a, scrolling Settings — the longest page, whose only glass is the bar:
+
+| | Janky frames | 90th | 95th |
+|---|---|---|---|
+| Blur on | 0.0% | 9ms | 10ms |
+| Blur off (`FieldIntensity.Off`) | 0.3% | 12ms | 12ms |
+
+Within noise of each other: one blurred rectangle per frame costs nothing on this hardware. Warm up
+before measuring — the first scroll into a screen reads ~14% janky from composition alone, which is
+not the blur and will send you chasing the wrong thing.
+
+> **Still unmeasured:**
+> the Ledger search field specifically, and glass on a long Paging list — the
+> case rule 5 forbids. Needs its own run if either is ever revisited.
 
 ---
 
@@ -318,6 +351,38 @@ stretched card.
 The Ledger bends it. A 3,000-row list has no bottom to anchor to, so it gets a fixed
 `headspaceLedger` (132dp) instead — enough to read as the same family, small enough that six rows
 stay visible.
+
+### The air is spent on scroll
+
+A page that scrolls opens with its heading centred in open space and gives that space up as it is
+read, ending as a single row shared with the back button. `CollapsingTopBar` takes a `collapse`
+fraction — 0 at rest, 1 once scrolled — and interpolates its height from `CollapsingHeaderHeight`
+(268dp) down to one 64dp row.
+
+Four things make it work, and each is easy to get wrong:
+
+- **The bar floats over the content, which is padded down by `CollapsingHeaderHeight`.** Stacked
+  above it instead, the content would stop at the bar rather than pass under it, and there would be
+  nothing to blur.
+- **The content is a Haze source; the bar is glass once collapsed.** That is what makes the page read
+  as one surface moving rather than two panes.
+- **The two heading states are cross-faded, not tweened.** A heading caught mid-scale is legible at
+  neither end, and the states want different alignment as well as different size.
+- **The typeface never changes.** `PageHeadingCollapsedStyle` is `PageHeadingStyle` at 20sp — same
+  family, same weight. A page that changes typeface halfway down reads as a different page.
+
+Read the fraction from whatever scroll state the page has — `ScrollState.collapseFraction()` for a
+`verticalScroll`, `LazyListState.collapseFraction()` for a list. The list version treats anything
+past the first item as fully collapsed, because `firstVisibleItemScrollOffset` resets at every item
+boundary and would otherwise spring the bar back open halfway down.
+
+The Ledger takes the treatment but not the component: its header is a set of controls — month
+arrows, search, the needs-checking filter — rather than a title, so it keeps them and applies
+`Modifier.collapsingGlass` itself. Its height is measured with `onSizeChanged` rather than fixed,
+because the month strip and the filter come and go.
+
+Home and Wallet do not scroll: their content is anchored, so their air is already the flexible
+`weight(1f)` and there is nothing to collapse. They are the shape the rest of the app copies.
 
 ---
 

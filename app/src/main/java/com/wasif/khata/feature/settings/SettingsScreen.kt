@@ -10,10 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -56,12 +57,15 @@ import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.ui.component.FieldScaffold
-import com.wasif.khata.core.ui.component.ContextHeader
+import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
+import com.wasif.khata.core.ui.component.CollapsingTopBar
+import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import com.wasif.khata.core.ui.theme.isLightColor
+import dev.chrisbanes.haze.hazeSource
 
 @Composable
 fun SettingsScreen(
@@ -110,31 +114,24 @@ fun SettingsContent(
     onResetTheme: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val scroll = rememberScrollState()
 
-    FieldScaffold(Modifier.fillMaxSize()) { _ ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-                Box(
-                    Modifier
-                        .size(spacing.minTouchTarget)
-                        .clip(CircleShape)
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
-                ContextHeader(heading = "Settings", subline = "Messages · home · theme · budget")
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Box(Modifier.fillMaxSize()) {
+            // Registered as a Haze source and padded down by the header's height, so
+            // the page passes blurred under the bar rather than stopping at it.
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .hazeSource(haze)
+                    // Consumed here so the viewport shrinks and the focused field
+                    // scrolls into view, instead of the window panning and taking
+                    // the top bar off screen with it.
+                    .imePadding()
+                    .verticalScroll(scroll)
+                    .padding(top = CollapsingHeaderHeight, bottom = spacing.xxl)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+            ) {
 
                 MessagesSection(
                     state = ingestion,
@@ -276,7 +273,15 @@ fun SettingsContent(
                     )
                 }
             }
-            }
+
+            CollapsingTopBar(
+                heading = "Settings",
+                subline = "Messages · home · theme · budget",
+                collapse = scroll.collapseFraction(),
+                hazeState = haze,
+                onBack = onBack,
+            )
+        }
     }
 }
 

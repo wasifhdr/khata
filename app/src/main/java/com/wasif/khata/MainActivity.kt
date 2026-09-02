@@ -3,6 +3,8 @@ package com.wasif.khata
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import android.graphics.Color
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -29,7 +31,17 @@ class MainActivity : ComponentActivity() {
         // back-stack root -- it cannot be corrected once NavHost has composed.
         splash.setKeepOnScreenCondition { viewModel.state.value is MainUiState.Loading }
 
-        enableEdgeToEdge()
+        // enableEdgeToEdge() with no arguments paints a translucent scrim behind the
+        // navigation bar, which reads as a band of different colour across the foot
+        // of every screen. The field is the background of this app, so the bars get
+        // nothing of their own and the gesture handle floats on it.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
+        // Android adds its own scrim behind a transparent navigation bar unless
+        // told the app has handled contrast itself.
+        window.isNavigationBarContrastEnforced = false
         super.onCreate(savedInstanceState)
         permissionChecker.activity = this
 

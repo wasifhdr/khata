@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -30,10 +32,13 @@ import androidx.compose.ui.draw.clip
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.time.DHAKA
-import com.wasif.khata.core.ui.component.ContextHeader
+import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
+import com.wasif.khata.core.ui.component.CollapsingTopBar
+import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.theme.BengaliBodyStyle
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.hazeSource
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -64,38 +69,17 @@ fun UnmatchedContent(
     onNotATransaction: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val listState = rememberLazyListState()
 
-    FieldScaffold(Modifier.fillMaxSize()) { _ ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-                Box(
-                    Modifier
-                        .size(spacing.minTouchTarget)
-                        .clip(CircleShape)
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-
-            ContextHeader(
-                heading = "Unread",
-                subline = if (state.isEmpty) {
-                    "Every message has a rule"
-                } else {
-                    "${state.messages.size} message${if (state.messages.size == 1) "" else "s"} without a rule"
-                },
-            )
-
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Box(Modifier.fillMaxSize()) {
+          Column(
+              Modifier
+                  .fillMaxSize()
+                  .hazeSource(haze)
+                  .imePadding()
+                  .windowInsetsPadding(WindowInsets.navigationBars),
+          ) {
             state.line?.let { notice ->
                 Text(
                     text = notice,
@@ -104,19 +88,20 @@ fun UnmatchedContent(
                     modifier = Modifier.padding(
                         start = spacing.screenHorizontal,
                         end = spacing.screenHorizontal,
-                        top = spacing.sm,
+                        top = CollapsingHeaderHeight,
                     ),
                 )
             }
 
             if (state.isEmpty) {
-                EmptyNote()
+                Box(Modifier.padding(top = CollapsingHeaderHeight)) { EmptyNote() }
             } else {
                 // No glass on rows: one blur pass per row per frame (DESIGN.md §5).
                 LazyColumn(
-                    Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        top = spacing.md,
+                        top = CollapsingHeaderHeight,
                         bottom = spacing.xxl,
                     ),
                 ) {
@@ -130,6 +115,19 @@ fun UnmatchedContent(
                     }
                 }
             }
+          }
+
+            CollapsingTopBar(
+                heading = "Unread",
+                subline = if (state.isEmpty) {
+                    "Every message has a rule"
+                } else {
+                    "${state.messages.size} message${if (state.messages.size == 1) "" else "s"} without a rule"
+                },
+                collapse = listState.collapseFraction(),
+                hazeState = haze,
+                onBack = onBack,
+            )
         }
     }
 }

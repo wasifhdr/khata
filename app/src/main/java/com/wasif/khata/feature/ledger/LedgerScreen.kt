@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,8 +33,16 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -48,6 +59,8 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.collapsingGlass
+import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.MoneyText
@@ -55,6 +68,7 @@ import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.hazeSource
 import com.wasif.khata.core.ui.theme.PageHeadingStyle
 import com.wasif.khata.core.ui.theme.PageSublineStyle
 import java.time.format.DateTimeFormatter
@@ -103,9 +117,30 @@ fun LedgerContent(
 ) {
     val spacing = LocalSpacing.current
     val isSearching = query.isNotBlank()
+    val listState = rememberLazyListState()
+    val collapse = listState.collapseFraction()
+
+    // The ledger's header is a set of controls rather than a title, so it keeps
+    // them and takes only the treatment: it floats over the list, turns to glass
+    // as the rows pass beneath it, and gives up its air the same way. Its height
+    // is measured rather than fixed, because the month strip and the filter come
+    // and go.
+    var headerPx by remember { mutableIntStateOf(0) }
+    val headerHeight = with(LocalDensity.current) { headerPx.toDp() }
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
+        Box(Modifier.fillMaxSize()) {
+          Column(
+              Modifier
+                  .align(Alignment.TopCenter)
+                  .fillMaxWidth()
+                  // Declared before the list, so without this the list would draw
+                  // over the bar and take its taps. zIndex orders both.
+                  .zIndex(1f)
+                  .onSizeChanged { headerPx = it.height }
+                  .collapsingGlass(haze, collapse)
+                  .windowInsetsPadding(WindowInsets.statusBars),
+          ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
                 Box(
                     Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
@@ -122,14 +157,23 @@ fun LedgerContent(
             // A list of 3,000 rows has no bottom to anchor to, so the ledger gets
             // a fixed headspace where the other screens get a flexible one --
             // enough to read as the same family, small enough that rows stay
-            // visible before scrolling.
+            // visible before scrolling. It spends that air on scroll like every
+            // other page, leaving the month itself in place to navigate by.
             MonthHeader(
                 header = header,
                 canGoForward = canGoForward,
                 isSearching = isSearching,
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
-                modifier = Modifier.fillMaxWidth().height(spacing.headspaceLedger),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(
+                        androidx.compose.ui.unit.lerp(
+                            spacing.headspaceLedger,
+                            spacing.xxl + spacing.md,
+                            collapse,
+                        ),
+                    ),
             )
 
             // A month-spend figure beside all-time search results would claim a
@@ -138,15 +182,15 @@ fun LedgerContent(
                 MonthStrip(header = header)
             }
 
-            // Glass here is affordable because this sits *above* the list rather
-            // than over it, and the only Haze source in the app is the static
-            // field -- so the blur samples a fixed backdrop, not the scrolling
-            // rows. Measured on device before landing; see the plan's Task 6.
+            // Glass only while the bar itself is not: once the bar turns to glass
+            // this would be glass on glass, which reads as a smear rather than two
+            // surfaces.
             KhataGlass(
                 hazeState = haze,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+                    .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm)
+                    .graphicsLayer { alpha = 1f - collapse * 0.35f },
                 shape = MaterialTheme.shapes.small,
             ) {
                 OutlinedTextField(
@@ -191,12 +235,15 @@ fun LedgerContent(
                 }
             }
 
+          }
+
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().hazeSource(haze).imePadding(),
+                state = listState,
                 contentPadding = PaddingValues(
                     start = spacing.screenHorizontal,
                     end = spacing.screenHorizontal,
-                    top = spacing.sm,
+                    top = headerHeight + spacing.sm,
                     // Clear the FAB, or the last row hides under it.
                     bottom = spacing.xxl + spacing.xl,
                 ),
@@ -244,7 +291,7 @@ fun LedgerContent(
         Box(
             Modifier
                 .align(Alignment.BottomEnd)
-                .windowInsetsPadding(WindowInsets.systemBars)
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(spacing.screenHorizontal)
                 .size(58.dp)
                 .clip(CircleShape)
