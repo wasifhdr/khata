@@ -65,6 +65,8 @@ class WalletViewModelTest {
             return received
         }
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = flowOf(emptyMap())
+        override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
+        override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
     }
 
     private val reference = object : ReferenceDataRepository {

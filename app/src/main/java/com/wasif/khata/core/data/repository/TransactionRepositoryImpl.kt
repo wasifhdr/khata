@@ -114,6 +114,9 @@ class TransactionRepositoryImpl @Inject constructor(
                     note = draft.note,
                     source = existing?.source ?: TransactionSource.MANUAL,
                     confidence = existing?.confidence ?: Confidence.HIGH,
+                    // An edit never reclassifies: a transfer stays a transfer when its
+                    // note changes. Only a fresh row takes the draft's kind.
+                    kind = existing?.kind ?: draft.kind,
                     rawMessageId = existing?.rawMessageId,
                     transferGroupId = existing?.transferGroupId,
                     feeMinor = existing?.feeMinor,

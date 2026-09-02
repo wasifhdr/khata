@@ -60,6 +60,8 @@ class ModulesViewModelTest {
         override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = flowOf(emptyMap())
+        override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
+        override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
     }
 
     private val preferences = object : PreferencesRepository {

@@ -3,6 +3,7 @@ package com.wasif.khata.domain.repository
 import androidx.paging.PagingData
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.domain.model.Transaction
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,12 @@ data class TransactionDraft(
     val merchantRaw: String?,
     val categoryId: Long?,
     val note: String?,
+    /**
+     * Defaulted so the editor's call sites are unaffected: a hand-entered
+     * transaction is ordinary. Reconciliation is the first caller that needs to say
+     * otherwise.
+     */
+    val kind: TransactionKind = TransactionKind.NORMAL,
 )
 
 interface TransactionRepository {
