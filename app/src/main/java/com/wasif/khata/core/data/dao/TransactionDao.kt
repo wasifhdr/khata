@@ -56,6 +56,20 @@ interface TransactionDao {
     @Query("UPDATE transactions SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long)
 
+    // Anything other than HIGH, not just LOW: the pipeline records MEDIUM for every
+    // newly-seen merchant, which is the common case for an SMS transaction.
+    @Query(
+        "SELECT * FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH' " +
+            "ORDER BY occurredAt DESC, id DESC"
+    )
+    fun pagingSourceNeedsAttention(): PagingSource<Int, TransactionEntity>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH'")
+    fun observeNeedsAttentionCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH'")
+    suspend fun countNeedsAttention(): Int
+
     @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
     suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?
 

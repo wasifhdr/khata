@@ -125,6 +125,8 @@ class LedgerViewModelTest {
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
+        override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
+        override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
         override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
@@ -159,6 +161,8 @@ class LedgerViewModelTest {
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
+        override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
+        override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
         override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)

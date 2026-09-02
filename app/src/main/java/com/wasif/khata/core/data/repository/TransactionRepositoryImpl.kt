@@ -76,6 +76,13 @@ class TransactionRepositoryImpl @Inject constructor(
             toExclusive = toExclusive,
         ).map { Money(it) }
 
+    override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> =
+        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
+            transactionDao.pagingSourceNeedsAttention()
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
+    override fun observeNeedsAttentionCount(): Flow<Int> = transactionDao.observeNeedsAttentionCount()
+
     override fun observeDayTotals(): Flow<Map<LocalDate, Money>> =
         transactionDao.observeDayTotals().map { rows ->
             rows.associate { it.dhakaDayIndex.dhakaDayIndexToLocalDate() to Money(it.spentMinor) }

@@ -414,7 +414,10 @@ private fun TransactionRow(
                 // "Uncategorised" for an unknown token, and substituting a real
                 // key like "category_neutral" here would silently suppress that.
                 token = chip?.colorToken,
-                lowConfidence = transaction.confidence == Confidence.LOW,
+                // Anything short of HIGH, not just LOW. The ingestion pipeline
+                // records MEDIUM for every newly-seen merchant, so testing for LOW
+                // alone left almost every SMS-captured row unmarked.
+                lowConfidence = transaction.confidence != Confidence.HIGH,
             )
             Column(Modifier.weight(1f).padding(start = spacing.sm, end = spacing.sm)) {
                 Text(
@@ -430,7 +433,7 @@ private fun TransactionRow(
                 val meta = buildList {
                     chip?.name?.let { add(it) }
                     transaction.note?.let { add(it) }
-                    if (transaction.confidence == Confidence.LOW) add("low confidence")
+                    if (transaction.confidence != Confidence.HIGH) add("needs checking")
                 }.joinToString(" · ")
                 if (meta.isNotEmpty()) {
                     Text(
