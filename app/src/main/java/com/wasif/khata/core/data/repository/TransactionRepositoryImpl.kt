@@ -7,6 +7,7 @@ import androidx.paging.map
 import androidx.room.withTransaction
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
+import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.dao.pagingSourceMatching
 import com.wasif.khata.core.data.entity.TransactionEntity
@@ -31,6 +32,7 @@ class TransactionRepositoryImpl @Inject constructor(
     private val db: KhataDatabase,
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
+    private val merchantDao: MerchantDao,
     private val clock: KhataClock,
 ) : TransactionRepository {
 
@@ -113,7 +115,14 @@ class TransactionRepositoryImpl @Inject constructor(
                     categoryId = draft.categoryId,
                     note = draft.note,
                     source = existing?.source ?: TransactionSource.MANUAL,
-                    confidence = existing?.confidence ?: Confidence.HIGH,
+                    // Choosing a category by hand IS the confirmation. Without this
+                    // a parsed row stays MEDIUM after you have categorised it, and
+                    // the needs-attention list can never be emptied.
+                    confidence = if (draft.categoryId != null) {
+                        Confidence.HIGH
+                    } else {
+                        existing?.confidence ?: Confidence.HIGH
+                    },
                     // An edit never reclassifies: a transfer stays a transfer when its
                     // note changes. Only a fresh row takes the draft's kind.
                     kind = existing?.kind ?: draft.kind,
@@ -127,6 +136,16 @@ class TransactionRepositoryImpl @Inject constructor(
             )
 
             accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
+
+            // Confirming a merchant is a one-time job: remember the choice, then
+            // apply it to that merchant's other rows Khata had left uncertain.
+            // Same database transaction, so a merchant can never end up confirmed
+            // with its transactions left behind.
+            val merchantId = existing?.merchantId
+            if (merchantId != null && draft.categoryId != null) {
+                merchantDao.confirmCategory(merchantId, draft.categoryId, now)
+                transactionDao.adoptMerchantCategory(merchantId, draft.categoryId, now)
+            }
 
             // @Upsert returns -1 when it updated rather than inserted.
             if (rowId == -1L) existing!!.id else rowId

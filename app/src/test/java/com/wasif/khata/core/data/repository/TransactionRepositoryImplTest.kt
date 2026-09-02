@@ -5,9 +5,14 @@ import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.data.entity.MerchantEntity
+import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.AccountType
+import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionKind
+import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.repository.TransactionDraft
@@ -15,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -38,7 +44,7 @@ class TransactionRepositoryImplTest {
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), clock)
+        repository = TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock)
     }
 
     @After
@@ -171,6 +177,7 @@ class TransactionRepositoryImplTest {
             db,
             db.transactionDao(),
             ThrowsOnSecondAdjustBalanceAccountDao(db.accountDao()),
+            db.merchantDao(),
             clock,
         )
 
@@ -193,6 +200,152 @@ class TransactionRepositoryImplTest {
         assertEquals("SHWAPNO", saved?.merchantRaw)
         assertEquals(5_000L, saved?.updatedAt)
     }
+
+    // --- Confirming a merchant's category ---------------------------------
+
+    private suspend fun merchant(category: Long? = null): Long = db.merchantDao().upsert(
+        MerchantEntity(
+            uuid = "m-1",
+            canonicalName = "Pathao",
+            categoryId = category,
+            placeId = null,
+            isUserConfirmed = false,
+            createdAt = 1000,
+            updatedAt = 1000,
+        )
+    )
+
+    /** A row as the SMS pipeline leaves it: merchant known, category not. */
+    private suspend fun parsedRow(
+        accountId: Long,
+        merchantId: Long,
+        uuid: String,
+        categoryId: Long? = null,
+        confidence: Confidence = Confidence.MEDIUM,
+    ): Long = db.transactionDao().upsert(
+        TransactionEntity(
+            uuid = uuid,
+            accountId = accountId,
+            amountMinor = 16_500,
+            direction = TransactionDirection.DEBIT,
+            occurredAt = 4_000L,
+            merchantRaw = "Pathao",
+            merchantId = merchantId,
+            categoryId = categoryId,
+            note = null,
+            source = TransactionSource.SMS,
+            confidence = confidence,
+            rawMessageId = null,
+            transferGroupId = null,
+            feeMinor = null,
+            referenceNumber = null,
+            providerTxnId = null,
+            kind = TransactionKind.NORMAL,
+            createdAt = 1000,
+            updatedAt = 1000,
+        )
+    )
+
+    private fun draftFor(id: Long, accountId: Long, categoryId: Long?) = TransactionDraft(
+        id = id,
+        accountId = accountId,
+        amount = Money(16_500),
+        direction = TransactionDirection.DEBIT,
+        occurredAt = 4_000L,
+        merchantRaw = "Pathao",
+        categoryId = categoryId,
+        note = null,
+    )
+
+    @Test
+    fun `categorising an uncertain row is what marks it checked`() = runTest {
+        val accountId = account()
+        val merchantId = merchant()
+        val id = parsedRow(accountId, merchantId, "t-1")
+
+        repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
+
+        // Without this the needs-attention list can never be emptied: you
+        // categorise the row and it stays on the list.
+        assertEquals(Confidence.HIGH, db.transactionDao().findById(id)!!.confidence)
+    }
+
+    @Test
+    fun `the merchant remembers the category, so the question is asked once`() = runTest {
+        val accountId = account()
+        val merchantId = merchant()
+        val id = parsedRow(accountId, merchantId, "t-1")
+
+        repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
+
+        val saved = db.merchantDao().findById(merchantId)!!
+        assertEquals(11L, saved.categoryId)
+        assertTrue(saved.isUserConfirmed)
+    }
+
+    @Test
+    fun `confirming once settles the merchant's other unreviewed rows`() = runTest {
+        val accountId = account()
+        val merchantId = merchant()
+        val id = parsedRow(accountId, merchantId, "t-1")
+        val sibling = parsedRow(accountId, merchantId, "t-2")
+
+        repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
+
+        val settled = db.transactionDao().findById(sibling)!!
+        assertEquals(11L, settled.categoryId)
+        assertEquals(Confidence.HIGH, settled.confidence)
+    }
+
+    @Test
+    fun `a row the user already categorised is never overwritten`() = runTest {
+        val accountId = account()
+        val merchantId = merchant()
+        val id = parsedRow(accountId, merchantId, "t-1")
+        val decided = parsedRow(accountId, merchantId, "t-2", categoryId = 99, confidence = Confidence.HIGH)
+
+        repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
+
+        // Backfill fills gaps. It does not relitigate decisions.
+        assertEquals(99L, db.transactionDao().findById(decided)!!.categoryId)
+    }
+
+    @Test
+    fun `another merchant's rows are left alone`() = runTest {
+        val accountId = account()
+        val merchantId = merchant()
+        val id = parsedRow(accountId, merchantId, "t-1")
+        val otherMerchant = db.merchantDao().upsert(
+            MerchantEntity(
+                uuid = "m-2",
+                canonicalName = "SHWAPNO",
+                categoryId = null,
+                placeId = null,
+                isUserConfirmed = false,
+                createdAt = 1000,
+                updatedAt = 1000,
+            )
+        )
+        val unrelated = parsedRow(accountId, otherMerchant, "t-3")
+
+        repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
+
+        assertNull(db.transactionDao().findById(unrelated)!!.categoryId)
+        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(unrelated)!!.confidence)
+    }
+
+    @Test
+    fun `clearing a category does not confirm the merchant`() = runTest {
+        val accountId = account()
+        val merchantId = merchant()
+        val id = parsedRow(accountId, merchantId, "t-1")
+
+        repository.save(draftFor(id, accountId, categoryId = null)).getOrThrow()
+
+        assertFalse(db.merchantDao().findById(merchantId)!!.isUserConfirmed)
+        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(id)!!.confidence)
+    }
+
 }
 
 /**

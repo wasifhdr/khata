@@ -53,6 +53,22 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE id = :id AND deletedAt IS NULL")
     suspend fun findById(id: Long): TransactionEntity?
 
+    /**
+     * Backfills the category the user just confirmed onto the merchant's other
+     * unreviewed rows, which is what makes confirming a merchant a one-time job
+     * rather than a per-transaction one.
+     *
+     * Deliberately narrow: only rows Khata itself guessed and left uncertain.
+     * A row with a category already on it was decided by the user or by an
+     * earlier confirmation, and is never overwritten from here.
+     */
+    @Query(
+        "UPDATE transactions SET categoryId = :categoryId, confidence = 'HIGH', updatedAt = :now " +
+            "WHERE merchantId = :merchantId AND categoryId IS NULL AND confidence = 'MEDIUM' " +
+            "AND source = 'SMS' AND deletedAt IS NULL"
+    )
+    suspend fun adoptMerchantCategory(merchantId: Long, categoryId: Long, now: Long): Int
+
     @Query("UPDATE transactions SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long)
 

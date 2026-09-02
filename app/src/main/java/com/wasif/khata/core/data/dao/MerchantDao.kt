@@ -23,4 +23,14 @@ interface MerchantDao {
             "WHERE a.rawText = :rawText AND m.deletedAt IS NULL AND a.deletedAt IS NULL LIMIT 1"
     )
     suspend fun findByAlias(rawText: String): MerchantEntity?
+
+    /**
+     * What the user chose, remembered. Every later message from this merchant
+     * arrives already categorised and HIGH, so the same choice is never asked twice.
+     */
+    @Query(
+        "UPDATE merchants SET categoryId = :categoryId, isUserConfirmed = 1, updatedAt = :now " +
+            "WHERE id = :id AND deletedAt IS NULL"
+    )
+    suspend fun confirmCategory(id: Long, categoryId: Long, now: Long)
 }
