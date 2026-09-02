@@ -1,10 +1,17 @@
 package com.wasif.khata.feature.settings
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.sms.BackfillProgress
+import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.ui.theme.KhataTheme
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,7 +30,13 @@ class SettingsScreenTest {
             KhataTheme {
                 SettingsContent(
                     prefs = KhataPreferences.Default,
+                    ingestion = IngestionState(),
                     onBack = {},
+                    onPermissionRequested = {},
+                    onBackfill = {},
+                    onReparse = {},
+                    onOpenUnmatched = {},
+                    onOpenReconcile = {},
                     onHomeViewSelected = {},
                     onMonthlyBudgetChanged = {},
                     onFieldSelected = {},
@@ -51,7 +64,13 @@ class SettingsScreenTest {
             KhataTheme {
                 SettingsContent(
                     prefs = KhataPreferences.Default,
+                    ingestion = IngestionState(),
                     onBack = {},
+                    onPermissionRequested = {},
+                    onBackfill = {},
+                    onReparse = {},
+                    onOpenUnmatched = {},
+                    onOpenReconcile = {},
                     onHomeViewSelected = {},
                     onMonthlyBudgetChanged = {},
                     onFieldSelected = {},
@@ -64,5 +83,124 @@ class SettingsScreenTest {
         }
 
         compose.onNodeWithText("Takes effect the next time you open Khata").assertIsDisplayed()
+    }
+
+    // --- The MESSAGES section ---------------------------------------------
+
+    private fun messages(
+        state: IngestionState,
+        onBackfill: () -> Unit = {},
+        onOpenUnmatched: () -> Unit = {},
+    ): @Composable () -> Unit = {
+        KhataTheme {
+            SettingsContent(
+                prefs = KhataPreferences.Default,
+                ingestion = state,
+                onBack = {},
+                onPermissionRequested = {},
+                onBackfill = onBackfill,
+                onReparse = {},
+                onOpenUnmatched = onOpenUnmatched,
+                onOpenReconcile = {},
+                onHomeViewSelected = {},
+                onMonthlyBudgetChanged = {},
+                onFieldSelected = {},
+                onGroundSelected = {},
+                onAccentSelected = {},
+                onIntensitySelected = {},
+                onResetTheme = {},
+            )
+        }
+    }
+
+    @Test
+    fun permissionIsDescribedByWhatItDoesNotByItsEnumName() {
+        compose.setContent(messages(IngestionState(permission = SmsPermissionState.NOT_REQUESTED)))
+
+        compose.onNodeWithText("Read bKash and EBL messages").assertIsDisplayed()
+        compose.onNodeWithText("NOT_REQUESTED").assertDoesNotExist()
+    }
+
+    @Test
+    fun refusingSmsIsPresentedAsAWorkingChoice() {
+        compose.setContent(messages(IngestionState(permission = SmsPermissionState.NOT_REQUESTED)))
+
+        // Nothing about permission may gate entry -- the copy has to say so.
+        compose.onNodeWithText("Khata works without this", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun aPermanentDenialSendsYouToAppSettingsRatherThanPromisingAnotherPrompt() {
+        compose.setContent(messages(IngestionState(permission = SmsPermissionState.PERMANENTLY_DENIED)))
+
+        // Android stops showing the dialog after two refusals, so "tap to ask
+        // again" would be a promise the system will not keep.
+        compose.onNodeWithText("app settings", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Tap to ask again").assertDoesNotExist()
+    }
+
+    @Test
+    fun backfillCannotBeStartedWithoutPermission() {
+        compose.setContent(messages(IngestionState(permission = SmsPermissionState.DENIED)))
+
+        compose.onNodeWithText("Read my message history").assertIsNotEnabled()
+    }
+
+    @Test
+    fun backfillStartsWhenPermissionIsGranted() {
+        var started = false
+        compose.setContent(
+            messages(IngestionState(permission = SmsPermissionState.GRANTED), onBackfill = { started = true }),
+        )
+
+        compose.onNodeWithText("Read my message history").performClick()
+
+        assertTrue(started)
+    }
+
+    @Test
+    fun progressIsReportedInWordsNotOnlyAsABar() {
+        compose.setContent(
+            messages(
+                IngestionState(
+                    permission = SmsPermissionState.GRANTED,
+                    backfill = BackfillProgress(processed = 40, total = 900, summary = IngestSummary()),
+                ),
+            ),
+        )
+
+        compose.onNodeWithText("40 of 900 messages").assertIsDisplayed()
+    }
+
+    @Test
+    fun aRunInFlightCannotBeStartedAgain() {
+        compose.setContent(
+            messages(
+                IngestionState(
+                    permission = SmsPermissionState.GRANTED,
+                    backfill = BackfillProgress(processed = 40, total = 900, summary = IngestSummary()),
+                ),
+            ),
+        )
+
+        compose.onNodeWithText("Read my message history").assertIsNotEnabled()
+        compose.onNodeWithText("Re-read with the current rules").assertIsNotEnabled()
+    }
+
+    @Test
+    fun theUnmatchedRowSaysHowManyAreWaitingBeforeYouOpenIt() {
+        compose.setContent(messages(IngestionState(unmatchedCount = 7)))
+
+        compose.onNodeWithText("7 waiting", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingUnmatchedNavigates() {
+        var opened = false
+        compose.setContent(messages(IngestionState(unmatchedCount = 7), onOpenUnmatched = { opened = true }))
+
+        compose.onNodeWithText("Messages Khata could not read").performClick()
+
+        assertTrue(opened)
     }
 }

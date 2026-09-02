@@ -7,14 +7,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wasif.khata.core.permission.AndroidSmsPermissionChecker
 import com.wasif.khata.core.ui.theme.KhataTheme
 import com.wasif.khata.navigation.KhataNavHost
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+
+    // shouldShowRequestPermissionRationale only answers for an Activity, and the
+    // checker is a singleton with only an application context.
+    @Inject lateinit var permissionChecker: AndroidSmsPermissionChecker
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -25,6 +31,7 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        permissionChecker.activity = this
 
         setContent {
             when (val state = viewModel.state.collectAsStateWithLifecycle().value) {
@@ -34,5 +41,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        permissionChecker.activity = null
+        super.onDestroy()
     }
 }

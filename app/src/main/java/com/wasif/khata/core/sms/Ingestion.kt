@@ -15,6 +15,7 @@ data class IngestSummary(
     val ignored: Int = 0,
     val unmatched: Int = 0,
     val duplicates: Int = 0,
+    val notMine: Int = 0,
 ) {
     fun plus(result: IngestResult): IngestSummary = when (result) {
         is IngestResult.Recorded -> copy(total = total + 1, recorded = recorded + 1)
@@ -22,6 +23,7 @@ data class IngestSummary(
         IngestResult.Ignored -> copy(total = total + 1, ignored = ignored + 1)
         IngestResult.Unmatched -> copy(total = total + 1, unmatched = unmatched + 1)
         IngestResult.Duplicate -> copy(total = total + 1, duplicates = duplicates + 1)
+        IngestResult.NotMine -> copy(total = total + 1, notMine = notMine + 1)
     }
 }
 

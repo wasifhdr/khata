@@ -21,6 +21,10 @@ import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
 import com.wasif.khata.feature.hub.ModulesScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
+import com.wasif.khata.feature.reconcile.DriftScreen
+import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
+import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
+import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
 import com.wasif.khata.feature.wallet.WalletScreen
 
@@ -29,11 +33,17 @@ object KhataRoutes {
     const val Wallet = "wallet"
     const val Ledger = "ledger"
     const val Settings = "settings"
+    const val Unmatched = "unmatched"
+    const val Reconcile = "reconcile"
+    const val RuleEditor = "rules/new/{rawMessageId}"
     const val EditorNew = "editor/new"
     const val EditorEdit = "editor/edit/{transactionId}"
     const val ArgTransactionId = "transactionId"
+    const val ArgRawMessageId = "rawMessageId"
 
     fun editorEdit(id: Long): String = "editor/edit/$id"
+
+    fun ruleEditor(rawMessageId: Long): String = "rules/new/$rawMessageId"
 }
 
 @Composable
@@ -122,7 +132,38 @@ fun KhataNavHost(homeView: HomeView) {
         }
 
         composable(KhataRoutes.Settings) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenUnmatched = { navController.navigate(KhataRoutes.Unmatched) },
+                onOpenReconcile = { navController.navigate(KhataRoutes.Reconcile) },
+            )
+        }
+
+        composable(KhataRoutes.Unmatched) {
+            UnmatchedScreen(
+                onBack = { navController.popBackStack() },
+                onWriteRule = { rawId -> navController.navigate(KhataRoutes.ruleEditor(rawId)) },
+            )
+        }
+
+        composable(
+            route = KhataRoutes.RuleEditor,
+            arguments = listOf(navArgument(KhataRoutes.ArgRawMessageId) { type = NavType.LongType }),
+        ) { entry ->
+            val rawId = entry.arguments?.getLong(KhataRoutes.ArgRawMessageId) ?: 0L
+            RuleEditorScreen(
+                onBack = { navController.popBackStack() },
+                // Back to the list, not to the message just handled: it is no
+                // longer unread, so returning to it would show a dead end.
+                onSaved = { navController.popBackStack() },
+                viewModel = hiltViewModel<RuleEditorViewModel, RuleEditorViewModel.Factory>(
+                    creationCallback = { factory -> factory.create(rawId) },
+                ),
+            )
+        }
+
+        composable(KhataRoutes.Reconcile) {
+            DriftScreen(onBack = { navController.popBackStack() })
         }
 
         composable(KhataRoutes.EditorNew) {

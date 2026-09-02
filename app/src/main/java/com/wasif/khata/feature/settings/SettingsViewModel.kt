@@ -5,22 +5,105 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.data.dao.RawMessageDao
+import com.wasif.khata.core.model.RawMessageStatus
+import com.wasif.khata.core.permission.SmsPermissionRepository
+import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.PreferencesRepository
+import com.wasif.khata.core.sms.BackfillProgress
+import com.wasif.khata.core.sms.BackfillUseCase
+import com.wasif.khata.core.sms.IngestSummary
+import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.ThemeSpec
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/**
+ * Everything the MESSAGES section needs, in one value. Grouped so adding a row
+ * there does not add a parameter to [SettingsContent] each time.
+ */
+data class IngestionState(
+    val permission: SmsPermissionState = SmsPermissionState.NOT_REQUESTED,
+    val unmatchedCount: Int = 0,
+    val backfill: BackfillProgress? = null,
+    val lastRun: String? = null,
+) {
+    val isWorking: Boolean get() = backfill != null && !backfill.isComplete
+}
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val repository: PreferencesRepository,
+    private val smsPermission: SmsPermissionRepository,
+    private val backfill: BackfillUseCase,
+    private val reparse: ReparseUseCase,
+    rawMessageDao: RawMessageDao,
 ) : ViewModel() {
+
+    private val _backfill = MutableStateFlow<BackfillProgress?>(null)
+    private val _lastRun = MutableStateFlow<String?>(null)
+
+    val ingestion: StateFlow<IngestionState> = combine(
+        smsPermission.observe(),
+        // Drives the row's own count, so it says how much is waiting before you open it.
+        rawMessageDao.observeByStatus(RawMessageStatus.UNMATCHED).map { it.size },
+        _backfill,
+        _lastRun,
+    ) { permission, unmatched, progress, lastRun ->
+        IngestionState(permission, unmatched, progress, lastRun)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = IngestionState(),
+    )
+
+    /**
+     * Records that the dialog was shown. Without this the repository cannot tell
+     * "never asked" from "asked and refused", and every refusal would look like
+     * a first run.
+     */
+    fun onPermissionRequested() = viewModelScope.launch { smsPermission.onRequested() }
+
+    /**
+     * Reading a multi-year inbox is thousands of messages, so progress is
+     * collected rather than awaited -- a silent block reads as a hang.
+     */
+    fun onBackfill() {
+        if (_backfill.value?.isComplete == false) return
+        _backfill.value = null
+        _lastRun.value = null
+        viewModelScope.launch {
+            runCatching {
+                backfill.run().collect { _backfill.value = it }
+            }.fold(
+                onSuccess = { _lastRun.value = _backfill.value?.summary?.inWords() },
+                onFailure = {
+                    _backfill.value = null
+                    _lastRun.value = "Could not read messages. Please try again."
+                },
+            )
+        }
+    }
+
+    fun onReparse() {
+        _lastRun.value = null
+        viewModelScope.launch {
+            runCatching { reparse() }.fold(
+                onSuccess = { _lastRun.value = it.inWords() },
+                onFailure = { _lastRun.value = "Could not re-read messages. Please try again." },
+            )
+        }
+    }
 
     val state: StateFlow<KhataPreferences> = repository.preferences.stateIn(
         scope = viewModelScope,
@@ -62,3 +145,11 @@ class SettingsViewModel @Inject constructor(
         repository.setTheme(edit(repository.preferences.first().themeSpec))
     }
 }
+
+/** Numbers a person can act on, rather than a struct dump. */
+fun IngestSummary.inWords(): String = buildList {
+    add("$recorded recorded")
+    if (updated > 0) add("$updated updated")
+    if (unmatched > 0) add("$unmatched unread")
+    if (ignored > 0) add("$ignored ignored")
+}.joinToString(" · ")

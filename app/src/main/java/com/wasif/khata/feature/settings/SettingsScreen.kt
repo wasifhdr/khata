@@ -21,9 +21,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +45,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import com.wasif.khata.core.permission.AndroidSmsPermissionChecker
+import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.ui.component.FieldScaffold
@@ -56,11 +66,19 @@ import com.wasif.khata.core.ui.theme.isLightColor
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenUnmatched: () -> Unit,
+    onOpenReconcile: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     SettingsContent(
         prefs = viewModel.state.collectAsStateWithLifecycle().value,
+        ingestion = viewModel.ingestion.collectAsStateWithLifecycle().value,
         onBack = onBack,
+        onPermissionRequested = viewModel::onPermissionRequested,
+        onBackfill = viewModel::onBackfill,
+        onReparse = viewModel::onReparse,
+        onOpenUnmatched = onOpenUnmatched,
+        onOpenReconcile = onOpenReconcile,
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onMonthlyBudgetChanged = viewModel::onMonthlyBudgetChanged,
         onFieldSelected = viewModel::onFieldSelected,
@@ -74,7 +92,13 @@ fun SettingsScreen(
 @Composable
 fun SettingsContent(
     prefs: KhataPreferences,
+    ingestion: IngestionState,
     onBack: () -> Unit,
+    onPermissionRequested: () -> Unit,
+    onBackfill: () -> Unit,
+    onReparse: () -> Unit,
+    onOpenUnmatched: () -> Unit,
+    onOpenReconcile: () -> Unit,
     onHomeViewSelected: (HomeView) -> Unit,
     onMonthlyBudgetChanged: (Long?) -> Unit,
     onFieldSelected: (FieldPalette) -> Unit,
@@ -108,7 +132,16 @@ fun SettingsContent(
             }
 
             Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
-                ContextHeader(heading = "Settings", subline = "Home · theme · budget")
+                ContextHeader(heading = "Settings", subline = "Messages · home · theme · budget")
+
+                MessagesSection(
+                    state = ingestion,
+                    onPermissionRequested = onPermissionRequested,
+                    onBackfill = onBackfill,
+                    onReparse = onReparse,
+                    onOpenUnmatched = onOpenUnmatched,
+                    onOpenReconcile = onOpenReconcile,
+                )
 
                 Section("Home view")
                 Row(
@@ -276,6 +309,157 @@ private fun MonthlyBudgetField(current: Long?, onChange: (Long?) -> Unit) {
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
     )
+}
+
+/**
+ * SMS capture, the two repair runs, and the two screens that show what needs a
+ * person. Sits first because it is the only section that can be *wrong* -- the
+ * theme below it is only ever a preference.
+ */
+@Composable
+private fun MessagesSection(
+    state: IngestionState,
+    onPermissionRequested: () -> Unit,
+    onBackfill: () -> Unit,
+    onReparse: () -> Unit,
+    onOpenUnmatched: () -> Unit,
+    onOpenReconcile: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { onPermissionRequested() }
+
+    Section("Messages")
+
+    // Permission is described by what it does, not by its enum name.
+    ActionRow(
+        title = when (state.permission) {
+            SmsPermissionState.GRANTED -> "Reading your messages"
+            SmsPermissionState.NOT_REQUESTED -> "Read bKash and EBL messages"
+            SmsPermissionState.DENIED -> "Message access is off"
+            SmsPermissionState.PERMANENTLY_DENIED -> "Message access is off"
+        },
+        subtitle = when (state.permission) {
+            SmsPermissionState.GRANTED -> "New messages become transactions on their own"
+            SmsPermissionState.NOT_REQUESTED -> "Khata works without this. You would enter each one by hand."
+            SmsPermissionState.DENIED -> "Tap to ask again"
+            // The system dialog stops appearing after two refusals, so "tap to
+            // ask again" here would be a promise Android will not keep.
+            SmsPermissionState.PERMANENTLY_DENIED -> "Android will not ask again. Turn it on in app settings."
+        },
+        enabled = !state.permission.enablesCapture,
+        onClick = {
+            if (state.permission.needsAppSettings) {
+                context.startActivity(
+                    Intent(
+                        AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", context.packageName, null),
+                    ),
+                )
+            } else {
+                launcher.launch(AndroidSmsPermissionChecker.PERMISSIONS)
+            }
+        },
+    )
+
+    ActionRow(
+        title = "Read my message history",
+        subtitle = "Goes through every message already on this phone. Safe to run twice.",
+        enabled = state.permission.enablesCapture && !state.isWorking,
+        onClick = onBackfill,
+    )
+
+    state.backfill?.let { progress ->
+        Column(Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal)) {
+            Text(
+                // Words as well as a bar: a bar alone cannot say how far along it is.
+                text = "${progress.processed} of ${progress.total} messages",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LinearProgressIndicator(
+                progress = { progress.fraction },
+                modifier = Modifier.fillMaxWidth().padding(top = spacing.xs),
+            )
+        }
+    }
+
+    ActionRow(
+        title = "Re-read with the current rules",
+        subtitle = "A rule written today fixes messages received months ago.",
+        enabled = !state.isWorking,
+        onClick = onReparse,
+    )
+
+    state.lastRun?.let { summary ->
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = spacing.screenHorizontal),
+        )
+    }
+
+    ActionRow(
+        title = "Messages Khata could not read",
+        subtitle = if (state.unmatchedCount == 0) {
+            "Nothing waiting"
+        } else {
+            "${state.unmatchedCount} waiting. Teach Khata to read them."
+        },
+        onClick = onOpenUnmatched,
+    )
+
+    ActionRow(
+        title = "Check balances",
+        subtitle = "Compare what Khata worked out against what the bank last said",
+        onClick = onOpenReconcile,
+    )
+}
+
+@Composable
+private fun ActionRow(
+    title: String,
+    subtitle: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                // Disabled is carried by the same two text tiers the rest of the
+                // app uses, never by a third colour.
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (enabled) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable

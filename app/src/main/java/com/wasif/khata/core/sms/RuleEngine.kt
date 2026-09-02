@@ -8,6 +8,22 @@ import javax.inject.Singleton
 @Singleton
 class RuleEngine @Inject constructor() {
 
+    /**
+     * Whether any rule even claims this sender. A message no rule claims can never
+     * be parsed, so storing it is pure cost -- and on a real phone it is most of
+     * the inbox: friends, OTPs, and operator promos.
+     *
+     * Deliberately more permissive than [parse]: a *disabled* rule still says the
+     * sender is one Khata cares about, so turning a rule off must not make the app
+     * blind to the bank that rule was for. Being wrong in this direction only
+     * stores a bank message that needs a person, which is what the review list is
+     * for; being wrong in the other direction loses it silently.
+     */
+    fun claimsSender(sender: String, rules: List<ParsingRuleEntity>): Boolean =
+        rules.filter { it.deletedAt == null }.any { rule ->
+            rule.senderPattern.toRegexOrNull()?.containsMatchIn(sender) == true
+        }
+
     fun parse(sender: String, body: String, rules: List<ParsingRuleEntity>): ParseOutcome {
         val ordered = rules.filter { it.isEnabled && it.deletedAt == null }.sortedBy { it.priority }
 

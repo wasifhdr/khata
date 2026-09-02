@@ -58,9 +58,18 @@ class AndroidSmsPermissionChecker @Inject constructor(
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
 
+    /**
+     * The Activity the rationale check needs. An application context is never an
+     * Activity, so asking one produced a permanent `false` here -- which made
+     * DENIED unreachable and sent the user to app settings after a single
+     * refusal. MainActivity hands itself over instead, and takes it back on
+     * destroy so a dead Activity is not held by this singleton.
+     */
+    var activity: Activity? = null
+
     override fun shouldShowRationale(): Boolean {
-        val activity = context as? Activity ?: return false
-        return PERMISSIONS.any { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
+        val host = activity ?: return false
+        return PERMISSIONS.any { ActivityCompat.shouldShowRequestPermissionRationale(host, it) }
     }
 
     companion object {

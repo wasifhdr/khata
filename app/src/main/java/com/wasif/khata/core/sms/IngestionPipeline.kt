@@ -30,6 +30,13 @@ sealed interface IngestResult {
     data object Ignored : IngestResult
     data object Unmatched : IngestResult
     data object Duplicate : IngestResult
+
+    /**
+     * Sender no rule claims. Not stored at all, so it is neither a transaction nor
+     * something to review -- distinct from [Ignored], which a rule deliberately
+     * matched and discarded.
+     */
+    data object NotMine : IngestResult
 }
 
 @Singleton
@@ -47,6 +54,17 @@ class IngestionPipeline @Inject constructor(
 
     suspend fun ingest(sender: String, body: String, receivedAt: Long): IngestResult {
         val now = clock.now()
+
+        // Before the message is stored, not after. On a real inbox 84% of messages
+        // are from senders no rule claims -- friends, OTPs, operator promos -- and
+        // keeping them would put the whole of someone's SMS history in this
+        // database while burying the handful worth reviewing.
+        //
+        // ponytail: a sender no rule claims can never be taught either, so a new
+        // bank needs a seeded rule before its messages are seen. Two banks and a
+        // wallet is the whole world here; revisit if adding a bank stops being a
+        // code change.
+        if (!engine.claimsSender(sender, parsingRuleDao.allIncludingDisabled())) return IngestResult.NotMine
 
         val rawId = rawMessageDao.insertIgnoringDuplicate(
             RawMessageEntity(
