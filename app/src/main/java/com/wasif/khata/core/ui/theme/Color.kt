@@ -29,7 +29,15 @@ object KhataPalette {
     val ground: Color = Color(0xFF061214)
     val onSurface: Color = Color(0xFFEDF2F1)
     val onSurfaceDim: Color = Color(0xFFA8B8B8)
-    val onSurfaceFaint: Color = Color(0xFF6E8180)
+    /**
+     * Borders and disabled controls. Raised from #6E8180 when the field moved
+     * onto every screen: at the old value a border over a lit field sat at
+     * 2.30:1, under the 3:1 graphical floor. The cost is a narrower
+     * enabled/disabled separation -- 1.37x on the ground rather than 1.60x --
+     * which is why disabled controls also carry `enabled = false` semantics
+     * rather than relying on the colour alone.
+     */
+    val onSurfaceFaint: Color = Color(0xFF8A9E9C)
 
     val accent: Color = Color(0xFF8FE0CE)
     val accentDeep: Color = Color(0xFF5FC9B2)
@@ -65,17 +73,22 @@ object KhataPalette {
      * that is never rendered, and would fail the default theme for no reason.
      */
     val fields: List<FieldPalette> = listOf(
-        FieldPalette("Verdigris", Color(0xFF185F56)), // default
-        FieldPalette("Abyss", Color(0xFF155159)),
-        FieldPalette("Counterpoint", Color(0xFF12555B)),
-        // Cyan is deliberately darker than the concept's swatch. At the value it
-        // was drawn, paper text over it lands at 2.78:1 -- unreadable. Being the
-        // brightest field is not worth being the one nothing can sit on.
-        FieldPalette("Cyan", Color(0xFF186A70)),
+        // Trimmed so the *grain-lit* peak -- not the raw stop -- clears 4.5:1
+        // against onSurfaceVariant. The grain lifts the brightest pixel by
+        // ~9/255, so a stop that passes on paper fails on screen; sizing to the
+        // raw value is what let dim text land at 3.92:1 over the mesh.
+        FieldPalette("Verdigris", Color(0xFF124740)), // default
+        FieldPalette("Abyss", Color(0xFF12464D)),
+        FieldPalette("Counterpoint", Color(0xFF0F474C)),
+        // Cyan is deliberately the most trimmed. It was already darkened once
+        // for this same reason; being the brightest field is not worth being
+        // the one nothing can sit on.
+        FieldPalette("Cyan", Color(0xFF10474B)),
+        // Violet needs no trim -- it is dark enough already at full strength.
         FieldPalette("Violet", Color(0xFF452F76)),
-        FieldPalette("Monochrome", Color(0xFF155553)),
-        FieldPalette("Deep sea", Color(0xFF105057)),
-        FieldPalette("Mist", Color(0xFF334B58)),
+        FieldPalette("Monochrome", Color(0xFF124746)),
+        FieldPalette("Deep sea", Color(0xFF0E464D)),
+        FieldPalette("Mist", Color(0xFF2C414D)),
     )
 
     /**

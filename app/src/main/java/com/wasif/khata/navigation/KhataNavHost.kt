@@ -9,6 +9,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.wasif.khata.core.prefs.HomeView
+import com.wasif.khata.core.ui.motion.fadeThroughEnter
+import com.wasif.khata.core.ui.motion.fadeThroughExit
+import com.wasif.khata.core.ui.motion.isHubTransition
+import com.wasif.khata.core.ui.motion.sharedAxisXEnter
+import com.wasif.khata.core.ui.motion.sharedAxisXExit
+import com.wasif.khata.core.ui.motion.sharedAxisXPopEnter
+import com.wasif.khata.core.ui.motion.sharedAxisXPopExit
+import com.wasif.khata.core.ui.theme.LocalMotion
 import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
 import com.wasif.khata.feature.hub.ModulesScreen
@@ -52,7 +60,28 @@ fun KhataNavHost(homeView: HomeView) {
         HomeView.Wallet -> KhataRoutes.Wallet
     }
 
-    NavHost(navController = navController, startDestination = start) {
+    val motion = LocalMotion.current
+
+    NavHost(
+        navController = navController,
+        startDestination = start,
+        enterTransition = {
+            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
+            if (hub) sharedAxisXEnter(motion) else fadeThroughEnter(motion)
+        },
+        exitTransition = {
+            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
+            if (hub) sharedAxisXExit(motion) else fadeThroughExit(motion)
+        },
+        popEnterTransition = {
+            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
+            if (hub) sharedAxisXPopEnter(motion) else fadeThroughEnter(motion)
+        },
+        popExitTransition = {
+            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
+            if (hub) sharedAxisXPopExit(motion) else fadeThroughExit(motion)
+        },
+    ) {
         composable(KhataRoutes.Modules) {
             ModulesScreen(
                 onOpenWallet = {

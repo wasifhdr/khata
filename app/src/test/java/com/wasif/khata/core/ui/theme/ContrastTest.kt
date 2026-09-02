@@ -2,6 +2,7 @@ package com.wasif.khata.core.ui.theme
 
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
+import com.wasif.khata.core.ui.component.FieldGrainAlpha
 import com.wasif.khata.core.data.seed.DEFAULT_CATEGORIES
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -43,6 +44,63 @@ class ContrastTest {
         KhataPalette.heroStops.forEach { h ->
             assertFloor("onSurface / hero $h", KhataPalette.onSurface, h, textFloor)
         }
+    }
+
+    /**
+     * The brightest pixel a field can actually put on screen. The mesh draws the
+     * key stop, then the grain lifts roughly half the pixels by
+     * `FieldGrainAlpha` of the way to white -- so the raw stop is not the worst
+     * case, and sizing against it is what let dim text land at 3.92:1 on a
+     * measured device screenshot while this file was green.
+     */
+    private fun grainLit(c: Color): Color = Color(
+        red = c.red * (1f - FieldGrainAlpha) + FieldGrainAlpha,
+        green = c.green * (1f - FieldGrainAlpha) + FieldGrainAlpha,
+        blue = c.blue * (1f - FieldGrainAlpha) + FieldGrainAlpha,
+    )
+
+    @Test
+    fun `every text role the ledger renders clears the text floor on every lit field`() {
+        // Ledger rows sit over the mesh now -- the per-screen density rule was
+        // withdrawn, so the ground is no longer the darkest thing under this
+        // text and every field has to hold it at Full intensity.
+        // Only two text tiers can clear 4.5:1 over a lit field -- paper and one
+        // dim. A third, fainter tier cannot, which is why `outline` is a border
+        // and disabled-state role here and carries no live text.
+        val roles = mapOf(
+            "onSurface" to DarkColors.onSurface,
+            "onSurfaceVariant" to DarkColors.onSurfaceVariant,
+        )
+
+        KhataPalette.fields.forEach { f ->
+            roles.forEach { (name, colour) ->
+                assertFloor("$name / lit field ${f.name}", colour, grainLit(f.keyStop), textFloor)
+            }
+            // Borders and disabled controls are graphical objects, not text.
+            assertFloor("outline / lit field ${f.name}", DarkColors.outline, grainLit(f.keyStop), graphicFloor)
+        }
+    }
+
+    @Test
+    fun `the outline role carries no live text`() {
+        // Sibling to the assertion above: it only holds while nothing renders
+        // body copy in `outline`. This pins that, because a single
+        // `color = colorScheme.outline` on a Text silently reintroduces a
+        // 2.33:1 label over the mesh.
+        val sources = java.io.File("src/main/java/com/wasif/khata")
+            .walkTopDown().filter { it.extension == "kt" }
+        // Anchored so `outlineVariant` -- a legitimate hairline role -- does not
+        // register as an offender.
+        val textInOutline = Regex("""color = MaterialTheme\.colorScheme\.outline(?![A-Za-z])""")
+        val offenders = sources
+            .filter { textInOutline.containsMatchIn(it.readText()) }
+            .map { it.name }
+            .toList()
+
+        assertTrue(
+            "these render text in the outline role, which cannot clear 4.5:1 over the field: $offenders",
+            offenders.isEmpty(),
+        )
     }
 
     @Test
@@ -87,13 +145,18 @@ class ContrastTest {
         // `outline` itself is documented as unfit for this job: if this ever
         // stops failing, the reasoning above (and the fix it justifies) is
         // stale and needs revisiting.
-        KhataPalette.heroStops.forEach { h ->
-            val ratio = contrastRatio(DarkColors.outline, h)
-            assertTrue(
-                "outline / hero $h is now $ratio, so it may no longer need routing around",
-                ratio < textFloor,
-            )
-        }
+        //
+        // Only the lightest stop is asserted. Unfitness needs the *worst* case
+        // to fail, not every case -- an earlier form of this checked all three
+        // and fired when `outline` was raised for the field work, even though
+        // the lightest stop still failed and the routing-around was still
+        // needed.
+        val lightest = KhataPalette.heroStops.first()
+        val ratio = contrastRatio(DarkColors.outline, lightest)
+        assertTrue(
+            "outline / lightest hero $lightest is now $ratio, so it may no longer need routing around",
+            ratio < textFloor,
+        )
     }
 
     @Test

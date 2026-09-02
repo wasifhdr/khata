@@ -30,11 +30,14 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.model.Money
+import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.HazeState
 
 @Composable
 fun WalletScreen(
@@ -60,51 +63,52 @@ fun WalletContent(
 ) {
     val spacing = LocalSpacing.current
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.systemBars),
-    ) {
-        // The back circle is the one thing deliberately outside the thumb arc:
-        // gesture-back is the primary way out, so this is an affordance rather
-        // than a control anyone should have to stretch for.
-        Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-            // Back when this screen was pushed; a hub glyph when it is the root.
-            // Without the second case, choosing Wallet as home would strand the
-            // user: the settings gear lives only on the hub, and back from a
-            // root exits the app.
-            when {
-                onBack != null -> NavCircle(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    description = "Back",
-                    onClick = onBack,
-                )
-                onOpenHub != null -> NavCircle(
-                    icon = Icons.Filled.Home,
-                    description = "All modules",
-                    onClick = onOpenHub,
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars),
+        ) {
+            // The back circle is the one thing deliberately outside the thumb arc:
+            // gesture-back is the primary way out, so this is an affordance rather
+            // than a control anyone should have to stretch for.
+            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
+                // Back when this screen was pushed; a hub glyph when it is the root.
+                // Without the second case, choosing Wallet as home would strand the
+                // user: the settings gear lives only on the hub, and back from a
+                // root exits the app.
+                when {
+                    onBack != null -> NavCircle(
+                        icon = Icons.AutoMirrored.Filled.ArrowBack,
+                        description = "Back",
+                        onClick = onBack,
+                    )
+                    onOpenHub != null -> NavCircle(
+                        icon = Icons.Filled.Home,
+                        description = "All modules",
+                        onClick = onOpenHub,
+                    )
+                }
+            }
+
+            // Heading centred in open space; content anchored to the bottom. Same
+            // shape as home, which is what makes the two read as one app.
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                ContextHeader(
+                    heading = "Wallet",
+                    subline = walletSubline(state),
                 )
             }
-        }
 
-        // Heading centred in open space; content anchored to the bottom. Same
-        // shape as home, which is what makes the two read as one app.
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ContextHeader(
-                heading = "Wallet",
-                subline = walletSubline(state),
-            )
-        }
-
-        Column(
-            Modifier.fillMaxWidth().padding(bottom = spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(spacing.sm),
-        ) {
-            NetWorthCard(state = state)
-            MonthPair(state = state)
-            AccountList(state = state, onOpenLedger = onOpenLedger)
-        }
+            Column(
+                Modifier.fillMaxWidth().padding(bottom = spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                NetWorthCard(state = state)
+                MonthPair(state = state, haze = haze)
+                AccountList(state = state, onOpenLedger = onOpenLedger)
+            }
+            }
     }
 }
 
@@ -156,19 +160,21 @@ private fun NetWorthCard(state: WalletUiState) {
 }
 
 @Composable
-private fun MonthPair(state: WalletUiState) {
+private fun MonthPair(state: WalletUiState, haze: HazeState) {
     val spacing = LocalSpacing.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         MonthFigure(
+            haze = haze,
             label = "SPENT",
             money = state.monthSpend,
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
         MonthFigure(
+            haze = haze,
             label = "RECEIVED",
             money = state.monthReceived,
             tint = MaterialTheme.colorScheme.primary,
@@ -179,29 +185,34 @@ private fun MonthPair(state: WalletUiState) {
 
 @Composable
 private fun MonthFigure(
+    haze: HazeState,
     label: String,
     money: Money,
     tint: Color,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
-    Column(
-        modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(spacing.md),
+    KhataGlass(
+        hazeState = haze,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Text(
-            text = money.format(),
-            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-            color = tint,
-            modifier = Modifier.padding(top = spacing.xs),
-        )
+        // Padding lives inside the glass: KhataGlass clips to `shape`, so
+        // padding applied outside would sit beyond the clip and the content
+        // would touch the bevel.
+        Column(Modifier.padding(spacing.md)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = money.format(),
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                color = tint,
+                modifier = Modifier.padding(top = spacing.xs),
+            )
+        }
     }
 }
 
@@ -219,7 +230,7 @@ private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit) {
             Text(
                 text = "ACCOUNTS",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = "Ledger →",
@@ -250,7 +261,7 @@ private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit) {
                         color = if (account.hasBalanceDrift) {
                             MaterialTheme.colorScheme.error
                         } else {
-                            MaterialTheme.colorScheme.outline
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )
                 }

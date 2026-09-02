@@ -33,6 +33,33 @@ class WalletScreenTest {
     )
 
     @Test
+    fun theMonthFiguresKeepTheirLabelsAndAmountsOnGlass() {
+        // The month figures moved from a flat surfaceContainer Column to
+        // KhataGlass. The paint is not assertable here, and asserting that a
+        // KhataGlass was called would only test the code against itself --
+        // losing the content while rewrapping is the real risk, so that is
+        // what this pins.
+        compose.setContent {
+            KhataTheme {
+                WalletContent(
+                    WalletUiState(
+                        monthSpend = Money(2_400_00),
+                        monthReceived = Money(50_000_00),
+                    ),
+                    {},
+                    {},
+                    {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("SPENT").assertIsDisplayed()
+        compose.onNodeWithText("RECEIVED").assertIsDisplayed()
+        compose.onNodeWithText("৳2,400.00").assertIsDisplayed()
+        compose.onNodeWithText("৳50,000.00").assertIsDisplayed()
+    }
+
+    @Test
     fun theSublineSaysWhetherAnythingNeedsChecking() {
         compose.setContent {
             KhataTheme {
