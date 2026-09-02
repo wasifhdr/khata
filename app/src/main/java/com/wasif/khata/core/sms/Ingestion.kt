@@ -27,7 +27,8 @@ data class IngestSummary(
     }
 }
 
-data class BackfillProgress(
+/** How far a whole-inbox pass has got. Shared by backfill and reparse. */
+data class IngestProgress(
     val processed: Int,
     val total: Int,
     val summary: IngestSummary,
@@ -49,14 +50,14 @@ class BackfillUseCase @Inject constructor(
     private val source: MessageSource,
     private val pipeline: IngestionPipeline,
 ) {
-    fun run(): Flow<BackfillProgress> = flow {
+    fun run(): Flow<IngestProgress> = flow {
         val messages = source.readAll()
         var summary = IngestSummary()
-        emit(BackfillProgress(processed = 0, total = messages.size, summary = summary))
+        emit(IngestProgress(processed = 0, total = messages.size, summary = summary))
 
         messages.forEachIndexed { index, message ->
             summary = summary.plus(pipeline.ingest(message.sender, message.body, message.receivedAt))
-            emit(BackfillProgress(processed = index + 1, total = messages.size, summary = summary))
+            emit(IngestProgress(processed = index + 1, total = messages.size, summary = summary))
         }
     }
 
@@ -76,10 +77,24 @@ class ReparseUseCase @Inject constructor(
     private val pipeline: IngestionPipeline,
     private val clock: KhataClock,
 ) {
-    suspend operator fun invoke(): IngestSummary {
+    /**
+     * Emits progress for the same reason backfill does: this walks every stored
+     * message, which on a real phone is thousands, and a caller that only awaits
+     * the answer shows a button reading "Saving..." for the better part of a
+     * minute with no sign it is doing anything.
+     */
+    fun run(): Flow<IngestProgress> = flow {
         val now = clock.now()
-        return rawMessageDao.allForReparse().fold(IngestSummary()) { summary, raw ->
-            summary.plus(pipeline.process(raw.id, raw.sender, raw.body, raw.receivedAt, now))
+        val messages = rawMessageDao.allForReparse()
+        var summary = IngestSummary()
+        emit(IngestProgress(processed = 0, total = messages.size, summary = summary))
+
+        messages.forEachIndexed { index, raw ->
+            summary = summary.plus(pipeline.process(raw.id, raw.sender, raw.body, raw.receivedAt, now))
+            emit(IngestProgress(processed = index + 1, total = messages.size, summary = summary))
         }
     }
+
+    /** Convenience for callers that only want the outcome. */
+    suspend operator fun invoke(): IngestSummary = run().last().summary
 }

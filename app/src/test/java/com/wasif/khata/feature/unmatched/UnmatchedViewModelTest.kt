@@ -289,4 +289,21 @@ class UnmatchedViewModelTest {
 
         assertNull(vm.state.value.notice)
     }
+
+    @Test
+    fun `progress replaces the notice while the re-read runs`() = runTest(dispatcher) {
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        insert("b", CODE.format("525524"), 2000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        val seen = mutableListOf<String?>()
+        backgroundScope.launch { vm.state.collect { seen += it.line } }
+        vm.onNotATransaction(vm.state.value.messages.first().id)
+        advanceUntilIdle()
+
+        assertTrue("expected a counting line, saw $seen", seen.any { it?.startsWith("Re-reading ") == true })
+        // And the outcome is what is left standing.
+        assertEquals("Hidden, along with 2 others like it.", vm.state.value.line)
+    }
 }

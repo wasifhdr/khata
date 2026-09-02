@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.KhataPreferences
-import com.wasif.khata.core.sms.BackfillProgress
+import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.ui.theme.KhataTheme
 import org.junit.Assert.assertTrue
@@ -164,7 +164,7 @@ class SettingsScreenTest {
             messages(
                 IngestionState(
                     permission = SmsPermissionState.GRANTED,
-                    backfill = BackfillProgress(processed = 40, total = 900, summary = IngestSummary()),
+                    backfill = IngestProgress(processed = 40, total = 900, summary = IngestSummary()),
                 ),
             ),
         )
@@ -178,7 +178,7 @@ class SettingsScreenTest {
             messages(
                 IngestionState(
                     permission = SmsPermissionState.GRANTED,
-                    backfill = BackfillProgress(processed = 40, total = 900, summary = IngestSummary()),
+                    backfill = IngestProgress(processed = 40, total = 900, summary = IngestSummary()),
                 ),
             ),
         )

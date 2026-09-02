@@ -10,7 +10,7 @@ import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.permission.SmsPermissionRepository
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.PreferencesRepository
-import com.wasif.khata.core.sms.BackfillProgress
+import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.BackfillUseCase
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.ReparseUseCase
@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 data class IngestionState(
     val permission: SmsPermissionState = SmsPermissionState.NOT_REQUESTED,
     val unmatchedCount: Int = 0,
-    val backfill: BackfillProgress? = null,
+    val backfill: IngestProgress? = null,
     val lastRun: String? = null,
 ) {
     val isWorking: Boolean get() = backfill != null && !backfill.isComplete
@@ -50,7 +50,7 @@ class SettingsViewModel @Inject constructor(
     rawMessageDao: RawMessageDao,
 ) : ViewModel() {
 
-    private val _backfill = MutableStateFlow<BackfillProgress?>(null)
+    private val _backfill = MutableStateFlow<IngestProgress?>(null)
     private val _lastRun = MutableStateFlow<String?>(null)
 
     val ingestion: StateFlow<IngestionState> = combine(
@@ -96,11 +96,18 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onReparse() {
+        if (_backfill.value?.isComplete == false) return
+        _backfill.value = null
         _lastRun.value = null
         viewModelScope.launch {
-            runCatching { reparse() }.fold(
-                onSuccess = { _lastRun.value = it.inWords() },
-                onFailure = { _lastRun.value = "Could not re-read messages. Please try again." },
+            runCatching {
+                reparse.run().collect { _backfill.value = it }
+            }.fold(
+                onSuccess = { _lastRun.value = _backfill.value?.summary?.inWords() },
+                onFailure = {
+                    _backfill.value = null
+                    _lastRun.value = "Could not re-read messages. Please try again."
+                },
             )
         }
     }

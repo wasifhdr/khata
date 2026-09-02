@@ -96,7 +96,7 @@ fun UnmatchedContent(
                 },
             )
 
-            state.notice?.let { notice ->
+            state.line?.let { notice ->
                 Text(
                     text = notice,
                     style = MaterialTheme.typography.bodyMedium,

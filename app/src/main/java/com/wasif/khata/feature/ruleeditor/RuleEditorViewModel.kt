@@ -9,6 +9,8 @@ import com.wasif.khata.core.model.RuleKind
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.sms.DerivedRule
 import com.wasif.khata.core.sms.FieldKind
+import com.wasif.khata.core.sms.IngestProgress
+import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.LabelledSpan
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.derivePattern
@@ -35,10 +37,24 @@ data class RuleEditorUiState(
     val kind: RuleKind = RuleKind.NORMAL,
     val name: String = "",
     val isSaving: Boolean = false,
+    val progress: IngestProgress? = null,
     val savedRuleId: Long? = null,
     val reparseSummary: String? = null,
     val error: String? = null,
 ) {
+    /**
+     * What the save button says. Re-reading thousands of stored messages takes the
+     * better part of a minute, and a button stuck on "Saving..." for that long
+     * reads as a hang.
+     */
+    val saveLabel: String
+        get() = when {
+            reparseSummary != null -> "Saved"
+            progress != null -> "Re-reading ${progress.processed} of ${progress.total}"
+            isSaving -> "Saving…"
+            else -> "Save and re-read history"
+        }
+
     val derived: DerivedRule
         get() = if (spans.isEmpty() && pending == null) {
             DerivedRule("", emptyMap(), "Tap the amount in the message, then say what it is.")
@@ -162,12 +178,18 @@ class RuleEditorViewModel @AssistedInject constructor(
                 )
                 // Reparse is idempotent, so offering it freely is safe — and it is what
                 // turns a new rule into retroactively corrected history.
-                reparse()
+                var last: IngestProgress? = null
+                reparse.run().collect {
+                    last = it
+                    _state.update { state -> state.copy(progress = it) }
+                }
+                last?.summary ?: IngestSummary()
             }.fold(
                 onSuccess = { summary ->
                     _state.update {
                         it.copy(
                             isSaving = false,
+                            progress = null,
                             savedRuleId = 1,
                             reparseSummary = "${summary.recorded} recorded · ${summary.unmatched} still unread",
                         )
@@ -175,7 +197,11 @@ class RuleEditorViewModel @AssistedInject constructor(
                 },
                 onFailure = {
                     _state.update {
-                        it.copy(isSaving = false, error = "Could not save the rule. Please try again.")
+                        it.copy(
+                            isSaving = false,
+                            progress = null,
+                            error = "Could not save the rule. Please try again.",
+                        )
                     }
                 },
             )

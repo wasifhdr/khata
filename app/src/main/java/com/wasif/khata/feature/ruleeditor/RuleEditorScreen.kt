@@ -152,7 +152,7 @@ fun RuleEditorContent(
                 }
 
                 if (state.reparseSummary == null) {
-                    SaveButton(enabled = state.canSave, isSaving = state.isSaving, onSave = onSave)
+                    SaveButton(enabled = state.canSave, label = state.saveLabel, onSave = onSave)
                 }
             }
         }
@@ -363,7 +363,7 @@ private fun Saved(summary: String, onDone: () -> Unit) {
 }
 
 @Composable
-private fun SaveButton(enabled: Boolean, isSaving: Boolean, onSave: () -> Unit) {
+private fun SaveButton(enabled: Boolean, label: String, onSave: () -> Unit) {
     val spacing = LocalSpacing.current
     Box(
         Modifier
@@ -382,7 +382,7 @@ private fun SaveButton(enabled: Boolean, isSaving: Boolean, onSave: () -> Unit) 
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (isSaving) "Saving…" else "Save and re-read history",
+            text = label,
             style = MaterialTheme.typography.labelLarge,
             // outline is borders and disabled controls only, never live text, so a
             // disabled label stays on a text tier.

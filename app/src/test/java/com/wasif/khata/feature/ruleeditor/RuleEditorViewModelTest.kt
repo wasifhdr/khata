@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -259,5 +260,46 @@ class RuleEditorViewModelTest {
         vm.onNameChanged("   ")
 
         assertFalse(vm.state.value.canSave)
+    }
+
+    @Test
+    fun `the save button says what it is doing rather than sitting on Saving`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        assertEquals("Save and re-read history", vm.state.value.saveLabel)
+    }
+
+    @Test
+    fun `re-reading history reports its progress`() = runTest(dispatcher) {
+        // Re-reading every stored message takes the better part of a minute on a
+        // real inbox; a button stuck on "Saving..." for that long reads as a hang.
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("1,240.50"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+
+        val seen = mutableListOf<String>()
+        backgroundScope.launch { vm.state.collect { seen += it.saveLabel } }
+        vm.onSave()
+        advanceUntilIdle()
+
+        assertTrue(
+            "expected a counting label, saw $seen",
+            seen.any { it.startsWith("Re-reading ") },
+        )
+    }
+
+    @Test
+    fun `progress is cleared once the run is done`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("1,240.50"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+
+        vm.onSave()
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.progress)
     }
 }

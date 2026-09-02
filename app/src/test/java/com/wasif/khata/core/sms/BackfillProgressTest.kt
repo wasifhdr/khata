@@ -107,7 +107,7 @@ class BackfillProgressTest {
     fun `stopping partway leaves the messages already ingested intact`() = runTest {
         // Each message is written in its own database transaction, so an interrupted
         // backfill is a shorter backfill rather than a corrupt one.
-        val emissions = mutableListOf<BackfillProgress>()
+        val emissions = mutableListOf<IngestProgress>()
         useCase(PAYMENT, UNKNOWN).run().collect { progress ->
             emissions += progress
             if (progress.processed == 1) return@collect

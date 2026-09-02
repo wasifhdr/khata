@@ -7,6 +7,7 @@ import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.entity.ParsingRuleEntity
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.model.RuleKind
+import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.deriveIgnorePattern
 import com.wasif.khata.core.time.KhataClock
@@ -40,8 +41,13 @@ data class UnmatchedUiState(
     /** What the last action did, in words. Cleared when another one starts. */
     val notice: String? = null,
     val isWorking: Boolean = false,
+    val progress: IngestProgress? = null,
 ) {
     val isEmpty: Boolean get() = messages.isEmpty()
+
+    /** Progress while it runs, the outcome once it is done. One line, either way. */
+    val line: String?
+        get() = progress?.let { "Re-reading ${it.processed} of ${it.total}…" } ?: notice
 }
 
 @HiltViewModel
@@ -55,11 +61,14 @@ class UnmatchedViewModel @Inject constructor(
     private val _notice = MutableStateFlow<String?>(null)
     private val _working = MutableStateFlow(false)
 
+    private val _progress = MutableStateFlow<IngestProgress?>(null)
+
     val state: StateFlow<UnmatchedUiState> = combine(
         rawMessageDao.observeByStatus(RawMessageStatus.UNMATCHED),
         _notice,
         _working,
-    ) { rows, notice, working ->
+        _progress,
+    ) { rows, notice, working, progress ->
         UnmatchedUiState(
             messages = rows.map {
                 UnmatchedMessage(
@@ -72,6 +81,7 @@ class UnmatchedViewModel @Inject constructor(
             isLoaded = true,
             notice = notice,
             isWorking = working,
+            progress = progress,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnmatchedUiState())
 
@@ -124,7 +134,7 @@ class UnmatchedViewModel @Inject constructor(
                         ),
                     ),
                 )
-                reparse()
+                reparse.run().collect { _progress.value = it }
             }.fold(
                 onSuccess = {
                     _notice.value = if (like == 1) {
@@ -135,6 +145,7 @@ class UnmatchedViewModel @Inject constructor(
                 },
                 onFailure = { _notice.value = "Could not hide that one. Please try again." },
             )
+            _progress.value = null
             _working.value = false
         }
     }
