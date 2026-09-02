@@ -28,6 +28,12 @@ interface AccountDao {
     suspend fun adjustBalance(accountId: Long, deltaMinor: Long, updatedAt: Long)
 
     @Query(
+        "UPDATE accounts SET reportedBalanceMinor = :balanceMinor, reportedBalanceAt = :at, " +
+            "updatedAt = :at WHERE id = :accountId"
+    )
+    suspend fun setReportedBalance(accountId: Long, balanceMinor: Long, at: Long)
+
+    @Query(
         """
         SELECT COALESCE(SUM(currentBalanceMinor), 0) FROM accounts
         WHERE deletedAt IS NULL AND includeInNetWorth = 1

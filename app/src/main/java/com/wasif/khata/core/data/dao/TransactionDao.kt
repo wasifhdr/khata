@@ -59,6 +59,12 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
     suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY id")
+    suspend fun allActive(): List<TransactionEntity>
+
+    @Query("SELECT * FROM transactions WHERE rawMessageId = :rawMessageId AND deletedAt IS NULL")
+    suspend fun findByRawMessageId(rawMessageId: Long): TransactionEntity?
+
     @Query(
         "SELECT * FROM transactions WHERE deletedAt IS NULL AND transferGroupId IS NULL " +
             "AND amountMinor = :amountMinor AND accountId != :notAccountId AND direction = :direction " +
