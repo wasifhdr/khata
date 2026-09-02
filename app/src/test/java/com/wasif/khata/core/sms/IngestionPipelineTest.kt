@@ -87,7 +87,10 @@ class IngestionPipelineTest {
         assertEquals(Money(85600), Money(all.single().amountMinor))
         assertEquals(TransactionDirection.DEBIT, all.single().direction)
         assertEquals("FOODPANDA BANGLADESH LIMITED", all.single().merchantRaw)
-        assertEquals(-85600L, accountNamed("bKash").currentBalanceMinor)
+        // The message says "Balance Tk 41.98", so that is the balance. Accumulating
+        // from zero instead would only ever be right for an account whose whole life
+        // is in the inbox.
+        assertEquals(4198L, accountNamed("bKash").currentBalanceMinor)
     }
 
     @Test
@@ -110,7 +113,7 @@ class IngestionPipelineTest {
         assertEquals("DHA3BH4G8R", all.single().providerTxnId)
         // The "successful" wording arrives second and is the more authoritative one.
         assertEquals("Uber Bangladesh Ltd-Uber", all.single().merchantRaw)
-        assertEquals(-56411L, accountNamed("bKash").currentBalanceMinor)
+        assertEquals(21409L, accountNamed("bKash").currentBalanceMinor)
     }
 
     @Test
@@ -120,7 +123,7 @@ class IngestionPipelineTest {
 
         assertEquals(IngestResult.Duplicate, second)
         assertEquals(1, transactions().size)
-        assertEquals(-85600L, accountNamed("bKash").currentBalanceMinor)
+        assertEquals(4198L, accountNamed("bKash").currentBalanceMinor)
     }
 
     @Test
@@ -129,7 +132,7 @@ class IngestionPipelineTest {
 
         val salary = accountNamed("EBL Salary")
         assertEquals(salary.id, transactions().single().accountId)
-        assertEquals(-6000L, salary.currentBalanceMinor)
+        assertEquals(5856L, salary.currentBalanceMinor)
     }
 
     @Test
@@ -182,7 +185,9 @@ class IngestionPipelineTest {
         val txn = transactions().single()
         assertEquals(TransactionKind.LOAN_DISBURSEMENT, txn.kind)
         assertEquals(TransactionDirection.CREDIT, txn.direction)
-        assertEquals(90000L, accountNamed("bKash").currentBalanceMinor)
+        // "Balance Tk 897.98" -- the bank's figure, not the Tk 900 credit summed
+        // from an assumed empty account.
+        assertEquals(89798L, accountNamed("bKash").currentBalanceMinor)
     }
 
     @Test
@@ -191,7 +196,9 @@ class IngestionPipelineTest {
 
         val bkash = accountNamed("bKash")
         assertEquals(4198L, bkash.reportedBalanceMinor)
-        assertEquals(9_000L, bkash.reportedBalanceAt)
+        // The message's own time, not the moment it was read: a backfill reads six
+        // years in one pass, and stamping them all "now" makes ordering meaningless.
+        assertEquals(transactions().single().occurredAt, bkash.reportedBalanceAt)
     }
 
     @Test
@@ -223,5 +230,43 @@ class IngestionPipelineTest {
         )
 
         assertEquals(TransactionKind.TRANSFER, transactions().single().kind)
+    }
+
+    // --- The balance is what the bank last said it was ----------------------
+
+    @Test
+    fun `a later statement overrules the running total`() = runTest {
+        pipeline.ingest("bKash", BKASH_PAYMENT, receivedAt = 1000)
+
+        // Ingested second but stamped earlier in its own text, so it must not drag
+        // the balance back to an older figure.
+        pipeline.ingest(
+            "bKash",
+            "Payment of Tk 10.00 to SOMEWHERE ELSE is successful. Balance Tk 999.00. " +
+                "TrxID OLDER00001 at 01/01/2020 09:00",
+            receivedAt = 2000,
+        )
+
+        assertEquals(4198L, accountNamed("bKash").currentBalanceMinor)
+    }
+
+    @Test
+    fun `money that moved with no message is banked rather than absorbed`() = runTest {
+        // Two payments whose stated balances cannot both follow from the amounts:
+        // Tk 856 leaves and the balance lands at 41.98, then Tk 10 leaves and the
+        // balance is 20.00 -- so Tk 11.98 went somewhere no message described.
+        pipeline.ingest("bKash", BKASH_PAYMENT, receivedAt = 1000)
+        pipeline.ingest(
+            "bKash",
+            "Payment of Tk 10.00 to SOMEWHERE ELSE is successful. Balance Tk 20.00. " +
+                "TrxID LATER000001 at 31/08/2026 20:00",
+            receivedAt = 2000,
+        )
+
+        val bkash = accountNamed("bKash")
+        assertEquals(2000L, bkash.currentBalanceMinor)
+        // 41.98 less the Tk 10 that left is 31.98, but the bank says 20.00, so
+        // Tk 11.98 moved with no message describing it.
+        assertEquals(-1198L, bkash.unexplainedMinor)
     }
 }

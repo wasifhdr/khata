@@ -104,7 +104,7 @@ class ReparseUseCaseTest {
         reparse()
 
         assertEquals(1, db.transactionDao().allActive().size)
-        assertEquals(-85600L, db.accountDao().getAll().first { it.name == "bKash" }.currentBalanceMinor)
+        assertEquals(4198L, db.accountDao().getAll().first { it.name == "bKash" }.currentBalanceMinor)
     }
 
     @Test
@@ -119,7 +119,7 @@ class ReparseUseCaseTest {
         reparse()
 
         assertEquals(1, db.transactionDao().allActive().size)
-        assertEquals(-6000L, db.accountDao().getAll().first { it.name == "EBL Salary" }.currentBalanceMinor)
+        assertEquals(5856L, db.accountDao().getAll().first { it.name == "EBL Salary" }.currentBalanceMinor)
     }
 
     @Test

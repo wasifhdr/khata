@@ -91,9 +91,9 @@ fun DriftContent(
                 ContextHeader(
                     heading = "Reconcile",
                     subline = if (state.isReconciled) {
-                        "Khata agrees with your banks"
+                        "Every taka is accounted for"
                     } else {
-                        "${state.drifts.size} account${if (state.drifts.size == 1) "" else "s"} disagree"
+                        "${state.drifts.size} account${if (state.drifts.size == 1) "" else "s"} with money unaccounted for"
                     },
                 )
 
@@ -156,7 +156,7 @@ private fun DriftRow(
     val spacing = LocalSpacing.current
     val short = drift.gap.abs().format()
     // The sign is a word, not only a colour: DESIGN.md rule 3.
-    val direction = if (drift.gap.minor > 0) "more than" else "less than"
+    val direction = if (drift.gap.minor > 0) "arrived" else "left"
     val since = Instant.ofEpochMilli(drift.reportedAt).atZone(DHAKA).toLocalDate()
         .format(driftDateFormatter)
 
@@ -183,7 +183,10 @@ private fun DriftRow(
         }
 
         Text(
-            text = "Your bank reports $short $direction Khata recorded, since $since.",
+            // The balance itself is not in question -- it comes from the bank's own
+            // messages. What this says is how much of it has no message behind it.
+            text = "$short $direction with no message to explain it, as of $since. " +
+                "Your balance is right; these transactions are missing.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = spacing.xs),
@@ -198,12 +201,12 @@ private fun DriftRow(
                 .background(MaterialTheme.colorScheme.secondaryContainer)
                 .clickable(enabled = !isRecording, onClick = onRecord)
                 .clearAndSetSemantics {
-                    contentDescription = "Record the difference for ${drift.accountName} as an adjustment"
+                    contentDescription = "Add the unaccounted ${drift.accountName} money as an adjustment"
                 },
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = if (isRecording) "Recording…" else "Record the difference",
+                text = if (isRecording) "Adding…" else "Add it as an adjustment",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )

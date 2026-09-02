@@ -39,6 +39,7 @@ class ReconciliationRepositoryTest {
         current: Long,
         reported: Long?,
         reportedAt: Long?,
+        unexplained: Long = 0,
     ) = db.accountDao().upsert(
         AccountEntity(
             uuid = "acc-$name",
@@ -48,6 +49,7 @@ class ReconciliationRepositoryTest {
             currentBalanceMinor = current,
             reportedBalanceMinor = reported,
             reportedBalanceAt = reportedAt,
+            unexplainedMinor = unexplained,
             includeInNetWorth = true,
             smsIdentifiers = "",
             createdAt = 1,
@@ -56,28 +58,30 @@ class ReconciliationRepositoryTest {
     )
 
     @Test
-    fun `an account whose reported balance matches computes no drift`() = runTest {
-        account("Matching", current = 5000, reported = 5000, reportedAt = 100)
+    fun `an account whose transactions account for every taka reports nothing`() = runTest {
+        account("Matching", current = 5000, reported = 5000, reportedAt = 100, unexplained = 0)
 
         assertEquals(emptyList<BalanceDrift>(), repository.observeDrift().first())
     }
 
     @Test
-    fun `an account whose reported balance is higher reports the gap and its date`() = runTest {
-        account("Drifting", current = 4660, reported = 5000, reportedAt = 100)
+    fun `money that arrived with no message is reported against the account`() = runTest {
+        // The balance is the bank's own figure and is not in question. What is
+        // reported is how much of it the recorded transactions cannot account for.
+        account("Drifting", current = 5000, reported = 5000, reportedAt = 100, unexplained = 340)
 
         val drift = repository.observeDrift().first().single()
 
         assertEquals("Drifting", drift.accountName)
-        assertEquals(Money(4660), drift.computed)
-        assertEquals(Money(5000), drift.reported)
         assertEquals(Money(340), drift.gap)
+        assertEquals(Money(5000), drift.reported)
+        assertEquals("what the transactions do add up to", Money(4660), drift.computed)
         assertEquals(100L, drift.reportedAt)
     }
 
     @Test
-    fun `a negative gap means Khata recorded more than the bank reports`() = runTest {
-        account("Overcounted", current = 5000, reported = 4660, reportedAt = 100)
+    fun `a negative gap means money left with no message`() = runTest {
+        account("Overcounted", current = 4660, reported = 4660, reportedAt = 100, unexplained = -340)
 
         assertEquals(Money(-340), repository.observeDrift().first().single().gap)
     }

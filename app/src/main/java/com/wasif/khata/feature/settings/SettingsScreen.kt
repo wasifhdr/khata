@@ -414,7 +414,7 @@ private fun MessagesSection(
 
     ActionRow(
         title = "Check balances",
-        subtitle = "Compare what Khata worked out against what the bank last said",
+        subtitle = "Your balances come from the bank. See what has no message behind it.",
         onClick = onOpenReconcile,
     )
 }

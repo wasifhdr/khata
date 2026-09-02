@@ -123,6 +123,7 @@ class LedgerViewModelTest {
         }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
+        override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
@@ -162,6 +163,7 @@ class LedgerViewModelTest {
         }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
+        override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals

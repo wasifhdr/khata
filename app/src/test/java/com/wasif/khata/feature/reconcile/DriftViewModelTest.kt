@@ -55,6 +55,7 @@ class DriftViewModelTest {
         computed = Money(computed),
         reported = Money(reported),
         reportedAt = Instant.parse("2026-08-12T06:00:00Z").toEpochMilli(),
+        gap = Money(reported - computed),
     )
 
     @Test

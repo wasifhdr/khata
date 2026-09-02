@@ -18,6 +18,6 @@ object ReconcileModule {
     @Provides
     fun provideAdjustmentRecorder(repository: TransactionRepository): AdjustmentRecorder =
         AdjustmentRecorder { accountId, gap, occurredAt ->
-            repository.save(adjustmentDraft(accountId, gap, occurredAt))
+            repository.recordUnexplained(adjustmentDraft(accountId, gap, occurredAt))
         }
 }

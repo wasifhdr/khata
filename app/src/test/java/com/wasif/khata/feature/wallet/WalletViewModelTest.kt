@@ -54,6 +54,7 @@ class WalletViewModelTest {
             pagedTransactions()
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
+        override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> {
             requestedSpendWindow = fromInclusive to toExclusive

@@ -171,8 +171,21 @@ class IngestionPipeline @Inject constructor(
             )
             val transactionId = if (rowId == -1L) existing!!.id else rowId
 
-            accountDao.adjustBalance(account.id, signedMinor(parsed.amount.minor, parsed.direction), now)
-            parsed.balance?.let { accountDao.setReportedBalance(account.id, it.minor, now) }
+            // Only movements after the last statement change the balance. Anything
+            // older is already inside the figure the bank quoted, so applying it
+            // would count it twice -- which is what a reparse of six years of
+            // history does otherwise.
+            val occurredAt = parsed.occurredAt ?: receivedAt
+            val alreadyInStatement = account.reportedBalanceAt?.let { occurredAt <= it } == true
+            if (!alreadyInStatement) {
+                accountDao.adjustBalance(account.id, signedMinor(parsed.amount.minor, parsed.direction), now)
+            }
+            // The message's own time, not the moment it was read: a backfill
+            // processes six years in one pass and every statement would otherwise
+            // carry the same timestamp, making "newer" meaningless.
+            parsed.balance?.let {
+                accountDao.applyStatedBalance(account.id, it.minor, occurredAt, now)
+            }
             rawMessageDao.markStatus(rawId, RawMessageStatus.PARSED, parsed.ruleId, now)
 
             // Inside the same database transaction, so a half-formed pair is impossible.

@@ -35,6 +35,16 @@ interface TransactionRepository {
     fun pagedTransactions(query: String): Flow<PagingData<Transaction>>
     fun observe(id: Long): Flow<Transaction?>
     suspend fun save(draft: TransactionDraft): Result<Long>
+
+    /**
+     * Writes an adjustment for money that moved with no message, and clears that
+     * account's running total of it.
+     *
+     * Deliberately does not touch the balance: the balance already came from the
+     * bank's own statement and is correct. This only makes the *transactions* add
+     * up to it, so the ledger stops being short by an amount it cannot explain.
+     */
+    suspend fun recordUnexplained(draft: TransactionDraft): Result<Long>
     suspend fun delete(id: Long): Result<Unit>
 
     /** Debits only, over a half-open window. Boundaries are the caller's to compute in Dhaka. */

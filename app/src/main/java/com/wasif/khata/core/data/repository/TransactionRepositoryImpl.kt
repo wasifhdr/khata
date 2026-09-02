@@ -152,6 +152,39 @@ class TransactionRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun recordUnexplained(draft: TransactionDraft): Result<Long> = runCatchingData {
+        db.withTransaction {
+            val now = clock.now()
+            val rowId = transactionDao.upsert(
+                TransactionEntity(
+                    uuid = UUID.randomUUID().toString(),
+                    accountId = draft.accountId,
+                    amountMinor = draft.amount.minor,
+                    direction = draft.direction,
+                    occurredAt = draft.occurredAt,
+                    merchantRaw = draft.merchantRaw,
+                    merchantId = null,
+                    categoryId = draft.categoryId,
+                    note = draft.note,
+                    source = TransactionSource.MANUAL,
+                    confidence = Confidence.HIGH,
+                    kind = draft.kind,
+                    rawMessageId = null,
+                    transferGroupId = null,
+                    feeMinor = null,
+                    referenceNumber = null,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+            // No adjustBalance: the balance came from the bank's own statement and
+            // is already right. Adding this row is what makes the transactions add
+            // up to it, so applying it twice would put the ledger back out.
+            accountDao.clearUnexplained(draft.accountId, now)
+            rowId
+        }
+    }
+
     override suspend fun delete(id: Long): Result<Unit> = runCatchingData {
         db.withTransaction {
             val existing = transactionDao.findById(id) ?: throw DataError.NotFound

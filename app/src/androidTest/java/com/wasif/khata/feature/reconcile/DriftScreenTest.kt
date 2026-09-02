@@ -28,6 +28,7 @@ class DriftScreenTest {
         computed = Money(computed),
         reported = Money(reported),
         reportedAt = Instant.parse("2026-08-12T06:00:00Z").toEpochMilli(),
+        gap = Money(reported - computed),
     )
 
     private fun setContent(state: DriftUiState, onRecord: (BalanceDrift) -> Unit = {}) {
@@ -58,7 +59,7 @@ class DriftScreenTest {
     fun the_direction_of_the_gap_is_stated_in_words_not_only_colour() {
         setContent(DriftUiState(drifts = listOf(drift()), isLoaded = true))
 
-        composeRule.onNodeWithText("more than", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("arrived with no message", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -67,7 +68,7 @@ class DriftScreenTest {
             DriftUiState(drifts = listOf(drift(computed = 500_000, reported = 466_000)), isLoaded = true),
         )
 
-        composeRule.onNodeWithText("less than", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("left with no message", substring = true).assertIsDisplayed()
     }
 
     @Test
@@ -76,7 +77,7 @@ class DriftScreenTest {
         setContent(DriftUiState(drifts = listOf(drift()), isLoaded = true)) { recorded = it }
 
         composeRule
-            .onNodeWithContentDescription("Record the difference for EBL Salary as an adjustment")
+            .onNodeWithContentDescription("Add the unaccounted EBL Salary money as an adjustment")
             .performClick()
 
         assertEquals(1L, recorded?.accountId)
@@ -103,6 +104,6 @@ class DriftScreenTest {
             DriftUiState(drifts = listOf(drift(), drift(id = 2, name = "bKash")), isLoaded = true),
         )
 
-        composeRule.onNodeWithText("2 accounts disagree").assertIsDisplayed()
+        composeRule.onNodeWithText("2 accounts with money unaccounted for").assertIsDisplayed()
     }
 }

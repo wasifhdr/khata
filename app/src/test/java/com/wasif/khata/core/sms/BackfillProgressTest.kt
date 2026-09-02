@@ -114,6 +114,6 @@ class BackfillProgressTest {
         }
 
         assertEquals(1, db.transactionDao().allActive().size)
-        assertEquals(-85600L, db.accountDao().getAll().first { it.name == "bKash" }.currentBalanceMinor)
+        assertEquals(4198L, db.accountDao().getAll().first { it.name == "bKash" }.currentBalanceMinor)
     }
 }

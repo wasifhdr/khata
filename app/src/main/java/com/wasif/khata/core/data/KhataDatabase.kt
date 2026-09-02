@@ -26,7 +26,7 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         RawMessageEntity::class,
         ParsingRuleEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {

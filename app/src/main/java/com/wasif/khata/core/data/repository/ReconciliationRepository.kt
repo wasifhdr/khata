@@ -13,15 +13,16 @@ data class BalanceDrift(
     val computed: Money,
     val reported: Money,
     val reportedAt: Long,
-) {
-    /** Positive when the bank says there is more money than Khata recorded. */
-    val gap: Money get() = reported - computed
-}
+    /** Positive when more arrived than the recorded transactions account for. */
+    val gap: Money,
+)
 
 /**
- * Nearly every bKash and EBL message states a running balance, so this is the app's
- * primary correctness mechanism rather than an occasional cross-check: it catches
- * missed cash spending and misparses by arithmetic instead of by vigilance.
+ * Every bKash and EBL message states the balance after it, so the balance itself is
+ * never in doubt — Khata takes each statement as fact. What this reports instead is
+ * the money that moved with no message to explain it, which is the honest measure of
+ * how complete the SMS history is. On a real inbox it found six years of deleted
+ * messages; it also catches cash spending that was never entered.
  */
 @Singleton
 class ReconciliationRepository @Inject constructor(
@@ -30,16 +31,18 @@ class ReconciliationRepository @Inject constructor(
     fun observeDrift(): Flow<List<BalanceDrift>> =
         accountDao.observeAll().map { accounts ->
             accounts.mapNotNull { account ->
-                val reported = account.reportedBalanceMinor ?: return@mapNotNull null
+                if (account.unexplainedMinor == 0L) return@mapNotNull null
                 val at = account.reportedBalanceAt ?: return@mapNotNull null
-                if (reported == account.currentBalanceMinor) return@mapNotNull null
 
                 BalanceDrift(
                     accountId = account.id,
                     accountName = account.name,
-                    computed = Money(account.currentBalanceMinor),
-                    reported = Money(reported),
+                    // The balance is the bank's own figure; what differs is how much
+                    // of it the recorded transactions can account for.
+                    computed = Money(account.currentBalanceMinor - account.unexplainedMinor),
+                    reported = Money(account.currentBalanceMinor),
                     reportedAt = at,
+                    gap = Money(account.unexplainedMinor),
                 )
             }
         }
