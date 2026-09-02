@@ -30,6 +30,7 @@ class DatabaseSeederTest {
         seeder = DatabaseSeeder(
             db.accountDao(),
             db.categoryDao(),
+            db.parsingRuleDao(),
             object : KhataClock { override fun now(): Long = 1L },
         )
     }

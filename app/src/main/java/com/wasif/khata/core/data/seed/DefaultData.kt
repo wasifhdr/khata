@@ -16,9 +16,13 @@ data class SeedCategory(
     val colorToken: String,
 )
 
+// smsIdentifiers holds the account tail, because EBL masks the same account two
+// ways (115***352 in transfers, 115**9352 on card messages) and only the last
+// three digits survive both.
 val DEFAULT_ACCOUNTS = listOf(
     SeedAccount("bkash", "bKash", AccountType.MFS, "bKash"),
-    SeedAccount("ebl", "EBL", AccountType.BANK, "EBL,EBLBANK"),
+    SeedAccount("ebl", "EBL Salary", AccountType.BANK, "352"),
+    SeedAccount("ebl-student", "EBL Student", AccountType.BANK, "286"),
     SeedAccount("cash", "Cash", AccountType.CASH, ""),
 )
 

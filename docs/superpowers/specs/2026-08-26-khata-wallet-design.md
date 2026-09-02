@@ -91,17 +91,24 @@ implementation:
 **Stack:** Kotlin · Jetpack Compose · Material 3 · Room · Coroutines/Flow ·
 Paging 3 · WorkManager · Glance · Hilt · Coil · kotlinx-serialization.
 
-**SDK targets:** `minSdk 30` (Android 11), `compileSdk` / `targetSdk` 37 (Android 17,
-the installed platform). Target device is a Pixel 6a on Android 17. Android 11 is
-the floor; support below it is explicitly not required.
+**SDK targets:** `minSdk 33` (Android 13), `compileSdk` / `targetSdk` 37 (Android 17,
+the installed platform). Target device is a Pixel 6a on Android 17.
 
-`minSdk 30` costs this design nothing. The one capability it forgoes relative to 31
-is Material You dynamic color, which Khata declines anyway (§15) in favour of a
-fixed palette that guarantees the debit/credit distinction survives. Scoped storage
-is already fully enforced at API 30, so no legacy storage handling appears anywhere
-in the media pipeline, and the modern permission model applies throughout. The
-splash screen needs the `core-splashscreen` compat library rather than the native
-API — the only concession, and it is not used in Phase 1.
+> **Superseded, 2026-09-02.** This section originally specified `minSdk 30` (Android
+> 11) and argued the cost was nil because the only capability API 31 adds is Material
+> You dynamic colour, which Khata declines. **That reasoning was wrong:** API 31 also
+> adds `RenderEffect`, the only way to get real backdrop blur on Android — below it
+> `Modifier.blur` is a silent no-op. The glass design system depends on it, and 33
+> additionally unlocks AGSL `RuntimeShader` for procedural grain rather than bitmap
+> fakes. The floor was raised to 33 with the user's confirmation. Full rationale in
+> `2026-08-28-khata-petrol-design.md` §10.
+
+`minSdk 33` costs this design nothing: `PRODUCT.md` records a single user on a Pixel
+6a running Android 17, sideloaded and not distributed. **Android 11 and 12 support is
+explicitly not required.** Raising the floor removes every capability check and
+fallback branch — scoped storage, the modern permission model, and the native splash
+screen API all apply unconditionally, so no legacy compatibility handling appears
+anywhere in the app.
 
 **Package:** `com.wasif.khata`.
 
