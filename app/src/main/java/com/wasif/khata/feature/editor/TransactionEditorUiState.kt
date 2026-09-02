@@ -41,6 +41,7 @@ data class TransactionEditorUiState(
             listOf(
                 TransactionKind.NORMAL to "Spending",
                 TransactionKind.LENT to "Lent to someone",
+                TransactionKind.COVERED_FOR_SOMEONE to "Paid a bill for someone",
                 TransactionKind.BORROWED_RETURNED to "Paid back what I borrowed",
             )
         } else {

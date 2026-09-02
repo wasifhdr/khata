@@ -8,6 +8,15 @@ import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.TransactionDirection
 import kotlinx.coroutines.flow.Flow
 
+/** One person, and what stands between you after everything nets out. */
+data class OwedRow(
+    val name: String,
+    /** Positive when they owe you, negative when you owe them. */
+    val netMinor: Long,
+    val entries: Int,
+    val lastAt: Long,
+)
+
 /** One row per Dhaka day that has any spending. */
 data class DayTotalRow(
     val dhakaDayIndex: Long,
@@ -131,7 +140,7 @@ interface TransactionDao {
         WHERE deletedAt IS NULL
           AND direction = :direction
           AND transferGroupId IS NULL
-          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT')
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
           AND occurredAt >= :fromInclusive
           AND occurredAt < :toExclusive
         """,
@@ -141,6 +150,42 @@ interface TransactionDao {
         fromInclusive: Long,
         toExclusive: Long,
     ): Flow<Long>
+
+    /**
+     * One row per person, netted. A name is grouped case-insensitively and without
+     * surrounding spaces, so "rafi" and "Rafi " are one person rather than three
+     * separate debts.
+     */
+    @Query(
+        """
+        SELECT TRIM(counterparty) AS name,
+               SUM(CASE WHEN kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED') THEN amountMinor
+                        WHEN kind IN ('LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED') THEN -amountMinor
+                        ELSE 0 END) AS netMinor,
+               COUNT(*) AS entries,
+               MAX(occurredAt) AS lastAt
+        FROM transactions
+        WHERE deletedAt IS NULL
+          AND counterparty IS NOT NULL AND TRIM(counterparty) != ''
+          AND kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED', 'LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED')
+        GROUP BY LOWER(TRIM(counterparty))
+        HAVING netMinor != 0
+        ORDER BY ABS(netMinor) DESC
+        """,
+    )
+    fun observeOwedByPerson(): Flow<List<OwedRow>>
+
+    /** Loans and covered bills with nobody's name on them yet. */
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE deletedAt IS NULL
+          AND (counterparty IS NULL OR TRIM(counterparty) = '')
+          AND kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED', 'LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED')
+        ORDER BY occurredAt DESC, id DESC
+        """,
+    )
+    fun observeUnnamedOwed(): Flow<List<TransactionEntity>>
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY occurredAt DESC, id DESC LIMIT 1")
     fun observeMostRecent(): Flow<TransactionEntity?>
@@ -155,7 +200,7 @@ interface TransactionDao {
                SUM(amountMinor) AS spentMinor
         FROM transactions
         WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
-          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT')
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
         GROUP BY dhakaDayIndex
         """,
     )

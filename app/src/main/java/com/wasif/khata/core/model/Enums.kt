@@ -38,6 +38,9 @@ enum class TransactionKind {
 
     /** Their share of a bill you paid, handed back to you. */
     REIMBURSEMENT,
+
+    /** A bill you settled on someone else's behalf, which they owe you back. */
+    COVERED_FOR_SOMEONE,
     ;
 
     /**
@@ -49,7 +52,9 @@ enum class TransactionKind {
      * lying: on a real month it read Tk 59,252 against Tk 25,232 actually spent.
      */
     val countsAsSpending: Boolean
-        get() = this !in setOf(TRANSFER, ADJUSTMENT, LENT, BORROWED_RETURNED, LOAN_REPAYMENT)
+        get() = this !in setOf(
+            TRANSFER, ADJUSTMENT, LENT, BORROWED_RETURNED, LOAN_REPAYMENT, COVERED_FOR_SOMEONE,
+        )
 
     /**
      * Whether money arriving under this kind is genuinely yours to keep. Borrowed
@@ -60,4 +65,21 @@ enum class TransactionKind {
         get() = this !in setOf(
             TRANSFER, ADJUSTMENT, LENT_RETURNED, BORROWED, REIMBURSEMENT, LOAN_DISBURSEMENT,
         )
+
+    /**
+     * How this row moves the balance between you and a person, in paisa-sign terms:
+     * positive means they owe you more, negative means you owe them more, zero means
+     * it is nothing to do with anybody.
+     */
+    val owedSign: Int
+        get() = when (this) {
+            LENT, COVERED_FOR_SOMEONE -> 1
+            LENT_RETURNED, REIMBURSEMENT -> -1
+            BORROWED -> -1
+            BORROWED_RETURNED -> 1
+            else -> 0
+        }
+
+    /** True for the kinds that put someone on the other side of the money. */
+    val involvesAPerson: Boolean get() = owedSign != 0
 }

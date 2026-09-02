@@ -49,6 +49,7 @@ class WalletScreenTest {
                     {},
                     {},
                     {},
+                    {},
                 )
             }
         }
@@ -70,6 +71,7 @@ class WalletScreenTest {
                             account("EBL", 2_98_606_00, 2_98_846_00),
                         ),
                     ),
+                    {},
                     {},
                     {},
                     {},
@@ -96,6 +98,7 @@ class WalletScreenTest {
                     {},
                     {},
                     {},
+                    {},
                 )
             }
         }
@@ -112,6 +115,7 @@ class WalletScreenTest {
                     {},
                     {},
                     {},
+                    {},
                 )
             }
         }
@@ -122,7 +126,7 @@ class WalletScreenTest {
     @Test
     fun theAppNameNeverAppearsOnAModulePage() {
         compose.setContent {
-            KhataTheme { WalletContent(WalletUiState(), {}, {}, {}) }
+            KhataTheme { WalletContent(WalletUiState(), {}, {}, {}, {}) }
         }
 
         val wordmark = compose.onAllNodesWithText("খাতা").fetchSemanticsNodes()
@@ -136,7 +140,7 @@ class WalletScreenTest {
                 // onBack null means this screen is the root. Without a hub glyph
                 // here the user cannot reach Settings again, because the gear
                 // lives only on the hub.
-                WalletContent(WalletUiState(), null, {}, {})
+                WalletContent(WalletUiState(), null, {}, {}, {})
             }
         }
 
@@ -151,7 +155,7 @@ class WalletScreenTest {
             KhataTheme {
                 // non-null onBack, null onOpenHub means this screen was pushed onto
                 // something, mirroring the isRoot=false branch in KhataNavHost.
-                WalletContent(WalletUiState(), {}, null, {})
+                WalletContent(WalletUiState(), {}, null, {}, {})
             }
         }
 

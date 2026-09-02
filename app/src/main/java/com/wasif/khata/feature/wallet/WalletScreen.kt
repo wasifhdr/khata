@@ -44,6 +44,7 @@ fun WalletScreen(
     onBack: (() -> Unit)?,
     onOpenHub: (() -> Unit)?,
     onOpenLedger: () -> Unit,
+    onOpenOwed: () -> Unit,
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     WalletContent(
@@ -51,6 +52,7 @@ fun WalletScreen(
         onBack = onBack,
         onOpenHub = onOpenHub,
         onOpenLedger = onOpenLedger,
+        onOpenOwed = onOpenOwed,
     )
 }
 
@@ -60,6 +62,7 @@ fun WalletContent(
     onBack: (() -> Unit)?,
     onOpenHub: (() -> Unit)?,
     onOpenLedger: () -> Unit,
+    onOpenOwed: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -106,7 +109,7 @@ fun WalletContent(
             ) {
                 NetWorthCard(state = state)
                 MonthPair(state = state, haze = haze)
-                AccountList(state = state, onOpenLedger = onOpenLedger)
+                AccountList(state = state, onOpenLedger = onOpenLedger, onOpenOwed = onOpenOwed)
             }
             }
     }
@@ -217,7 +220,7 @@ private fun MonthFigure(
 }
 
 @Composable
-private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit) {
+private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit, onOpenOwed: () -> Unit) {
     val spacing = LocalSpacing.current
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -231,6 +234,14 @@ private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit) {
                 text = "ACCOUNTS",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Owed →",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(end = LocalSpacing.current.md)
+                    .clickable(onClick = onOpenOwed),
             )
             Text(
                 text = "Ledger →",

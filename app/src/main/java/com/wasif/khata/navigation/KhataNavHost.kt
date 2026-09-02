@@ -21,6 +21,7 @@ import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
 import com.wasif.khata.feature.hub.ModulesScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
+import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
@@ -35,6 +36,7 @@ object KhataRoutes {
     const val Settings = "settings"
     const val Unmatched = "unmatched"
     const val Reconcile = "reconcile"
+    const val Owed = "owed"
     const val RuleEditor = "rules/new/{rawMessageId}"
     const val EditorNew = "editor/new"
     const val EditorEdit = "editor/edit/{transactionId}"
@@ -120,6 +122,7 @@ fun KhataNavHost(homeView: HomeView) {
                 onBack = if (isRoot) null else ({ navController.popBackStack() }),
                 onOpenHub = if (isRoot) ({ navController.navigate(KhataRoutes.Modules) }) else null,
                 onOpenLedger = { navController.navigate(KhataRoutes.Ledger) },
+                onOpenOwed = { navController.navigate(KhataRoutes.Owed) },
             )
         }
 
@@ -159,6 +162,13 @@ fun KhataNavHost(homeView: HomeView) {
                 viewModel = hiltViewModel<RuleEditorViewModel, RuleEditorViewModel.Factory>(
                     creationCallback = { factory -> factory.create(rawId) },
                 ),
+            )
+        }
+
+        composable(KhataRoutes.Owed) {
+            OwedScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
             )
         }
 

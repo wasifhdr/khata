@@ -63,6 +63,7 @@ class TransactionKindTest {
             TransactionKind.LENT,
             TransactionKind.BORROWED_RETURNED,
             TransactionKind.LOAN_REPAYMENT,
+            TransactionKind.COVERED_FOR_SOMEONE,
         )
         assertTrue(
             TransactionKind.entries.filterNot { it.countsAsSpending }.toSet() == excludedInSql,
