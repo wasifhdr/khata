@@ -27,12 +27,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +48,7 @@ import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.AmountTextStyle
@@ -128,16 +131,34 @@ fun LedgerContent(
                 MonthStrip(header = header)
             }
 
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                placeholder = { Text("Search merchants and notes") },
-                singleLine = true,
-                shape = MaterialTheme.shapes.small,
+            // Glass here is affordable because this sits *above* the list rather
+            // than over it, and the only Haze source in the app is the static
+            // field -- so the blur samples a fixed backdrop, not the scrolling
+            // rows. Measured on device before landing; see the plan's Task 6.
+            KhataGlass(
+                hazeState = haze,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
-            )
+                shape = MaterialTheme.shapes.small,
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    placeholder = { Text("Search merchants and notes") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    // The glass IS the container. Material's own container fill
+                    // would paint an opaque rectangle over the blur and leave a
+                    // flat box with a bevel round it.
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.paging.LoadState
 import androidx.paging.LoadStates
 import androidx.paging.PagingData
@@ -41,6 +42,7 @@ class LedgerScreenTest {
         header: LedgerHeaderState = LedgerHeaderState(monthLabel = "August 2026", daysLeft = 3),
         canGoForward: Boolean = false,
         query: String = "",
+        onQueryChange: (String) -> Unit = {},
         onPreviousMonth: () -> Unit = {},
         onNextMonth: () -> Unit = {},
         onAddTransaction: () -> Unit = {},
@@ -59,7 +61,7 @@ class LedgerScreenTest {
                 categoryTokens = mapOf(11L to CategoryChip(name = "Groceries", colorToken = "category_green")),
                 canGoForward = canGoForward,
                 query = query,
-                onQueryChange = {},
+                onQueryChange = onQueryChange,
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
                 onBack = {},
@@ -67,6 +69,19 @@ class LedgerScreenTest {
                 onOpenTransaction = onOpenTransaction,
             )
         }
+    }
+
+    @Test
+    fun theSearchFieldStillAcceptsInputOnGlass() {
+        // The search field moved inside a KhataGlass wrapper. Wrapping a text
+        // field in a Box that clips and draws is where focus and hit-testing get
+        // lost, so this pins the interaction rather than the paint.
+        var typed = ""
+        compose.setContent(content(onQueryChange = { typed = it }))
+
+        compose.onNodeWithText("Search merchants and notes").performTextInput("shwapno")
+
+        assertEquals("shwapno", typed)
     }
 
     @Test

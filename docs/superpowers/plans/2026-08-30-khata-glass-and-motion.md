@@ -1087,6 +1087,22 @@ Record "Janky frames" as a percentage, before and after this task's change, on t
 "$ANDROID_HOME/platform-tools/adb.exe" shell setprop debug.hwui.profile false
 ```
 
+**Outcome when this was executed: the measurement was inconclusive on the emulator, and the
+glass was kept.** Same scroll (16 swipes over 60 rows), `dumpsys gfxinfo`:
+
+| | flat search field | glass search field |
+|---|---|---|
+| Total frames | 48 | 47 |
+| Janky frames | 45 (93.75%) | 46 (97.87%) |
+| 50th / 90th / 95th / 99th | 250 / 450 / 450 / 550 ms | 250 / 450 / 450 / 550 ms |
+
+Every percentile is identical and the baseline is already 94% janky, so the `khata_test` emulator's
+software renderer is the bottleneck and cannot discriminate between the two. The one-frame
+difference is noise, not signal. This needs a physical device to mean anything; until then the
+argument for keeping the glass is structural rather than measured -- the field is the only Haze
+source, so the blur samples a backdrop that does not change while the list scrolls, and the search
+field sits above the list rather than over it.
+
 **The fallback, if jank rises measurably:** revert the search field to its flat `surfaceContainer` form and record the measured numbers in your report. §5 marks this surface "Measure", so a flat search bar is a legitimate outcome of having measured — not a failure of the task. Do not keep glass here on the grounds that it looks better if the numbers say it costs frames.
 
 - [ ] **Step 6: Commit**
