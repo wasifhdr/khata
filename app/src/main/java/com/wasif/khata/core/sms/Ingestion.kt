@@ -4,6 +4,9 @@ import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.time.KhataClock
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.last
 
 data class IngestSummary(
     val total: Int = 0,
@@ -22,20 +25,41 @@ data class IngestSummary(
     }
 }
 
+data class BackfillProgress(
+    val processed: Int,
+    val total: Int,
+    val summary: IngestSummary,
+) {
+    val isComplete: Boolean get() = processed >= total
+    val fraction: Float get() = if (total == 0) 1f else processed.toFloat() / total
+}
+
 /**
  * Reads the whole inbox through the pipeline. Idempotent by construction: a repeat
  * run inserts no new raw messages, so it reports duplicates rather than doubling
  * anything.
+ *
+ * Emits progress rather than returning once, because a multi-year inbox is thousands
+ * of messages and a silent block reads as a hang.
  */
 @Singleton
 class BackfillUseCase @Inject constructor(
     private val source: MessageSource,
     private val pipeline: IngestionPipeline,
 ) {
-    suspend operator fun invoke(): IngestSummary =
-        source.readAll().fold(IngestSummary()) { summary, message ->
-            summary.plus(pipeline.ingest(message.sender, message.body, message.receivedAt))
+    fun run(): Flow<BackfillProgress> = flow {
+        val messages = source.readAll()
+        var summary = IngestSummary()
+        emit(BackfillProgress(processed = 0, total = messages.size, summary = summary))
+
+        messages.forEachIndexed { index, message ->
+            summary = summary.plus(pipeline.ingest(message.sender, message.body, message.receivedAt))
+            emit(BackfillProgress(processed = index + 1, total = messages.size, summary = summary))
         }
+    }
+
+    /** Convenience for callers that only want the outcome. */
+    suspend operator fun invoke(): IngestSummary = run().last().summary
 }
 
 /**
