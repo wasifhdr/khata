@@ -41,6 +41,7 @@ class IngestionPipeline @Inject constructor(
     private val accountDao: AccountDao,
     private val merchantDao: MerchantDao,
     private val engine: RuleEngine,
+    private val pairing: TransferPairing,
     private val clock: KhataClock,
 ) {
 
@@ -142,6 +143,9 @@ class IngestionPipeline @Inject constructor(
             accountDao.adjustBalance(account.id, signedMinor(parsed.amount.minor, parsed.direction), now)
             parsed.balance?.let { accountDao.setReportedBalance(account.id, it.minor, now) }
             rawMessageDao.markStatus(rawId, RawMessageStatus.PARSED, parsed.ruleId, now)
+
+            // Inside the same database transaction, so a half-formed pair is impossible.
+            pairing.pair(transactionId)
 
             if (existing != null) IngestResult.Updated(transactionId) else IngestResult.Recorded(transactionId)
         }

@@ -64,6 +64,7 @@ class IngestionPipelineTest {
             accountDao = db.accountDao(),
             merchantDao = db.merchantDao(),
             engine = RuleEngine(),
+            pairing = TransferPairing(db.transactionDao(), clock),
             clock = clock,
         )
     }
@@ -191,6 +192,26 @@ class IngestionPipelineTest {
         val bkash = accountNamed("bKash")
         assertEquals(4198L, bkash.reportedBalanceMinor)
         assertEquals(9_000L, bkash.reportedBalanceAt)
+    }
+
+    @Test
+    fun `the real Own Account Transfer pair is grouped end to end`() = runTest {
+        pipeline.ingest(
+            "EBL",
+            "AC 112***286 is debited with BDT 6500 as Own Account Transfer on 18-AUG-26 01:20:19 PM Balance is BDT 34.2 Thanks. EBL Helpline 16230",
+            receivedAt = 1000,
+        )
+        pipeline.ingest(
+            "EBL",
+            "AC 115***352 is credited with BDT 6500 as Own Account Transfer on 18-AUG-26 01:20:20 PM Balance is BDT 6516.56 Thanks. EBL Helpline 16230",
+            receivedAt = 2000,
+        )
+
+        val all = transactions()
+        assertEquals(2, all.size)
+        val groups = all.mapNotNull { it.transferGroupId }.distinct()
+        assertEquals("both legs must share one group", 1, groups.size)
+        assertTrue("neither leg may count as spending", all.all { it.kind == TransactionKind.TRANSFER })
     }
 
     @Test
