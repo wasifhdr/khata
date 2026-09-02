@@ -58,8 +58,34 @@ class DatabaseSeeder @Inject constructor(
             )
         }
 
-        if (ruleDao.countIncludingDeleted() == 0) {
-            ruleDao.upsertAll(BUILT_IN_RULES.map { it.copy(createdAt = now, updatedAt = now) })
-        }
+        syncBuiltInRules(now)
+    }
+
+    /**
+     * Runs every launch, not only on a fresh install. A widened rule is worthless
+     * if it only reaches people who have never opened the app -- the built-ins
+     * were seeded once and then frozen, so an existing install kept reading
+     * messages with whatever wording the rules shipped with on day one.
+     *
+     * Matched by uuid rather than inserted blindly, because @Upsert resolves
+     * conflicts by primary key: a built-in with id = 0 and a uuid already present
+     * would fail its insert and then update nothing.
+     *
+     * A built-in the user has switched off stays off, and rules they wrote
+     * themselves are never touched.
+     */
+    private suspend fun syncBuiltInRules(now: Long) {
+        val existing = ruleDao.allIncludingDisabled().associateBy { it.uuid }
+        ruleDao.upsertAll(
+            BUILT_IN_RULES.map { builtIn ->
+                val previous = existing[builtIn.uuid]
+                builtIn.copy(
+                    id = previous?.id ?: 0,
+                    isEnabled = previous?.isEnabled ?: true,
+                    createdAt = previous?.createdAt ?: now,
+                    updatedAt = now,
+                )
+            },
+        )
     }
 }

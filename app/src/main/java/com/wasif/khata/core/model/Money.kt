@@ -45,12 +45,16 @@ value class Money(val minor: Long) : Comparable<Money> {
 
             val negative = cleaned.startsWith("-")
             val unsigned = cleaned.removePrefix("-")
+            // A lone sign is not a sum. Checked before the taka part is allowed to
+            // default, or "-" would read as zero.
+            if (unsigned.isEmpty()) return null
 
             val parts = unsigned.split(".")
             if (parts.size > 2) return null
 
-            val takaPart = parts[0]
-            if (takaPart.isEmpty() || !takaPart.all { it.isDigit() }) return null
+            // ".56" is a legitimate sum: EBL omits the leading zero.
+            val takaPart = parts[0].ifEmpty { "0" }
+            if (!takaPart.all { it.isDigit() }) return null
 
             val paisaPart = when {
                 parts.size == 1 -> "00"

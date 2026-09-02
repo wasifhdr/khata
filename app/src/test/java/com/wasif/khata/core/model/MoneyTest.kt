@@ -114,4 +114,17 @@ class MoneyTest {
         assertNull(Money.parse("-"))
         assertNull(Money.parse("--123"))
     }
+
+    @Test
+    fun `parse reads a sum written without its leading zero`() {
+        // EBL sends "Balance is BDT .56" and "debited with BDT .06".
+        assertEquals(56L, Money.parse(".56")?.minor)
+        assertEquals(6L, Money.parse(".06")?.minor)
+        assertEquals(-6L, Money.parse("-.06")?.minor)
+    }
+
+    @Test
+    fun `parse still rejects a bare decimal point`() {
+        assertNull(Money.parse("."))
+    }
 }

@@ -8,10 +8,12 @@ import java.time.format.DateTimeFormatterBuilder
 import java.time.format.DateTimeParseException
 import java.util.Locale
 
-// One matcher for all four shapes the providers actually emit: "BDT 60",
-// "BDT5000", "Tk 2,600.00", and "Tk.750.00".
+// One matcher for all five shapes the providers actually emit: "BDT 60",
+// "BDT5000", "Tk 2,600.00", "Tk.750.00", and "BDT .56" -- EBL writes a sum under
+// one taka with no leading zero, and requiring a digit first read "BDT .06" as
+// six taka rather than six paisa.
 private val AMOUNT = Regex(
-    """(?:BDT|TK)?\.?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)""",
+    """(?:BDT|TK)?\.?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?|\.[0-9]{1,2})""",
     RegexOption.IGNORE_CASE,
 )
 
