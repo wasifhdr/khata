@@ -30,6 +30,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val Home = stringPreferencesKey("home_view")
         val Budget = longPreferencesKey("monthly_budget_minor")
         val BudgetSet = intPreferencesKey("monthly_budget_set")
+        val SmsRequested = intPreferencesKey("sms_permission_requested")
     }
 
     override val preferences: Flow<KhataPreferences> = store.data
@@ -57,6 +58,7 @@ class PreferencesRepositoryImpl @Inject constructor(
                 // Two keys, because null and zero are different answers and one
                 // Long cannot carry both.
                 monthlyBudgetMinor = if (p[Keys.BudgetSet] == 1) p[Keys.Budget] ?: 0L else null,
+                hasRequestedSmsPermission = p[Keys.SmsRequested] == 1,
             )
         }
 
@@ -83,6 +85,10 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override suspend fun setHomeView(view: HomeView) {
         store.edit { it[Keys.Home] = view.name }
+    }
+
+    override suspend fun setSmsPermissionRequested() {
+        store.edit { it[Keys.SmsRequested] = 1 }
     }
 
     override suspend fun setMonthlyBudget(minor: Long?) {

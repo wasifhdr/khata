@@ -9,4 +9,5 @@ interface PreferencesRepository {
     suspend fun resetTheme()
     suspend fun setHomeView(view: HomeView)
     suspend fun setMonthlyBudget(minor: Long?)
+    suspend fun setSmsPermissionRequested()
 }
