@@ -18,9 +18,39 @@ data class DerivedRule(
     val error: String?,
 )
 
-private val EBL_DATETIME = Regex("""\d{2}-[A-Za-z]{3}-\d{2} \d{2}:\d{2}:\d{2} [AP]M""")
-private val BKASH_DATETIME = Regex("""\d{2}/\d{2}/\d{4} \d{2}:\d{2}""")
-private val AMOUNT_WITH_UNIT = Regex("""(?:BDT|Tk)\.? ?[\d,]+(?:\.\d{1,2})?""", RegexOption.IGNORE_CASE)
+/**
+ * A money figure. The alternation exists because EBL really does send
+ * "Balance is BDT .56" -- with no digit before the point -- and `[\d,]+` alone
+ * cannot read it.
+ */
+private const val NUMBER = """(?:[\d,]+(?:\.\d{1,2})?|\.\d{1,2})"""
+private const val MONEY = """(?:BDT|Tk)\.? ?$NUMBER"""
+private const val EBL_STAMP = """\d{2}-[A-Za-z]{3}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[AP]M"""
+private const val BKASH_STAMP = """\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}"""
+
+private val EBL_DATETIME = Regex(EBL_STAMP)
+private val BKASH_DATETIME = Regex(BKASH_STAMP)
+private val AMOUNT_WITH_UNIT = Regex(MONEY, RegexOption.IGNORE_CASE)
+
+/**
+ * Shapes that must vary even where the user did not tap them, paired with what
+ * they become.
+ *
+ * Without this, everything outside a labelled span is literal -- so a rule taught
+ * from one EBL transfer carried "on 25-JUL-26 01:20:52 PM" inside it and matched
+ * exactly that one message out of forty identical ones. Nobody tapping "the
+ * amount" means "and only ever at 01:20:52 PM".
+ *
+ * Deliberately narrow: only timestamps and money, both of which are values by
+ * definition. A bare number keeps its literal meaning, because "EBL Helpline
+ * 16230" is part of what identifies the message, not a quantity that varies.
+ * Timestamps are tried before money since a date is also full of digits.
+ */
+private val VARYING_SHAPES: List<Pair<Regex, String>> = listOf(
+    EBL_DATETIME to EBL_STAMP,
+    BKASH_DATETIME to BKASH_STAMP,
+    AMOUNT_WITH_UNIT to MONEY,
+)
 
 /**
  * Builds a rule pattern from spans the user tapped. Everything between the spans
@@ -74,12 +104,11 @@ fun derivePattern(body: String, spans: List<LabelledSpan>): DerivedRule {
 private fun generalise(selected: String, kind: FieldKind): String = when (kind) {
     FieldKind.AMOUNT, FieldKind.BALANCE ->
         // Only demand a unit if the selection actually included one.
-        if (AMOUNT_WITH_UNIT.matches(selected.trim())) """(?:BDT|Tk)\.? ?[\d,]+(?:\.\d{1,2})?"""
-        else """[\d,]+(?:\.\d{1,2})?"""
+        if (AMOUNT_WITH_UNIT.matches(selected.trim())) MONEY else NUMBER
 
     FieldKind.DATETIME -> when {
-        EBL_DATETIME.matches(selected.trim()) -> """\d{2}-[A-Za-z]{3}-\d{2} \d{2}:\d{2}:\d{2} [AP]M"""
-        BKASH_DATETIME.matches(selected.trim()) -> """\d{2}/\d{2}/\d{4} \d{2}:\d{2}"""
+        EBL_DATETIME.matches(selected.trim()) -> EBL_STAMP
+        BKASH_DATETIME.matches(selected.trim()) -> BKASH_STAMP
         // An unrecognised date shape: keep it loose rather than guess a format.
         else -> """[^\s].{0,30}?"""
     }
@@ -92,9 +121,14 @@ private fun generalise(selected: String, kind: FieldKind): String = when (kind) 
 }
 
 /**
- * Escapes metacharacters one at a time rather than with \Q…\E, because the pattern is
- * shown to the user and has to stay readable. Runs of whitespace become \s+ so a
- * double space in a later message does not break the rule.
+ * The text between the labelled spans. Escapes metacharacters one at a time rather
+ * than with \Q…\E, because the pattern is shown to the user and has to stay
+ * readable. Runs of whitespace become \s+ so a double space in a later message
+ * does not break the rule.
+ *
+ * Anything matching a [VARYING_SHAPES] entry is generalised rather than escaped:
+ * the surrounding words are what identify a message, not the timestamp or the
+ * balance that happened to be in the one example.
  */
 private fun literal(text: String): String = buildString {
     var i = 0
@@ -105,6 +139,16 @@ private fun literal(text: String): String = buildString {
             append("""\s+""")
             continue
         }
+
+        val varying = VARYING_SHAPES.firstNotNullOfOrNull { (shape, pattern) ->
+            shape.matchAt(text, i)?.let { it.range.last + 1 to pattern }
+        }
+        if (varying != null) {
+            append(varying.second)
+            i = varying.first
+            continue
+        }
+
         if (c in """\.[]{}()<>*+-=!?^$|""") append('\\')
         append(c)
         i++
