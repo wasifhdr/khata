@@ -22,7 +22,7 @@ JUnit4 + Robolectric + kotlinx-coroutines-test.
 Every task's requirements implicitly include this section.
 
 - **This plan is headless.** It touches **no** Compose file, no file under `core/ui/`, no theme token, and no screen. A concurrent session owns the design system. If a task seems to need UI, stop and report — it belongs to Plan 2b.
-- `minSdk 30`, `compileSdk` / `targetSdk 37`, package `com.wasif.khata`.
+- `minSdk 33`, `compileSdk` / `targetSdk 37`, package `com.wasif.khata`.
 - Money is always `Long` **paisa**. Never `Double`, never `Float`, anywhere.
 - Currency is BDT only.
 - Every table carries `uuid TEXT NOT NULL`, `createdAt INTEGER NOT NULL`, `updatedAt INTEGER NOT NULL`, `deletedAt INTEGER` (nullable). Deletes are soft.

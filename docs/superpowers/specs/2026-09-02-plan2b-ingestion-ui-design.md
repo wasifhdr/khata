@@ -117,10 +117,13 @@ visual composition to be written against the settled design system.
 3. The design system's final component vocabulary is known, so screens are assembled
    from it rather than inventing parallel styling.
 
-## 8. Open question for the author
+## 8. Resolved: minSdk 33
 
-`minSdk` is currently **33**, not the 30 recorded in the wallet spec. The glass
-effects likely require it — `Modifier.blur` needs API 31+. If Android 11 support is
-still wanted, the glass treatment needs a fallback path; if it is not, the wallet spec
-and `PRODUCT.md` should be corrected to say 33. This is a product decision, not a
-technical one, and is left open rather than guessed.
+Raised from 30 with the user's confirmation on 2026-09-02. API 31 adds `RenderEffect`,
+without which `Modifier.blur` is a silent no-op; 33 additionally unlocks AGSL
+`RuntimeShader` for procedural grain. Android 11 and 12 support is no longer a
+requirement. `PRODUCT.md` and the wallet design spec have been corrected; the full
+rationale lives in `2026-08-28-khata-petrol-design.md` §10.
+
+Consequence for this plan: no capability checks or fallback branches are needed in any
+2b screen. Blur, shaders, and the modern permission model can all be assumed.
