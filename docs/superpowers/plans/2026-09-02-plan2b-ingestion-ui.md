@@ -14,24 +14,38 @@ derived values as getters rather than constructor parameters.
 
 **Spec:** `docs/superpowers/specs/2026-09-02-plan2b-ingestion-ui-design.md`
 
-## Preconditions — verify before Task 1
+## Preconditions — all met as of 2026-09-02
 
-- [ ] `design/glass-and-motion` is committed and merged to `main`.
-- [ ] `plan2a/sms-ingestion` is merged to `main`.
-- [ ] `./gradlew testDebugUnitTest` passes on `main`.
-- [ ] The design system's component vocabulary has been read: `core/ui/component/` and `core/ui/theme/`. **Every screen below is assembled from those components.** If a screen seems to need a new visual primitive, add it to `core/ui/component/` rather than styling in place.
+- [x] `design/glass-and-motion` merged to `main` (`0c9f74b`).
+- [x] `plan2a/sms-ingestion` merged to `main` (`18310ac`).
+- [x] `./gradlew testDebugUnitTest` passes on `main` — 227 tests, 0 failures.
+- [x] `DESIGN.md` exists at the repo root and has been read. **It is the authority.** Where it and this plan disagree, DESIGN.md wins and this plan is stale.
 
 ## Global Constraints
 
 - Package `com.wasif.khata`. Money is always `Long` paisa. Instants UTC millis, boundaries in `Asia/Dhaka`.
-- **All styling from the design system.** No hardcoded colour, dp, or text style in any feature file.
 - Async is Coroutines/Flow — no `LiveData`. DI is Hilt + KSP.
 - Derived UI values are getters on `UiState`, never constructor parameters.
 - Durable state (an error still true after rotation) lives in `UiState`; one-shot imperatives go through the effects `Channel`.
-- Touch targets ≥ 48dp. Routinely-used controls sit in the bottom third — this app is operated one-handed.
 - Comments carry a non-obvious *why*, never a restatement of *what*.
 - **No AI, no network.** Plan 3 owns that.
-- Instrumented tests need a device or the `khata_test` emulator; see the Plan 1 notes in `.superpowers/sdd/progress.md` for how it is started (it lives on `D:` because `C:` is full).
+- Instrumented tests need a device or the `khata_test` emulator; it lives on `D:` because `C:` is full — see `.superpowers/sdd/progress.md`.
+
+## Design system contract — from `DESIGN.md`
+
+These are enforced by tests, not review. Breaking one fails the build.
+
+1. **No colour literal outside `core/ui/theme`.** Every colour from `MaterialTheme.colorScheme`, `KhataPalette`, or `LocalCategoryColors`.
+2. **`outline` is never text.** It is borders and disabled controls only. `ContrastTest` scans the source for `color = MaterialTheme.colorScheme.outline` and fails on a hit. Only two text tiers exist over the field: `onSurface` and `onSurfaceVariant` (§3.3).
+3. **Colour is never the only signal** — a shape and a word say whatever colour says.
+4. **Every screen root is `FieldScaffold`.** A screen that paints `colorScheme.background` itself is a bug: it will be the only screen without the field. Follow `SettingsScreen` as the reference (§4, §11).
+5. **Layout rule (§9):** air at the top, content anchored to the bottom, heading centred in the air — a `weight(1f)` headspace above a wrap-content block. This is how one-handed reach is satisfied, rather than each screen remembering a rule. Long lists use `headspaceLedger` (132dp) instead.
+6. **Heading + subline via `ContextHeader`**, not hand-rolled Text pairs.
+7. **Glass placement (§5):** never on list rows (one blur pass per row per frame), never on settings selection controls (the tuner needs neutral surfaces). Selectable controls are **opaque when selected, glass when not, one shared body lambda** — a translucent selected chip reads as less committed, which inverts what selection means.
+8. **Money uses `AmountTextStyle`** (Fraunces, `tnum`). Bengali strings need `BengaliBodyStyle` — Instrument Sans has no Bengali glyphs and will fall through to the device font. A raw SMS body or merchant name can contain Bengali.
+9. **`alert` (`#FF7A6B`) is the designated colour for errors and balance drift** (§3.1).
+10. **New destinations need no transition work** — anything hanging off the hub is shared-axis automatically, everything else fades through (§8, §11).
+11. **A new colour goes in `Color.kt` with a `ContrastTest` assertion**, never at the call site.
 
 ---
 
@@ -116,14 +130,25 @@ The most consequential screen in the plan.
 
 ### Task 6: Confidence marker and filter in the ledger
 
-**Modifies:** the ledger row and its ViewModel.
+**Less to build than originally written.** `CategoryDot` already takes `lowConfidence` and
+renders a ring plus a content description, and `LedgerScreen` already passes it and adds the
+words to the row's metadata line. Two independent signals, per DESIGN.md rule 3 — that part
+is done.
+
+**The real gap:** the ledger only treats `Confidence.LOW` as low. Plan 2a records **`MEDIUM`**
+for every newly-seen merchant, which is the common case for an SMS-ingested transaction — so
+today virtually every ingested row is unmarked. Fixing this is the task.
+
+**Modifies:** `LedgerScreen` row, `LedgerViewModel`, `LedgerUiState`.
 
 **Behaviour to test:**
 
-1. A `MEDIUM`/`LOW` confidence row carries a marker; `HIGH` does not.
-2. The marker is not colour-alone — it must survive greyscale, per the design system's stated rule.
-3. A "needs attention" filter shows only non-`HIGH` rows and reports its own count.
-4. Confirming a merchant's category upgrades subsequent transactions for that merchant to `HIGH`.
+1. A `MEDIUM` row carries the marker, not just `LOW` — anything other than `HIGH` is "needs attention".
+2. `HIGH` carries no marker.
+3. The marker remains two signals — ring *and* word. Do not replace either with colour.
+4. A "needs attention" filter shows only non-`HIGH` rows and reports its own count.
+5. The filter composes with the existing search rather than replacing it.
+6. Confirming a merchant's category upgrades that merchant's subsequent transactions to `HIGH`.
 
 ---
 
