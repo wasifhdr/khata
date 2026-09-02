@@ -28,6 +28,13 @@ interface RawMessageDao {
     @Query("SELECT * FROM raw_messages WHERE deletedAt IS NULL ORDER BY receivedAt")
     suspend fun allForReparse(): List<RawMessageEntity>
 
+    // Newest first: a format that broke recently is the one worth a rule now.
+    @Query(
+        "SELECT * FROM raw_messages WHERE status = :status AND deletedAt IS NULL " +
+            "ORDER BY receivedAt DESC"
+    )
+    fun observeByStatus(status: RawMessageStatus): Flow<List<RawMessageEntity>>
+
     @Query("UPDATE raw_messages SET status = :status, matchedRuleId = :ruleId, updatedAt = :updatedAt WHERE id = :id")
     suspend fun markStatus(id: Long, status: RawMessageStatus, ruleId: Long?, updatedAt: Long)
 
