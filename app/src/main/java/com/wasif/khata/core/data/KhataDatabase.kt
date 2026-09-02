@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.CategoryDao
 import com.wasif.khata.core.data.dao.MerchantDao
+import com.wasif.khata.core.data.dao.ParsingRuleDao
+import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.entity.CategoryEntity
@@ -32,4 +34,6 @@ abstract class KhataDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun transactionDao(): TransactionDao
     abstract fun merchantDao(): MerchantDao
+    abstract fun rawMessageDao(): RawMessageDao
+    abstract fun parsingRuleDao(): ParsingRuleDao
 }

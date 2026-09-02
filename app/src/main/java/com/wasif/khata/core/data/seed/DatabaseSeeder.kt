@@ -2,8 +2,10 @@ package com.wasif.khata.core.data.seed
 
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.CategoryDao
+import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.entity.CategoryEntity
+import com.wasif.khata.core.sms.BUILT_IN_RULES
 import com.wasif.khata.core.time.KhataClock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,6 +14,7 @@ import javax.inject.Singleton
 class DatabaseSeeder @Inject constructor(
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
+    private val ruleDao: ParsingRuleDao,
     private val clock: KhataClock,
 ) {
 
@@ -53,6 +56,10 @@ class DatabaseSeeder @Inject constructor(
                     )
                 }
             )
+        }
+
+        if (ruleDao.countIncludingDeleted() == 0) {
+            ruleDao.upsertAll(BUILT_IN_RULES.map { it.copy(createdAt = now, updatedAt = now) })
         }
     }
 }

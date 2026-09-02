@@ -6,6 +6,8 @@ import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.CategoryDao
 import com.wasif.khata.core.data.dao.MerchantDao
+import com.wasif.khata.core.data.dao.ParsingRuleDao
+import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.migration.MIGRATION_1_2
 import com.wasif.khata.core.time.KhataClock
@@ -33,6 +35,8 @@ object DatabaseModule {
     @Provides fun provideCategoryDao(db: KhataDatabase): CategoryDao = db.categoryDao()
     @Provides fun provideTransactionDao(db: KhataDatabase): TransactionDao = db.transactionDao()
     @Provides fun provideMerchantDao(db: KhataDatabase): MerchantDao = db.merchantDao()
+    @Provides fun provideRawMessageDao(db: KhataDatabase): RawMessageDao = db.rawMessageDao()
+    @Provides fun provideParsingRuleDao(db: KhataDatabase): ParsingRuleDao = db.parsingRuleDao()
 }
 
 @Module

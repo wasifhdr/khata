@@ -56,6 +56,28 @@ interface TransactionDao {
     @Query("UPDATE transactions SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long)
 
+    @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
+    suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?
+
+    @Query(
+        "SELECT * FROM transactions WHERE deletedAt IS NULL AND transferGroupId IS NULL " +
+            "AND amountMinor = :amountMinor AND accountId != :notAccountId AND direction = :direction " +
+            "AND occurredAt BETWEEN :fromMillis AND :toMillis"
+    )
+    suspend fun findPairCandidates(
+        amountMinor: Long,
+        notAccountId: Long,
+        direction: TransactionDirection,
+        fromMillis: Long,
+        toMillis: Long,
+    ): List<TransactionEntity>
+
+    @Query(
+        "UPDATE transactions SET transferGroupId = :groupId, kind = 'TRANSFER', " +
+            "updatedAt = :updatedAt WHERE id IN (:ids)"
+    )
+    suspend fun markAsTransfer(ids: List<Long>, groupId: String, updatedAt: Long)
+
     // COALESCE, because SUM over no rows is NULL and this runs against an empty
     // database on every first launch.
     @Query(
