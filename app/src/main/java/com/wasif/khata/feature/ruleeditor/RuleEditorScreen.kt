@@ -184,6 +184,11 @@ private fun MessageTokens(state: RuleEditorUiState, onTokenTapped: (Int) -> Unit
     FlowRow(
         Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
         horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        // FlowRow defaults to Arrangement.Top between wrapped lines, which is no
+        // gap at all. Every child here paints its own background, so without this
+        // the second line's chips sit flush against the first line's and the
+        // message reads as one solid block rather than separate words.
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
         state.tokens.forEachIndexed { index, token ->
             val labelled = state.kindOfToken(index)
@@ -229,6 +234,7 @@ private fun FieldChoices(onFieldChosen: (FieldKind) -> Unit, onCancel: () -> Uni
     FlowRow(
         Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal, vertical = spacing.md),
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         FieldKind.entries.forEach { kind ->
             Pill(text = kind.label, selected = false) { onFieldChosen(kind) }
@@ -240,7 +246,12 @@ private fun FieldChoices(onFieldChosen: (FieldKind) -> Unit, onCancel: () -> Uni
 @Composable
 private fun Captures(state: RuleEditorUiState) {
     val spacing = LocalSpacing.current
-    Column(Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.screenHorizontal)
+            .padding(top = spacing.md),
+    ) {
         Text(
             text = "Khata reads",
             style = MaterialTheme.typography.labelLarge,
@@ -272,7 +283,10 @@ private fun DirectionChoice(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
             TransactionDirection.entries.forEach { direction ->
                 Pill(
                     text = if (direction == TransactionDirection.DEBIT) "Out" else "In",
@@ -303,7 +317,10 @@ private fun KindChoice(selected: RuleKind, onChanged: (RuleKind) -> Unit) {
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
             offered.forEach { (kind, label) ->
                 Pill(text = label, selected = kind == selected) { onChanged(kind) }
             }

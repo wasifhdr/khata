@@ -241,6 +241,9 @@ fun TransactionEditorContent(
                 FlowRow(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    // Wrapped lines get no gap by default, so chips on the second
+                    // row sit flush against the first row's.
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
                     state.accounts.forEach { account ->
                         EditorChip(
@@ -257,6 +260,9 @@ fun TransactionEditorContent(
                 FlowRow(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    // Wrapped lines get no gap by default, so chips on the second
+                    // row sit flush against the first row's.
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
                     state.categories.forEach { category ->
                         EditorChip(
