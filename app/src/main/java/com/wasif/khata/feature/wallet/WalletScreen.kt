@@ -31,11 +31,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.HazeState
 
 @Composable
 fun WalletScreen(
@@ -103,7 +105,7 @@ fun WalletContent(
                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 NetWorthCard(state = state)
-                MonthPair(state = state)
+                MonthPair(state = state, haze = haze)
                 AccountList(state = state, onOpenLedger = onOpenLedger)
             }
             }
@@ -158,19 +160,21 @@ private fun NetWorthCard(state: WalletUiState) {
 }
 
 @Composable
-private fun MonthPair(state: WalletUiState) {
+private fun MonthPair(state: WalletUiState, haze: HazeState) {
     val spacing = LocalSpacing.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         MonthFigure(
+            haze = haze,
             label = "SPENT",
             money = state.monthSpend,
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
         MonthFigure(
+            haze = haze,
             label = "RECEIVED",
             money = state.monthReceived,
             tint = MaterialTheme.colorScheme.primary,
@@ -181,29 +185,34 @@ private fun MonthPair(state: WalletUiState) {
 
 @Composable
 private fun MonthFigure(
+    haze: HazeState,
     label: String,
     money: Money,
     tint: Color,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
-    Column(
-        modifier
-            .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(spacing.md),
+    KhataGlass(
+        hazeState = haze,
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = money.format(),
-            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-            color = tint,
-            modifier = Modifier.padding(top = spacing.xs),
-        )
+        // Padding lives inside the glass: KhataGlass clips to `shape`, so
+        // padding applied outside would sit beyond the clip and the content
+        // would touch the bevel.
+        Column(Modifier.padding(spacing.md)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = money.format(),
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                color = tint,
+                modifier = Modifier.padding(top = spacing.xs),
+            )
+        }
     }
 }
 

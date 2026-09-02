@@ -44,6 +44,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.ui.component.FieldScaffold
+import dev.chrisbanes.haze.HazeState
+import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.theme.KhataPalette
@@ -194,29 +196,42 @@ fun TransactionEditorContent(
                 ) {
                     TransactionDirection.entries.forEach { direction ->
                         val selected = state.direction == direction
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .height(spacing.minTouchTarget)
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.secondaryContainer
+                        // One body, two surfaces. Only the *unselected* half is
+                        // glass: a translucent selected pill reads as less
+                        // committed than an opaque one, which inverts the thing
+                        // selection is meant to say.
+                        val body: @Composable () -> Unit = {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clickable { actions.onDirectionChange(direction) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = if (direction == TransactionDirection.DEBIT) "Spent" else "Received",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
                                     } else {
-                                        MaterialTheme.colorScheme.surfaceContainer
+                                        MaterialTheme.colorScheme.onSurfaceVariant
                                     },
                                 )
-                                .clickable { actions.onDirectionChange(direction) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = if (direction == TransactionDirection.DEBIT) "Spent" else "Received",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
+                            }
+                        }
+                        if (selected) {
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .height(spacing.minTouchTarget)
+                                    .clip(MaterialTheme.shapes.small)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                            ) { body() }
+                        } else {
+                            KhataGlass(
+                                hazeState = haze,
+                                modifier = Modifier.weight(1f).height(spacing.minTouchTarget),
+                                shape = MaterialTheme.shapes.small,
+                                content = body,
                             )
                         }
                     }
@@ -229,6 +244,7 @@ fun TransactionEditorContent(
                 ) {
                     state.accounts.forEach { account ->
                         EditorChip(
+                            haze = haze,
                             label = account.name,
                             selected = state.accountId == account.id,
                             token = null,
@@ -244,6 +260,7 @@ fun TransactionEditorContent(
                 ) {
                     state.categories.forEach { category ->
                         EditorChip(
+                            haze = haze,
                             label = category.name,
                             selected = state.categoryId == category.id,
                             token = category.colorToken,
@@ -333,37 +350,43 @@ private fun FieldLabel(text: String) {
 
 @Composable
 private fun EditorChip(
+    haze: HazeState,
     label: String,
     selected: Boolean,
     token: String?,
     onClick: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
-    Row(
-        Modifier
-            .clip(CircleShape)
-            .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.secondaryContainer
+    // Same split as the direction pill: selected stays opaque so it keeps
+    // reading as a commitment, unselected becomes glass.
+    val body: @Composable () -> Unit = {
+        Row(
+            Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = spacing.md, vertical = spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        ) {
+            // Colour quarantined to a dot; the name always carries the meaning.
+            token?.let { CategoryDot(token = it) }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
                 } else {
-                    MaterialTheme.colorScheme.surfaceContainer
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = spacing.md, vertical = spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-    ) {
-        // Colour quarantined to a dot; the name always carries the meaning.
-        token?.let { CategoryDot(token = it) }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (selected) {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
+        }
+    }
+    if (selected) {
+        Box(
+            Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer),
+        ) { body() }
+    } else {
+        KhataGlass(hazeState = haze, shape = CircleShape, content = body)
     }
 }
