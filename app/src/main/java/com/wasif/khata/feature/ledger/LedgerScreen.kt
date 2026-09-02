@@ -45,6 +45,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemContentType
 import androidx.paging.compose.itemKey
 import com.wasif.khata.core.model.Confidence
+import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.theme.AmountTextStyle
@@ -93,7 +94,7 @@ fun LedgerContent(
     val spacing = LocalSpacing.current
     val isSearching = query.isNotBlank()
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
                 Box(
@@ -251,7 +252,7 @@ private fun MonthHeader(
                     }
                 },
                 style = PageSublineStyle,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = spacing.xs),
             )
@@ -336,7 +337,7 @@ private fun DayHeaderRow(header: LedgerItem.DayHeader, isSearching: Boolean) {
         Text(
             text = header.date.format(dayFormatter),
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         // Search matches rows from every month, but observeDayTotals() stays a
         // month-agnostic, all-time aggregate either way -- under search it no
@@ -356,12 +357,12 @@ private fun DayHeaderRow(header: LedgerItem.DayHeader, isSearching: Boolean) {
                 Text(
                     text = "SPENT",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = header.total.format(),
                     style = AmountTextStyle,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -414,7 +415,7 @@ private fun TransactionRow(
                     Text(
                         text = meta,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -454,7 +455,7 @@ private fun EmptyLedger(
                 "Use the arrows to look at another month, or tap + to record something."
             },
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = spacing.sm),
         )

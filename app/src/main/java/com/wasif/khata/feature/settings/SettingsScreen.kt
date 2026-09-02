@@ -45,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.FieldPalette
@@ -84,161 +85,162 @@ fun SettingsContent(
 ) {
     val spacing = LocalSpacing.current
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.systemBars),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-            Box(
-                Modifier
-                    .size(spacing.minTouchTarget)
-                    .clip(CircleShape)
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
-            ContextHeader(heading = "Settings", subline = "Home · theme · budget")
-
-            Section("Home view")
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                HomeView.entries.forEach { view ->
-                    val selected = prefs.homeView == view
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(spacing.minTouchTarget)
-                            .clip(MaterialTheme.shapes.small)
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceContainer
-                                },
-                            )
-                            .clickable { onHomeViewSelected(view) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = view.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    }
-                }
-            }
-            // I6: KhataNavHost freezes its start destination for the process
-            // lifetime -- back from the root has to keep exiting the app, which
-            // stops being true the instant the graph could be rebuilt under a
-            // live back stack. So this control cannot take effect immediately;
-            // saying so here is the other half of that fix; freezing alone
-            // would make the control look broken instead.
-            Text(
-                text = "Takes effect the next time you open Khata",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(
-                    start = spacing.screenHorizontal,
-                    end = spacing.screenHorizontal,
-                    top = spacing.xs,
-                ),
-            )
-
-            Section("Monthly budget")
-            MonthlyBudgetField(
-                current = prefs.monthlyBudgetMinor,
-                onChange = onMonthlyBudgetChanged,
-            )
-
-            Section("Field")
-            SwatchGrid(
-                swatches = KhataPalette.fields.map { it.name to it.keyStop },
-                selectedIndex = KhataPalette.fields.indexOf(prefs.themeSpec.field),
-                onSelect = { onFieldSelected(KhataPalette.fields[it]) },
-            )
-
-            Section("Ground")
-            SwatchGrid(
-                swatches = KhataPalette.grounds.map { it.name to it.color },
-                selectedIndex = KhataPalette.grounds.indexOfFirst { it.color == prefs.themeSpec.ground },
-                onSelect = { onGroundSelected(KhataPalette.grounds[it].color) },
-            )
-
-            Section("Accent")
-            SwatchGrid(
-                swatches = KhataPalette.accents.map { it.name to it.color },
-                selectedIndex = KhataPalette.accents.indexOfFirst { it.color == prefs.themeSpec.accent },
-                onSelect = { onAccentSelected(KhataPalette.accents[it].color) },
-            )
-
-            Section("Field intensity")
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                FieldIntensity.entries.forEach { level ->
-                    val selected = prefs.themeSpec.intensity == level
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(spacing.minTouchTarget)
-                            .clip(MaterialTheme.shapes.small)
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceContainer
-                                },
-                            )
-                            .clickable { onIntensitySelected(level) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = level.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    }
+    FieldScaffold(Modifier.fillMaxSize()) { _ ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
+                Box(
+                    Modifier
+                        .size(spacing.minTouchTarget)
+                        .clip(CircleShape)
+                        .clickable(onClick = onBack),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
 
-            Box(
-                Modifier
-                    .padding(spacing.screenHorizontal)
-                    .fillMaxWidth()
-                    .height(spacing.minTouchTarget)
-                    .clip(MaterialTheme.shapes.small)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small)
-                    .clickable { onResetTheme() },
-                contentAlignment = Alignment.Center,
-            ) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = spacing.xxl)) {
+                ContextHeader(heading = "Settings", subline = "Home · theme · budget")
+
+                Section("Home view")
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    HomeView.entries.forEach { view ->
+                        val selected = prefs.homeView == view
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(spacing.minTouchTarget)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainer
+                                    },
+                                )
+                                .clickable { onHomeViewSelected(view) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = view.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                }
+                // I6: KhataNavHost freezes its start destination for the process
+                // lifetime -- back from the root has to keep exiting the app, which
+                // stops being true the instant the graph could be rebuilt under a
+                // live back stack. So this control cannot take effect immediately;
+                // saying so here is the other half of that fix; freezing alone
+                // would make the control look broken instead.
                 Text(
-                    text = "Reset to default",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    text = "Takes effect the next time you open Khata",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(
+                        start = spacing.screenHorizontal,
+                        end = spacing.screenHorizontal,
+                        top = spacing.xs,
+                    ),
                 )
+
+                Section("Monthly budget")
+                MonthlyBudgetField(
+                    current = prefs.monthlyBudgetMinor,
+                    onChange = onMonthlyBudgetChanged,
+                )
+
+                Section("Field")
+                SwatchGrid(
+                    swatches = KhataPalette.fields.map { it.name to it.keyStop },
+                    selectedIndex = KhataPalette.fields.indexOf(prefs.themeSpec.field),
+                    onSelect = { onFieldSelected(KhataPalette.fields[it]) },
+                )
+
+                Section("Ground")
+                SwatchGrid(
+                    swatches = KhataPalette.grounds.map { it.name to it.color },
+                    selectedIndex = KhataPalette.grounds.indexOfFirst { it.color == prefs.themeSpec.ground },
+                    onSelect = { onGroundSelected(KhataPalette.grounds[it].color) },
+                )
+
+                Section("Accent")
+                SwatchGrid(
+                    swatches = KhataPalette.accents.map { it.name to it.color },
+                    selectedIndex = KhataPalette.accents.indexOfFirst { it.color == prefs.themeSpec.accent },
+                    onSelect = { onAccentSelected(KhataPalette.accents[it].color) },
+                )
+
+                Section("Field intensity")
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    FieldIntensity.entries.forEach { level ->
+                        val selected = prefs.themeSpec.intensity == level
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(spacing.minTouchTarget)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainer
+                                    },
+                                )
+                                .clickable { onIntensitySelected(level) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = level.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                }
+
+                Box(
+                    Modifier
+                        .padding(spacing.screenHorizontal)
+                        .fillMaxWidth()
+                        .height(spacing.minTouchTarget)
+                        .clip(MaterialTheme.shapes.small)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, MaterialTheme.shapes.small)
+                        .clickable { onResetTheme() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Reset to default",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
-        }
+            }
     }
 }
 
@@ -282,7 +284,7 @@ private fun Section(title: String) {
     Text(
         text = title.uppercase(),
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.outline,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(
             start = spacing.screenHorizontal,
             end = spacing.screenHorizontal,

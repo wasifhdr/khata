@@ -108,7 +108,7 @@ fun ModulesContent(
                 Text(
                     text = "সব হিসাব, এক খাতায়",
                     style = TaglineTextStyle,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = spacing.md),
                 )
@@ -236,12 +236,12 @@ private fun DormantRow(haze: HazeState, left: String, right: String) {
                     Text(
                         text = name.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "Not built",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

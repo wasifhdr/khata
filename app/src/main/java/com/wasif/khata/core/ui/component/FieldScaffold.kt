@@ -69,7 +69,7 @@ half4 main(float2 coord) {
 """
 
 /** How far the grain is pushed. Above roughly 0.05 it stops reading as texture and starts reading as noise. */
-private const val GrainAlpha = 0.035f
+internal const val FieldGrainAlpha = 0.035f
 
 /**
  * Soft radial pools rather than a full-bleed linear gradient: a linear wash
@@ -110,7 +110,7 @@ fun FieldBackdrop(modifier: Modifier = Modifier) {
             // ground is the darkest surface in the app and banding shows there
             // too, so gating this on intensity would leave Off the one theme
             // that bands.
-            grain.setFloatUniform("alpha", GrainAlpha)
+            grain.setFloatUniform("alpha", FieldGrainAlpha)
             drawRect(brush = ShaderBrush(grain))
         },
     )

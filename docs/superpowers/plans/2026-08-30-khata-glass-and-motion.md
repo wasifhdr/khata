@@ -724,7 +724,14 @@ export JAVA_HOME="/e/Android/Android Studio/jbr"
 ./gradlew.bat testDebugUnitTest --tests '*ContrastTest*'
 ```
 
-Expected: this may PASS already — the existing "paper text on field" assertions cover some of these roles, and `outline` was raised in the merge-gate fix wave. **If it passes, that is a real result, not a reason to skip the test**: it is now pinned against future field or role changes, which is exactly the hole that let `outline`-on-petrol ship. If it fails, the failing role's value must be raised in `DarkColors` and re-verified against the grounds too — never lower the assertion.
+Expected: this may PASS already — the existing "paper text on field" assertions cover some of these roles, and `outline` was raised in the merge-gate fix wave. **Outcome when this was executed:** it failed, and the plan's remedy below turned out not to
+exist. `onSurfaceVariant` cannot be lightened enough to clear 4.5:1 on the brighter fields without
+becoming paper white and collapsing the type hierarchy. What was done instead, with the user's
+decision: the field key stops were trimmed 12-33% (all but Violet), sized against the *grain-lit*
+peak rather than the raw stop, because the grain lifts the brightest pixel by ~9/255. `outline` was
+raised to #8A9E9C and demoted to a border/disabled-state role -- every `color = colorScheme.outline`
+on a Text moved to `onSurfaceVariant`, because only two text tiers can clear the floor over a lit
+field. A source-scanning test pins that. **If it passes, that is a real result, not a reason to skip the test**: it is now pinned against future field or role changes, which is exactly the hole that let `outline`-on-petrol ship. If it fails, the failing role's value must be raised in `DarkColors` and re-verified against the grounds too — never lower the assertion.
 
 - [ ] **Step 3: Put the field on the Wallet**
 

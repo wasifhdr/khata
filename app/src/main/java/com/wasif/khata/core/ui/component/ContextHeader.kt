@@ -43,7 +43,7 @@ fun ContextHeader(
         Text(
             text = subline,
             style = PageSublineStyle,
-            color = MaterialTheme.colorScheme.outline,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = spacing.xs),
         )

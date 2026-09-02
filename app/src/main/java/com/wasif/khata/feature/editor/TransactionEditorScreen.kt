@@ -43,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.theme.KhataPalette
@@ -78,238 +79,239 @@ fun TransactionEditorContent(
 ) {
     val spacing = LocalSpacing.current
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .windowInsetsPadding(WindowInsets.systemBars),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
-            horizontalArrangement = Arrangement.SpaceBetween,
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars),
         ) {
-            Box(
-                Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close",
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            if (state.isEditing) {
                 Box(
-                    Modifier
-                        .size(spacing.minTouchTarget)
-                        .clip(CircleShape)
-                        .clickable(onClick = actions::onDelete),
+                    Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = "Delete transaction",
-                        tint = MaterialTheme.colorScheme.error,
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-            }
-        }
-
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ContextHeader(
-                heading = if (state.isEditing) "Edit entry" else "New entry",
-                // The defaults the editor already assumed, stated where they can
-                // be corrected rather than left invisible.
-                subline = state.accounts.firstOrNull { it.id == state.accountId }?.name
-                    ?: "No account",
-            )
-        }
-
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = spacing.lg),
-        ) {
-            // Amount first and largest. This is the single change that most
-            // directly answers "everything is the same size".
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = spacing.screenHorizontal)
-                    .clip(MaterialTheme.shapes.large)
-                    .background(Brush.linearGradient(KhataPalette.heroStops))
-                    .padding(spacing.md),
-            ) {
-                Text(
-                    text = "AMOUNT",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                BasicTextField(
-                    value = state.amountInput,
-                    onValueChange = actions::onAmountChange,
-                    textStyle = MaterialTheme.typography.displayLarge.copy(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontFeatureSettings = "tnum",
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = spacing.xs)
-                        .testTag("amountField"),
-                    decorationBox = { inner ->
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text(
-                                text = "৳",
-                                style = MaterialTheme.typography.displayLarge.copy(
-                                    color = MaterialTheme.colorScheme.primary,
-                                ),
-                            )
-                            Box(Modifier.weight(1f)) { inner() }
-                        }
-                    },
-                )
-                if (state.amountHasError) {
-                    // Durable text under the field, never a transient toast.
-                    Text(
-                        text = "Enter an amount like 1234.56",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = spacing.xs),
-                    )
-                }
-            }
-
-            // Two visible states, never a switch: a switch hides which state is
-            // which.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = spacing.screenHorizontal, vertical = spacing.md),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                TransactionDirection.entries.forEach { direction ->
-                    val selected = state.direction == direction
+                if (state.isEditing) {
                     Box(
                         Modifier
-                            .weight(1f)
-                            .height(spacing.minTouchTarget)
-                            .clip(MaterialTheme.shapes.small)
-                            .background(
-                                if (selected) {
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceContainer
-                                },
-                            )
-                            .clickable { actions.onDirectionChange(direction) },
+                            .size(spacing.minTouchTarget)
+                            .clip(CircleShape)
+                            .clickable(onClick = actions::onDelete),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = if (direction == TransactionDirection.DEBIT) "Spent" else "Received",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (selected) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = "Delete transaction",
+                            tint = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
             }
 
-            FieldLabel("Account")
-            FlowRow(
-                Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                state.accounts.forEach { account ->
-                    EditorChip(
-                        label = account.name,
-                        selected = state.accountId == account.id,
-                        token = null,
-                        onClick = { actions.onAccountSelected(account.id) },
-                    )
-                }
-            }
-
-            FieldLabel("Category")
-            FlowRow(
-                Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                state.categories.forEach { category ->
-                    EditorChip(
-                        label = category.name,
-                        selected = state.categoryId == category.id,
-                        token = category.colorToken,
-                        onClick = { actions.onCategorySelected(category.id) },
-                    )
-                }
-            }
-
-            FieldLabel("Merchant")
-            OutlinedTextField(
-                value = state.merchantInput,
-                onValueChange = actions::onMerchantChange,
-                singleLine = true,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-            )
-
-            FieldLabel("Note")
-            OutlinedTextField(
-                value = state.noteInput,
-                onValueChange = actions::onNoteChange,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-            )
-
-            state.saveError?.let { error ->
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(
-                        horizontal = spacing.screenHorizontal,
-                        vertical = spacing.sm,
-                    ),
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                ContextHeader(
+                    heading = if (state.isEditing) "Edit entry" else "New entry",
+                    // The defaults the editor already assumed, stated where they can
+                    // be corrected rather than left invisible.
+                    subline = state.accounts.firstOrNull { it.id == state.accountId }?.name
+                        ?: "No account",
                 )
             }
 
-            // Full-width, in the thumb arc, disabled until genuinely saveable.
-            Box(
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(spacing.screenHorizontal)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(
-                        if (state.canSave) {
-                            Brush.linearGradient(KhataPalette.heroStops)
-                        } else {
-                            // A flat fill, not a gradient with matching stops:
-                            // the disabled state has no accent to blend.
-                            SolidColor(MaterialTheme.colorScheme.surfaceContainer)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = spacing.lg),
+            ) {
+                // Amount first and largest. This is the single change that most
+                // directly answers "everything is the same size".
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.screenHorizontal)
+                        .clip(MaterialTheme.shapes.large)
+                        .background(Brush.linearGradient(KhataPalette.heroStops))
+                        .padding(spacing.md),
+                ) {
+                    Text(
+                        text = "AMOUNT",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    BasicTextField(
+                        value = state.amountInput,
+                        onValueChange = actions::onAmountChange,
+                        textStyle = MaterialTheme.typography.displayLarge.copy(
+                            color = MaterialTheme.colorScheme.primary,
+                            fontFeatureSettings = "tnum",
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = spacing.xs)
+                            .testTag("amountField"),
+                        decorationBox = { inner ->
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = "৳",
+                                    style = MaterialTheme.typography.displayLarge.copy(
+                                        color = MaterialTheme.colorScheme.primary,
+                                    ),
+                                )
+                                Box(Modifier.weight(1f)) { inner() }
+                            }
                         },
                     )
-                    .clickable(enabled = state.canSave, onClick = actions::onSave)
-                    .padding(vertical = spacing.md),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Save entry",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (state.canSave) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    },
+                    if (state.amountHasError) {
+                        // Durable text under the field, never a transient toast.
+                        Text(
+                            text = "Enter an amount like 1234.56",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = spacing.xs),
+                        )
+                    }
+                }
+
+                // Two visible states, never a switch: a switch hides which state is
+                // which.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.screenHorizontal, vertical = spacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    TransactionDirection.entries.forEach { direction ->
+                        val selected = state.direction == direction
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(spacing.minTouchTarget)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.secondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainer
+                                    },
+                                )
+                                .clickable { actions.onDirectionChange(direction) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (direction == TransactionDirection.DEBIT) "Spent" else "Received",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                }
+
+                FieldLabel("Account")
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    state.accounts.forEach { account ->
+                        EditorChip(
+                            label = account.name,
+                            selected = state.accountId == account.id,
+                            token = null,
+                            onClick = { actions.onAccountSelected(account.id) },
+                        )
+                    }
+                }
+
+                FieldLabel("Category")
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    state.categories.forEach { category ->
+                        EditorChip(
+                            label = category.name,
+                            selected = state.categoryId == category.id,
+                            token = category.colorToken,
+                            onClick = { actions.onCategorySelected(category.id) },
+                        )
+                    }
+                }
+
+                FieldLabel("Merchant")
+                OutlinedTextField(
+                    value = state.merchantInput,
+                    onValueChange = actions::onMerchantChange,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                 )
+
+                FieldLabel("Note")
+                OutlinedTextField(
+                    value = state.noteInput,
+                    onValueChange = actions::onNoteChange,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                )
+
+                state.saveError?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(
+                            horizontal = spacing.screenHorizontal,
+                            vertical = spacing.sm,
+                        ),
+                    )
+                }
+
+                // Full-width, in the thumb arc, disabled until genuinely saveable.
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(spacing.screenHorizontal)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(
+                            if (state.canSave) {
+                                Brush.linearGradient(KhataPalette.heroStops)
+                            } else {
+                                // A flat fill, not a gradient with matching stops:
+                                // the disabled state has no accent to blend.
+                                SolidColor(MaterialTheme.colorScheme.surfaceContainer)
+                            },
+                        )
+                        .clickable(enabled = state.canSave, onClick = actions::onSave)
+                        .padding(vertical = spacing.md),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "Save entry",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (state.canSave) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        },
+                    )
+                }
             }
-        }
+            }
     }
 }
 
@@ -319,7 +321,7 @@ private fun FieldLabel(text: String) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.outline,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(
             start = spacing.screenHorizontal,
             end = spacing.screenHorizontal,
