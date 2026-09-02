@@ -106,7 +106,11 @@ class IngestionPipeline @Inject constructor(
 
         return db.withTransaction {
             val merchant = resolveMerchant(parsed.merchant, now)
+            // providerTxnId catches the reserved/successful twins, which are two
+            // different raw messages. rawMessageId catches reparse of one message,
+            // which is the only dedup key EBL offers since it sends no TrxID.
             val existing = parsed.providerTxnId?.let { transactionDao.findByProviderTxnId(it) }
+                ?: transactionDao.findByRawMessageId(rawId)
 
             // Reverse the superseded row's balance effect before applying the new one,
             // or the "reserved" then "successful" pair double-counts.

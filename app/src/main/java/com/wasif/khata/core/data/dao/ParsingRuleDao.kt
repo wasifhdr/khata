@@ -18,6 +18,9 @@ interface ParsingRuleDao {
     @Query("SELECT * FROM parsing_rules WHERE deletedAt IS NULL ORDER BY priority")
     fun observeAll(): Flow<List<ParsingRuleEntity>>
 
+    @Query("SELECT * FROM parsing_rules WHERE deletedAt IS NULL ORDER BY priority")
+    suspend fun allIncludingDisabled(): List<ParsingRuleEntity>
+
     @Query("SELECT COUNT(*) FROM parsing_rules")
     suspend fun countIncludingDeleted(): Int
 }
