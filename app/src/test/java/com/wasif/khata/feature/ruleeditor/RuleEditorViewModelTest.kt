@@ -381,4 +381,48 @@ class RuleEditorViewModelTest {
 
         assertTrue(vm.state.value.canSave)
     }
+
+    @Test
+    fun `teaching the same message twice revises one rule rather than stacking two`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("1,240.50"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+        vm.onSave()
+        advanceUntilIdle()
+
+        // Same message, taught again -- a correction, not a second rule.
+        val again = viewModel()
+        advanceUntilIdle()
+        again.onTokenTapped(again.tokenIndex("1,240.50"))
+        again.onFieldChosen(FieldKind.AMOUNT)
+        again.onDirectionChanged(TransactionDirection.CREDIT)
+        again.onSave()
+        advanceUntilIdle()
+
+        val user = db.parsingRuleDao().allIncludingDisabled().filter { it.origin == "USER" }
+        assertEquals(1, user.size)
+        assertEquals("the second teaching is the one that counts", TransactionDirection.CREDIT, user.single().direction)
+    }
+
+    @Test
+    fun `a revision keeps the place the rule already earned`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+        vm.onTokenTapped(vm.tokenIndex("1,240.50"))
+        vm.onFieldChosen(FieldKind.AMOUNT)
+        vm.onSave()
+        advanceUntilIdle()
+        val first = db.parsingRuleDao().allIncludingDisabled().single { it.origin == "USER" }.priority
+
+        val again = viewModel()
+        advanceUntilIdle()
+        again.onTokenTapped(again.tokenIndex("1,240.50"))
+        again.onFieldChosen(FieldKind.AMOUNT)
+        again.onSave()
+        advanceUntilIdle()
+
+        // Re-saving must not push the rule to the back of the queue each time.
+        assertEquals(first, db.parsingRuleDao().allIncludingDisabled().single { it.origin == "USER" }.priority)
+    }
 }

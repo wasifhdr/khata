@@ -115,11 +115,16 @@ class UnmatchedViewModel @Inject constructor(
             }
             runCatching {
                 val now = clock.now()
-                val priority = (ruleDao.allIncludingDisabled().maxOfOrNull { it.priority } ?: 0) + 1
+                // Dismissing the same message twice is one decision, not two rules.
+                val uuid = "ignore-${message.body.hashCode()}"
+                val existing = ruleDao.findByUuid(uuid)
+                val priority = existing?.priority
+                    ?: ((ruleDao.allIncludingDisabled().maxOfOrNull { it.priority } ?: 0) + 1)
                 ruleDao.upsertAll(
                     listOf(
                         ParsingRuleEntity(
-                            uuid = "ignore-${message.body.hashCode()}-$now",
+                            id = existing?.id ?: 0,
+                            uuid = uuid,
                             name = "Not a transaction",
                             senderPattern = Regex.escape(message.sender),
                             bodyPattern = pattern,
@@ -129,7 +134,7 @@ class UnmatchedViewModel @Inject constructor(
                             origin = "USER",
                             isEnabled = true,
                             sampleMessage = message.body,
-                            createdAt = now,
+                            createdAt = existing?.createdAt ?: now,
                             updatedAt = now,
                         ),
                     ),

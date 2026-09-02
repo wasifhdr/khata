@@ -180,15 +180,23 @@ class RuleEditorViewModel @AssistedInject constructor(
         viewModelScope.launch {
             runCatching {
                 val now = clock.now()
+                // Keyed on the message, not the moment: teaching the same message a
+                // second time is a revision of that rule, not a second rule. The
+                // timestamp used to be in here, so every save stacked another copy.
+                val uuid = "user-${current.body.hashCode()}"
+                val existing = ruleDao.findByUuid(uuid)
                 // Appended after every existing rule, so a hand-made rule can never
                 // outrank an IGNORE rule. An OTP message carries a real amount and a
                 // real merchant; letting one of these jump the queue would silently
-                // double every OTP-carrying payment.
-                val priority = (ruleDao.allIncludingDisabled().maxOfOrNull { it.priority } ?: 0) + 1
+                // double every OTP-carrying payment. A revision keeps the place it
+                // already earned rather than being sent to the back each time.
+                val priority = existing?.priority
+                    ?: ((ruleDao.allIncludingDisabled().maxOfOrNull { it.priority } ?: 0) + 1)
                 ruleDao.upsertAll(
                     listOf(
                         ParsingRuleEntity(
-                            uuid = "user-${current.body.hashCode()}-$now",
+                            id = existing?.id ?: 0,
+                            uuid = uuid,
                             name = current.name.trim(),
                             senderPattern = Regex.escape(current.sender),
                             bodyPattern = current.derived.pattern,
@@ -198,7 +206,7 @@ class RuleEditorViewModel @AssistedInject constructor(
                             origin = "USER",
                             isEnabled = true,
                             sampleMessage = current.body,
-                            createdAt = now,
+                            createdAt = existing?.createdAt ?: now,
                             updatedAt = now,
                         ),
                     ),
