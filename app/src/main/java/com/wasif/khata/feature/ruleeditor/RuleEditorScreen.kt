@@ -39,6 +39,7 @@ import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.sms.FieldKind
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.LocalSpacing
 
 @Composable
@@ -307,38 +308,6 @@ private fun KindChoice(selected: RuleKind, onChanged: (RuleKind) -> Unit) {
                 Pill(text = label, selected = kind == selected) { onChanged(kind) }
             }
         }
-    }
-}
-
-@Composable
-private fun Pill(text: String, selected: Boolean, onClick: () -> Unit) {
-    val spacing = LocalSpacing.current
-    Box(
-        Modifier
-            .height(spacing.minTouchTarget)
-            .clip(MaterialTheme.shapes.small)
-            // Selected controls stay opaque: a translucent selected chip reads as less
-            // committed than an opaque one, which inverts what selection means.
-            .background(
-                if (selected) {
-                    MaterialTheme.colorScheme.secondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                },
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = spacing.md),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (selected) {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
     }
 }
 

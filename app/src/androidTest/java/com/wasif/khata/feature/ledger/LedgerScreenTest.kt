@@ -43,6 +43,9 @@ class LedgerScreenTest {
         canGoForward: Boolean = false,
         query: String = "",
         onQueryChange: (String) -> Unit = {},
+        needsAttentionOnly: Boolean = false,
+        needsAttentionCount: Int = 0,
+        onNeedsAttentionToggled: () -> Unit = {},
         onPreviousMonth: () -> Unit = {},
         onNextMonth: () -> Unit = {},
         onAddTransaction: () -> Unit = {},
@@ -62,6 +65,9 @@ class LedgerScreenTest {
                 canGoForward = canGoForward,
                 query = query,
                 onQueryChange = onQueryChange,
+                needsAttentionOnly = needsAttentionOnly,
+                needsAttentionCount = needsAttentionCount,
+                onNeedsAttentionToggled = onNeedsAttentionToggled,
                 onPreviousMonth = onPreviousMonth,
                 onNextMonth = onNextMonth,
                 onBack = {},
@@ -204,7 +210,7 @@ class LedgerScreenTest {
         compose.setContent(content(items = listOf(LedgerItem.Row(low))))
 
         compose.onNodeWithText("Pathao").assertIsDisplayed()
-        compose.onNodeWithText("low confidence", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("needs checking", substring = true).assertIsDisplayed()
         compose.onNodeWithContentDescription("Low confidence").assertIsDisplayed()
     }
 
@@ -282,5 +288,47 @@ class LedgerScreenTest {
         assertTrue("the day-header total should not appear while searching", total.isEmpty())
         val spentLabels = compose.onAllNodesWithText("SPENT").fetchSemanticsNodes()
         assertTrue("no SPENT label should appear while searching", spentLabels.isEmpty())
+    }
+
+    @Test
+    fun theNeedsAttentionFilterIsAbsentWhenNothingNeedsChecking() {
+        // A filter permanently reading "0 to check" is noise you learn to skip.
+        compose.setContent(content(needsAttentionCount = 0))
+
+        compose.onNodeWithText("to check", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun theNeedsAttentionFilterSaysHowManyItWouldShow() {
+        compose.setContent(content(needsAttentionCount = 4))
+
+        compose.onNodeWithText("4 to check").assertIsDisplayed()
+    }
+
+    @Test
+    fun tappingTheFilterReportsTheToggle() {
+        var toggled = false
+        compose.setContent(content(needsAttentionCount = 4, onNeedsAttentionToggled = { toggled = true }))
+
+        compose.onNodeWithText("4 to check").performClick()
+
+        assertTrue(toggled)
+    }
+
+    @Test
+    fun anActiveFilterSaysSoInWordsNotOnlyInFill() {
+        // Colour is never the only signal: the label itself changes.
+        compose.setContent(content(needsAttentionCount = 4, needsAttentionOnly = true))
+
+        compose.onNodeWithText("Showing 4 to check").assertIsDisplayed()
+    }
+
+    @Test
+    fun anActiveFilterStaysVisibleEvenAfterEveryRowIsCleared() {
+        // Otherwise clearing the last row removes the control that is filtering
+        // the list, stranding you on an empty screen with no way back.
+        compose.setContent(content(needsAttentionCount = 0, needsAttentionOnly = true))
+
+        compose.onNodeWithText("Showing 0 to check").assertIsDisplayed()
     }
 }
