@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTextInput
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.ui.theme.KhataTheme
 import com.wasif.khata.domain.model.Account
 import com.wasif.khata.domain.model.Category
@@ -53,6 +54,8 @@ class TransactionEditorScreenTest {
         override fun onAccountSelected(id: Long) = Unit
         override fun onCategorySelected(id: Long?) { selectedCategory = id }
         override fun onDirectionChange(direction: TransactionDirection) = Unit
+        override fun onKindChange(kind: TransactionKind) = Unit
+        override fun onCounterpartyChange(value: String) = Unit
         override fun onDateChange(epochMillis: Long) = Unit
         override fun onSave() { saved = true }
         override fun onDelete() = Unit
@@ -73,6 +76,8 @@ class TransactionEditorScreenTest {
         override fun onAccountSelected(id: Long) = Unit
         override fun onCategorySelected(id: Long?) = Unit
         override fun onDirectionChange(direction: TransactionDirection) = Unit
+        override fun onKindChange(kind: TransactionKind) = Unit
+        override fun onCounterpartyChange(value: String) = Unit
         override fun onDateChange(epochMillis: Long) = Unit
         override fun onSave() = Unit
         override fun onDelete() = Unit

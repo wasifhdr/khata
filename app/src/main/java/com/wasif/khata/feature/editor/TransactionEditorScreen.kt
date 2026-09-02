@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.Pill
 import dev.chrisbanes.haze.HazeState
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
@@ -273,6 +274,34 @@ fun TransactionEditorContent(
                             onClick = { actions.onCategorySelected(category.id) },
                         )
                     }
+                }
+
+                // Only shown when there is more than one sensible answer, which
+                // for a plain purchase there is not.
+                FieldLabel("What kind")
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    state.kindChoices.forEach { (kind, label) ->
+                        Pill(
+                            text = label,
+                            selected = state.kind == kind,
+                        ) { actions.onKindChange(kind) }
+                    }
+                }
+
+                if (state.wantsCounterparty) {
+                    FieldLabel(state.counterpartyLabel)
+                    OutlinedTextField(
+                        value = state.counterpartyInput,
+                        onValueChange = actions::onCounterpartyChange,
+                        placeholder = { Text("Optional") },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                    )
                 }
 
                 FieldLabel("Merchant")

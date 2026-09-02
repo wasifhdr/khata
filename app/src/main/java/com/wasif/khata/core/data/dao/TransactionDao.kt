@@ -131,6 +131,7 @@ interface TransactionDao {
         WHERE deletedAt IS NULL
           AND direction = :direction
           AND transferGroupId IS NULL
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT')
           AND occurredAt >= :fromInclusive
           AND occurredAt < :toExclusive
         """,
@@ -154,6 +155,7 @@ interface TransactionDao {
                SUM(amountMinor) AS spentMinor
         FROM transactions
         WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT')
         GROUP BY dhakaDayIndex
         """,
     )

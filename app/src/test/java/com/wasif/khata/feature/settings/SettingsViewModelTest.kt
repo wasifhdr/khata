@@ -3,6 +3,7 @@ package com.wasif.khata.feature.settings
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.permission.SmsPermissionChecker
 import com.wasif.khata.core.permission.SmsPermissionRepository
@@ -130,6 +131,11 @@ class SettingsViewModelTest {
         ),
         reparse = ReparseUseCase(db.rawMessageDao(), pipeline, clock),
         rawMessageDao = db.rawMessageDao(),
+        accountDao = db.accountDao(),
+        transactions = TransactionRepositoryImpl(
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock,
+        ),
+        clock = clock,
     )
 
     @Test

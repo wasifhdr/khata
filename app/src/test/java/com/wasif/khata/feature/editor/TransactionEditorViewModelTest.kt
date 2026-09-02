@@ -46,6 +46,7 @@ class TransactionEditorViewModelTest {
             pagedTransactions()
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
+        override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = Result.success(null)
 
         override suspend fun save(draft: TransactionDraft): Result<Long> {
             savedDraft = draft

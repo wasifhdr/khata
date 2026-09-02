@@ -17,6 +17,8 @@ data class TransactionDraft(
     val merchantRaw: String?,
     val categoryId: Long?,
     val note: String?,
+    /** The person on the other side, when the money is owed one way or the other. */
+    val counterparty: String? = null,
     /**
      * Defaulted so the editor's call sites are unaffected: a hand-entered
      * transaction is ordinary. Reconciliation is the first caller that needs to say
@@ -45,6 +47,13 @@ interface TransactionRepository {
      * up to it, so the ledger stops being short by an amount it cannot explain.
      */
     suspend fun recordUnexplained(draft: TransactionDraft): Result<Long>
+
+    /**
+     * Writes off whatever an account currently holds, so it starts again from zero
+     * today. Written as a dated adjustment rather than by editing the balance, so
+     * the ledger still says what happened and when.
+     */
+    suspend fun resetToZero(accountId: Long, at: Long): Result<Long?>
     suspend fun delete(id: Long): Result<Unit>
 
     /** Debits only, over a half-open window. Boundaries are the caller's to compute in Dhaka. */

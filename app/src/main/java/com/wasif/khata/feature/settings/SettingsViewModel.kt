@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.permission.SmsPermissionRepository
 import com.wasif.khata.core.permission.SmsPermissionState
+import com.wasif.khata.core.model.AccountType
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.BackfillUseCase
@@ -37,6 +40,7 @@ data class IngestionState(
     val unmatchedCount: Int = 0,
     val backfill: IngestProgress? = null,
     val lastRun: String? = null,
+    val cashBalance: Money = Money.ZERO,
 ) {
     val isWorking: Boolean get() = backfill != null && !backfill.isComplete
 }
@@ -48,6 +52,9 @@ class SettingsViewModel @Inject constructor(
     private val backfill: BackfillUseCase,
     private val reparse: ReparseUseCase,
     rawMessageDao: RawMessageDao,
+    private val accountDao: AccountDao,
+    private val transactions: com.wasif.khata.domain.repository.TransactionRepository,
+    private val clock: com.wasif.khata.core.time.KhataClock,
 ) : ViewModel() {
 
     private val _backfill = MutableStateFlow<IngestProgress?>(null)
@@ -59,8 +66,11 @@ class SettingsViewModel @Inject constructor(
         rawMessageDao.observeByStatus(RawMessageStatus.UNMATCHED).map { it.size },
         _backfill,
         _lastRun,
-    ) { permission, unmatched, progress, lastRun ->
-        IngestionState(permission, unmatched, progress, lastRun)
+        accountDao.observeAll().map { accounts ->
+            Money(accounts.firstOrNull { it.type == AccountType.CASH }?.currentBalanceMinor ?: 0L)
+        },
+    ) { permission, unmatched, progress, lastRun, cash ->
+        IngestionState(permission, unmatched, progress, lastRun, cash)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -91,6 +101,21 @@ class SettingsViewModel @Inject constructor(
                     _backfill.value = null
                     _lastRun.value = "Could not read messages. Please try again."
                 },
+            )
+        }
+    }
+
+    /**
+     * Six years of ATM withdrawals with no cash spending entered against them leave
+     * the cash account holding money that is long gone. This writes that off as of
+     * today so the figure starts meaning something.
+     */
+    fun onResetCash() {
+        viewModelScope.launch {
+            val cash = accountDao.getAll().firstOrNull { it.type == AccountType.CASH } ?: return@launch
+            transactions.resetToZero(cash.id, clock.now()).fold(
+                onSuccess = { _lastRun.value = "Cash starts again from zero" },
+                onFailure = { _lastRun.value = "Could not reset cash. Please try again." },
             )
         }
     }

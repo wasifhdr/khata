@@ -14,6 +14,7 @@ import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.dhakaDayIndexToLocalDate
@@ -114,6 +115,7 @@ class TransactionRepositoryImpl @Inject constructor(
                     merchantId = existing?.merchantId,
                     categoryId = draft.categoryId,
                     note = draft.note,
+                    counterparty = draft.counterparty,
                     source = existing?.source ?: TransactionSource.MANUAL,
                     // Choosing a category by hand IS the confirmation. Without this
                     // a parsed row stays MEDIUM after you have categorised it, and
@@ -166,6 +168,7 @@ class TransactionRepositoryImpl @Inject constructor(
                     merchantId = null,
                     categoryId = draft.categoryId,
                     note = draft.note,
+                    counterparty = draft.counterparty,
                     source = TransactionSource.MANUAL,
                     confidence = Confidence.HIGH,
                     kind = draft.kind,
@@ -181,6 +184,42 @@ class TransactionRepositoryImpl @Inject constructor(
             // is already right. Adding this row is what makes the transactions add
             // up to it, so applying it twice would put the ledger back out.
             accountDao.clearUnexplained(draft.accountId, now)
+            rowId
+        }
+    }
+
+    override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = runCatchingData {
+        db.withTransaction {
+            val account = accountDao.getAll().firstOrNull { it.id == accountId } ?: throw DataError.NotFound
+            val balance = account.currentBalanceMinor
+            if (balance == 0L) return@withTransaction null
+
+            val now = clock.now()
+            // Opposite sign to the balance, so the two cancel.
+            val rowId = transactionDao.upsert(
+                TransactionEntity(
+                    uuid = UUID.randomUUID().toString(),
+                    accountId = accountId,
+                    amountMinor = kotlin.math.abs(balance),
+                    direction = if (balance > 0) TransactionDirection.DEBIT else TransactionDirection.CREDIT,
+                    occurredAt = at,
+                    merchantRaw = null,
+                    merchantId = null,
+                    categoryId = null,
+                    note = "Starting again from zero",
+                    counterparty = null,
+                    source = TransactionSource.MANUAL,
+                    confidence = Confidence.HIGH,
+                    kind = TransactionKind.ADJUSTMENT,
+                    rawMessageId = null,
+                    transferGroupId = null,
+                    feeMinor = null,
+                    referenceNumber = null,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            )
+            accountDao.adjustBalance(accountId, -balance, now)
             rowId
         }
     }

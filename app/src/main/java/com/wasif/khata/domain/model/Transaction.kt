@@ -3,6 +3,7 @@ package com.wasif.khata.domain.model
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
 
 data class Transaction(
@@ -16,6 +17,8 @@ data class Transaction(
     val merchantId: Long?,
     val categoryId: Long?,
     val note: String?,
+    val counterparty: String? = null,
+    val kind: TransactionKind = TransactionKind.NORMAL,
     val source: TransactionSource,
     val confidence: Confidence,
     val transferGroupId: String?,
@@ -25,4 +28,12 @@ data class Transaction(
         get() = if (direction == TransactionDirection.DEBIT) -amount else amount
 
     val isTransfer: Boolean get() = transferGroupId != null
+
+    /** True when this row moved money without anything being bought or earned. */
+    val isSettlement: Boolean
+        get() = isTransfer || if (direction == TransactionDirection.DEBIT) {
+            !kind.countsAsSpending
+        } else {
+            !kind.countsAsIncome
+        }
 }

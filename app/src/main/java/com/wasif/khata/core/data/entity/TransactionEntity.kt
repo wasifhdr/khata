@@ -30,6 +30,12 @@ data class TransactionEntity(
     val merchantId: Long?,
     val categoryId: Long?,
     val note: String?,
+    /**
+     * The person on the other side, for money that is owed in one direction or the
+     * other. Free text rather than a table of people: "how much does Rafi owe me"
+     * is a GROUP BY, and a contacts model is a bigger idea than this needs.
+     */
+    val counterparty: String? = null,
     val source: TransactionSource,
     val confidence: Confidence,
     val rawMessageId: Long?,

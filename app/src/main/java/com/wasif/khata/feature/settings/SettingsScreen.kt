@@ -76,6 +76,7 @@ fun SettingsScreen(
         onBack = onBack,
         onPermissionRequested = viewModel::onPermissionRequested,
         onBackfill = viewModel::onBackfill,
+        onResetCash = viewModel::onResetCash,
         onReparse = viewModel::onReparse,
         onOpenUnmatched = onOpenUnmatched,
         onOpenReconcile = onOpenReconcile,
@@ -96,6 +97,7 @@ fun SettingsContent(
     onBack: () -> Unit,
     onPermissionRequested: () -> Unit,
     onBackfill: () -> Unit,
+    onResetCash: () -> Unit,
     onReparse: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
@@ -138,6 +140,7 @@ fun SettingsContent(
                     state = ingestion,
                     onPermissionRequested = onPermissionRequested,
                     onBackfill = onBackfill,
+                    onResetCash = onResetCash,
                     onReparse = onReparse,
                     onOpenUnmatched = onOpenUnmatched,
                     onOpenReconcile = onOpenReconcile,
@@ -321,6 +324,7 @@ private fun MessagesSection(
     state: IngestionState,
     onPermissionRequested: () -> Unit,
     onBackfill: () -> Unit,
+    onResetCash: () -> Unit,
     onReparse: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
@@ -411,6 +415,18 @@ private fun MessagesSection(
         },
         onClick = onOpenUnmatched,
     )
+
+    // Withdrawals top the cash account up; nothing takes money out of it until
+    // cash spending is entered. Six years of that leaves a figure that is honest
+    // about what left the bank and wrong about what is in your pocket.
+    if (state.cashBalance.minor != 0L) {
+        ActionRow(
+            title = "Start cash again from zero",
+            subtitle = "Cash holds ${state.cashBalance.format()} that was withdrawn and never spent here. " +
+                "Writes it off as of today.",
+            onClick = onResetCash,
+        )
+    }
 
     ActionRow(
         title = "Check balances",

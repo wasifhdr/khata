@@ -3,6 +3,7 @@ package com.wasif.khata.feature.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionDraft
@@ -73,6 +74,8 @@ class TransactionEditorViewModel @AssistedInject constructor(
                             noteInput = existing.note.orEmpty(),
                             accountId = existing.accountId,
                             categoryId = existing.categoryId,
+                            kind = existing.kind,
+                            counterpartyInput = existing.counterparty.orEmpty(),
                             direction = existing.direction,
                             occurredAt = existing.occurredAt,
                         )
@@ -93,8 +96,18 @@ class TransactionEditorViewModel @AssistedInject constructor(
 
     override fun onCategorySelected(id: Long?) = _uiState.update { it.copy(categoryId = id) }
 
-    override fun onDirectionChange(direction: TransactionDirection) =
-        _uiState.update { it.copy(direction = direction) }
+    override fun onDirectionChange(direction: TransactionDirection) = _uiState.update {
+        // A kind belongs to one direction: "lent to someone" makes no sense once
+        // the money is coming in, so switching sides resets it rather than leaving
+        // a choice that cannot be seen or unset.
+        val stillOffered = it.copy(direction = direction).kindChoices.any { (k, _) -> k == it.kind }
+        it.copy(direction = direction, kind = if (stillOffered) it.kind else TransactionKind.NORMAL)
+    }
+
+    override fun onKindChange(kind: TransactionKind) = _uiState.update { it.copy(kind = kind) }
+
+    override fun onCounterpartyChange(value: String) =
+        _uiState.update { it.copy(counterpartyInput = value) }
 
     override fun onDateChange(epochMillis: Long) = _uiState.update { it.copy(occurredAt = epochMillis) }
 
@@ -116,6 +129,8 @@ class TransactionEditorViewModel @AssistedInject constructor(
                     merchantRaw = state.merchantInput.takeIf { it.isNotBlank() },
                     categoryId = state.categoryId,
                     note = state.noteInput.takeIf { it.isNotBlank() },
+                    counterparty = state.counterpartyInput.trim().takeIf { it.isNotBlank() },
+                    kind = state.kind,
                 )
             )
             _uiState.update { it.copy(isSaving = false) }
