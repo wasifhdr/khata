@@ -160,3 +160,33 @@ private fun duplicateKind(spans: List<LabelledSpan>): FieldKind? =
 
 private fun overlaps(ordered: List<LabelledSpan>): Boolean =
     ordered.zipWithNext().any { (a, b) -> b.start < a.endExclusive }
+
+/**
+ * A pattern that matches this message's *shape*, for the "not a transaction"
+ * action on the unread list.
+ *
+ * The opening words are what identify a bank message: 108 verification codes on a
+ * real phone differed only in the code itself, and "Your bKash verification code
+ * is" separates them from everything else that sender sends. So the pattern is the
+ * leading run of words that carry no digits, anchored at the start.
+ *
+ * Anchored deliberately: an unanchored phrase would also match a real transaction
+ * that happened to quote it.
+ *
+ * Returns null when the opening is too short to be distinctive. "Payment Tk 20.00
+ * to Grameenphone" reduces to two words, and an IGNORE rule that broad would
+ * silence a whole class of real payments -- better to refuse and say so than to
+ * guess.
+ */
+fun deriveIgnorePattern(body: String): String? {
+    val opening = body.trim().split(Regex("""\s+"""))
+        .takeWhile { word -> word.none { it.isDigit() } }
+        .take(MAX_IGNORE_WORDS)
+
+    if (opening.size < MIN_IGNORE_WORDS) return null
+    return "^" + opening.joinToString("""\s+""") { literal(it) }
+}
+
+/** Enough words to be about one kind of message, short enough to survive a reworded tail. */
+private const val MIN_IGNORE_WORDS = 3
+private const val MAX_IGNORE_WORDS = 6

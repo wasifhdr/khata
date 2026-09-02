@@ -4,7 +4,14 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.entity.RawMessageEntity
+import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.model.RawMessageStatus
+import com.wasif.khata.core.model.RuleKind
+import com.wasif.khata.core.sms.IngestionPipeline
+import com.wasif.khata.core.sms.ReparseUseCase
+import com.wasif.khata.core.sms.RuleEngine
+import com.wasif.khata.core.sms.TransferPairing
+import com.wasif.khata.core.time.KhataClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.launch
@@ -17,6 +24,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -28,6 +37,11 @@ class UnmatchedViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var db: KhataDatabase
+    private lateinit var pipeline: IngestionPipeline
+
+    private val clock = object : KhataClock {
+        override fun now(): Long = 9_000L
+    }
 
     @Before
     fun setUp() {
@@ -43,6 +57,17 @@ class UnmatchedViewModelTest {
             .setTransactionExecutor(dispatcher.asExecutor())
             .allowMainThreadQueries()
             .build()
+        pipeline = IngestionPipeline(
+            db = db,
+            rawMessageDao = db.rawMessageDao(),
+            parsingRuleDao = db.parsingRuleDao(),
+            transactionDao = db.transactionDao(),
+            accountDao = db.accountDao(),
+            merchantDao = db.merchantDao(),
+            engine = RuleEngine(),
+            pairing = TransferPairing(db.transactionDao(), clock),
+            clock = clock,
+        )
     }
 
     @After
@@ -76,7 +101,12 @@ class UnmatchedViewModelTest {
      * value and every assertion below would read the empty default.
      */
     private fun TestScope.startedViewModel(): UnmatchedViewModel =
-        UnmatchedViewModel(db.rawMessageDao()).also { vm ->
+        UnmatchedViewModel(
+            rawMessageDao = db.rawMessageDao(),
+            ruleDao = db.parsingRuleDao(),
+            reparse = ReparseUseCase(db.rawMessageDao(), pipeline, clock),
+            clock = clock,
+        ).also { vm ->
             backgroundScope.launch { vm.state.collect {} }
         }
 
@@ -152,5 +182,111 @@ class UnmatchedViewModelTest {
         advanceUntilIdle()
 
         assertTrue(vm.state.value.isEmpty)
+    }
+
+    // --- "Not a transaction" ------------------------------------------------
+
+    private val CODE = "Your bKash verification code is %s. The code will expire in 2 minutes."
+
+    @Test
+    fun `hiding one verification code hides every one of them`() = runTest(dispatcher) {
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        insert("b", CODE.format("525524"), 2000, RawMessageStatus.UNMATCHED)
+        insert("c", CODE.format("118822"), 1000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        vm.onNotATransaction(vm.state.value.messages.first().id)
+        advanceUntilIdle()
+
+        // The whole point: the list can actually be finished.
+        assertTrue(vm.state.value.isEmpty)
+        assertEquals(3, db.rawMessageDao().countByStatus(RawMessageStatus.IGNORED))
+    }
+
+    @Test
+    fun `it says how many it hid rather than doing it silently`() = runTest(dispatcher) {
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        insert("b", CODE.format("525524"), 2000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        vm.onNotATransaction(vm.state.value.messages.first().id)
+        advanceUntilIdle()
+
+        assertEquals("Hidden, along with 2 others like it.", vm.state.value.notice)
+    }
+
+    @Test
+    fun `a message from another sender is left alone`() = runTest(dispatcher) {
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        insert("b", CODE.format("525524"), 2000, RawMessageStatus.UNMATCHED, sender = "EBL")
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        vm.onNotATransaction(vm.state.value.messages.first { it.sender == "bKash" }.id)
+        advanceUntilIdle()
+
+        assertEquals(listOf("EBL"), vm.state.value.messages.map { it.sender })
+    }
+
+    @Test
+    fun `an unrelated message is not swept up`() = runTest(dispatcher) {
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        insert("b", "Some new bKash wording about a payment", 2000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        vm.onNotATransaction(vm.state.value.messages.first { it.body.contains("verification") }.id)
+        advanceUntilIdle()
+
+        assertEquals(1, vm.state.value.messages.size)
+        assertTrue(vm.state.value.messages.single().body.contains("payment"))
+    }
+
+    @Test
+    fun `too short an opening is refused with a reason, and nothing is written`() = runTest(dispatcher) {
+        insert("a", "Tk 500 received", 3000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        vm.onNotATransaction(vm.state.value.messages.single().id)
+        advanceUntilIdle()
+
+        assertNotNull(vm.state.value.notice)
+        assertTrue(vm.state.value.notice!!.contains("too few words"))
+        assertEquals(0, db.parsingRuleDao().allIncludingDisabled().count { it.origin == "USER" })
+        assertEquals(1, vm.state.value.messages.size)
+    }
+
+    @Test
+    fun `the rule it writes cannot outrank a rule that reads the message`() = runTest(dispatcher) {
+        DatabaseSeeder(db.accountDao(), db.categoryDao(), db.parsingRuleDao(), clock).seedIfEmpty()
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+
+        vm.onNotATransaction(vm.state.value.messages.single().id)
+        advanceUntilIdle()
+
+        val rules = db.parsingRuleDao().allIncludingDisabled()
+        val written = rules.single { it.origin == "USER" }
+        assertEquals(RuleKind.IGNORE, written.kind)
+        // Evaluated last, so at worst it silences something nothing else could read.
+        assertEquals(rules.maxOf { it.priority }, written.priority)
+    }
+
+    @Test
+    fun `the notice clears once it has been read`() = runTest(dispatcher) {
+        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
+        val vm = startedViewModel()
+        advanceUntilIdle()
+        vm.onNotATransaction(vm.state.value.messages.single().id)
+        advanceUntilIdle()
+
+        vm.onNoticeShown()
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.notice)
     }
 }

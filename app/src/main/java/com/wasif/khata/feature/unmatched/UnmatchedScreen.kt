@@ -48,7 +48,12 @@ fun UnmatchedScreen(
     viewModel: UnmatchedViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    UnmatchedContent(state = state, onBack = onBack, onWriteRule = onWriteRule)
+    UnmatchedContent(
+        state = state,
+        onBack = onBack,
+        onWriteRule = onWriteRule,
+        onNotATransaction = viewModel::onNotATransaction,
+    )
 }
 
 @Composable
@@ -56,6 +61,7 @@ fun UnmatchedContent(
     state: UnmatchedUiState,
     onBack: () -> Unit,
     onWriteRule: (Long) -> Unit,
+    onNotATransaction: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -90,6 +96,19 @@ fun UnmatchedContent(
                 },
             )
 
+            state.notice?.let { notice ->
+                Text(
+                    text = notice,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(
+                        start = spacing.screenHorizontal,
+                        end = spacing.screenHorizontal,
+                        top = spacing.sm,
+                    ),
+                )
+            }
+
             if (state.isEmpty) {
                 EmptyNote()
             } else {
@@ -102,7 +121,12 @@ fun UnmatchedContent(
                     ),
                 ) {
                     items(state.messages, key = { it.id }) { message ->
-                        UnmatchedRow(message = message, onWriteRule = { onWriteRule(message.id) })
+                        UnmatchedRow(
+                            message = message,
+                            enabled = !state.isWorking,
+                            onWriteRule = { onWriteRule(message.id) },
+                            onNotATransaction = { onNotATransaction(message.id) },
+                        )
                     }
                 }
             }
@@ -136,7 +160,9 @@ private fun EmptyNote() {
 @Composable
 private fun UnmatchedRow(
     message: UnmatchedMessage,
+    enabled: Boolean,
     onWriteRule: () -> Unit,
+    onNotATransaction: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     val received = Instant.ofEpochMilli(message.receivedAt).atZone(DHAKA).toLocalDate()
@@ -171,21 +197,44 @@ private fun UnmatchedRow(
             modifier = Modifier.padding(top = spacing.xs),
         )
 
-        Box(
-            Modifier
-                .padding(top = spacing.sm)
-                .height(spacing.minTouchTarget)
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.secondaryContainer)
-                .clickable(onClick = onWriteRule)
-                .padding(horizontal = spacing.md),
-            contentAlignment = Alignment.Center,
+        // Two answers, because most of what a bank sends is not a transaction at
+        // all. Teaching is the emphasised one; hiding is quieter but present, or
+        // the list of verification codes never ends.
+        Row(
+            Modifier.padding(top = spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Text(
-                text = "Write a rule",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
+            Box(
+                Modifier
+                    .height(spacing.minTouchTarget)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable(enabled = enabled, onClick = onWriteRule)
+                    .padding(horizontal = spacing.md),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Write a rule",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
+
+            Box(
+                Modifier
+                    .height(spacing.minTouchTarget)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .clickable(enabled = enabled, onClick = onNotATransaction)
+                    .padding(horizontal = spacing.md),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Not a transaction",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }

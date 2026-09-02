@@ -1,6 +1,7 @@
 package com.wasif.khata.feature.unmatched
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -26,10 +27,19 @@ class UnmatchedScreenTest {
         receivedAt = Instant.parse("2026-08-12T06:00:00Z").toEpochMilli(),
     )
 
-    private fun setContent(state: UnmatchedUiState, onWriteRule: (Long) -> Unit = {}) {
+    private fun setContent(
+        state: UnmatchedUiState,
+        onWriteRule: (Long) -> Unit = {},
+        onNotATransaction: (Long) -> Unit = {},
+    ) {
         composeRule.setContent {
             KhataTheme {
-                UnmatchedContent(state = state, onBack = {}, onWriteRule = onWriteRule)
+                UnmatchedContent(
+                    state = state,
+                    onBack = {},
+                    onWriteRule = onWriteRule,
+                    onNotATransaction = onNotATransaction,
+                )
             }
         }
     }
@@ -53,7 +63,12 @@ class UnmatchedScreenTest {
     @Test
     fun writing_a_rule_reports_the_message_it_was_invoked_for() {
         var chosen: Long? = null
-        setContent(UnmatchedUiState(messages = listOf(message(id = 42)), isLoaded = true)) { chosen = it }
+        // Named, not a trailing lambda: there are two callbacks now and a trailing
+        // lambda binds to the last one.
+        setContent(
+            UnmatchedUiState(messages = listOf(message(id = 42)), isLoaded = true),
+            onWriteRule = { chosen = it },
+        )
 
         composeRule.onNodeWithText("Write a rule").performClick()
 
@@ -98,5 +113,60 @@ class UnmatchedScreenTest {
         )
 
         assertEquals(2, composeRule.onAllNodesWithText("Write a rule").fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun every_message_offers_both_answers() {
+        setContent(UnmatchedUiState(messages = listOf(message()), isLoaded = true))
+
+        // Most of what a bank sends is not a transaction, so "teach me" cannot be
+        // the only way out of this list.
+        composeRule.onNodeWithText("Write a rule").assertIsDisplayed()
+        composeRule.onNodeWithText("Not a transaction").assertIsDisplayed()
+    }
+
+    @Test
+    fun not_a_transaction_reports_the_message_it_was_tapped_for() {
+        var hidden: Long? = null
+        setContent(
+            UnmatchedUiState(messages = listOf(message(id = 42)), isLoaded = true),
+            onNotATransaction = { hidden = it },
+        )
+
+        composeRule.onNodeWithText("Not a transaction").performClick()
+
+        assertEquals(42L, hidden)
+    }
+
+    @Test
+    fun what_the_last_action_did_is_said_in_words() {
+        setContent(
+            UnmatchedUiState(
+                messages = listOf(message()),
+                isLoaded = true,
+                notice = "Hidden, along with 108 others like it.",
+            ),
+        )
+
+        composeRule.onNodeWithText("Hidden, along with 108 others like it.").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_notice_is_shown_even_once_the_list_is_empty() {
+        // Hiding the last message empties the list; without this the confirmation
+        // would vanish at the exact moment it matters most.
+        setContent(
+            UnmatchedUiState(messages = emptyList(), isLoaded = true, notice = "Hidden."),
+        )
+
+        composeRule.onNodeWithText("Hidden.").assertIsDisplayed()
+    }
+
+    @Test
+    fun both_actions_are_disabled_while_one_is_running() {
+        setContent(UnmatchedUiState(messages = listOf(message()), isLoaded = true, isWorking = true))
+
+        composeRule.onNodeWithText("Write a rule").assertIsNotEnabled()
+        composeRule.onNodeWithText("Not a transaction").assertIsNotEnabled()
     }
 }
