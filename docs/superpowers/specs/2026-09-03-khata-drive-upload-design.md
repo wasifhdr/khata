@@ -68,8 +68,9 @@ Identity.getAuthorizationClient(activity)
 ```
 
 If the result reports `hasResolution()`, its `PendingIntent` is launched for consent;
-`getAuthorizationResultFromIntent` then yields the grant. The account name is written
-to DataStore. **That is the only thing stored** — no token, no refresh token.
+`getAuthorizationResultFromIntent` then yields the grant, and a single boolean is
+written to DataStore. **That is the only thing stored** — no token, no refresh token,
+no address.
 
 **Nightly**, from the worker, where no Activity exists:
 
@@ -77,14 +78,14 @@ to DataStore. **That is the only thing stored** — no token, no refresh token.
 Identity.getAuthorizationClient(applicationContext)
     .authorize(AuthorizationRequest.builder()
         .setRequestedScopes(listOf(Scope(DRIVE_FILE)))
-        .setAccount(Account(storedName, "com.google"))
         .build())
 ```
 
 The `Context` overload of `getAuthorizationClient` is what makes an unattended upload
-possible at all, and `setAccount` is what stops a picker appearing at 02:00. Both
-were confirmed against the 22.0.0 artifact rather than the documentation, which
-renders its signatures client-side and cannot be read.
+possible at all — confirmed against the 22.0.0 artifact rather than the documentation,
+which renders its signatures client-side and cannot be read. No account is pinned: on
+device, `authorize()` against an existing grant returns `hasResolution=false` with a
+live token and no UI, which is precisely what 02:00 needs.
 
 If a worker's `authorize` comes back with `hasResolution()`, the grant is gone. A
 worker cannot show consent UI, so it records that and stops; Settings reads
@@ -140,7 +141,7 @@ replace.
 system that quietly stops is worse than one that never existed, because it is trusted.
 Three states, from two stored values:
 
-- Not connected — no account stored.
+- Not connected — `driveConnected` false.
 - `Last uploaded 3 Sep, 02:00` — `driveLastUploadAt`.
 - Reconnect to Drive — `driveNeedsReconnect`, set when a worker's `authorize` came
   back needing resolution.
