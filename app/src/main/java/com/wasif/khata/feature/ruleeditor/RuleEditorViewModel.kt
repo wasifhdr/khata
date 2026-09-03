@@ -189,8 +189,14 @@ class RuleEditorViewModel @AssistedInject constructor(
                 // real merchant; letting one of these jump the queue would silently
                 // double every OTP-carrying payment. A revision keeps the place it
                 // already earned rather than being sent to the back each time.
+                // Excluding AI rules: they sit in a reserved high band, and counting
+                // them would push every later hand-written rule into it.
                 val priority = existing?.priority
-                    ?: ((ruleDao.allIncludingDisabled().maxOfOrNull { it.priority } ?: 0) + 1)
+                    ?: ((
+                        ruleDao.allIncludingDisabled()
+                            .filter { it.origin != "AI" }
+                            .maxOfOrNull { it.priority } ?: 0
+                        ) + 1)
                 ruleDao.upsertAll(
                     listOf(
                         ParsingRuleEntity(

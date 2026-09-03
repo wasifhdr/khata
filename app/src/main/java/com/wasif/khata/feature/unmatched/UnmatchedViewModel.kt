@@ -118,8 +118,14 @@ class UnmatchedViewModel @Inject constructor(
                 // Dismissing the same message twice is one decision, not two rules.
                 val uuid = "ignore-${message.body.hashCode()}"
                 val existing = ruleDao.findByUuid(uuid)
+                // Excluding AI rules: they sit in a reserved high band, and counting
+                // them would push every later hand-written rule into it.
                 val priority = existing?.priority
-                    ?: ((ruleDao.allIncludingDisabled().maxOfOrNull { it.priority } ?: 0) + 1)
+                    ?: ((
+                        ruleDao.allIncludingDisabled()
+                            .filter { it.origin != "AI" }
+                            .maxOfOrNull { it.priority } ?: 0
+                        ) + 1)
                 ruleDao.upsertAll(
                     listOf(
                         ParsingRuleEntity(
