@@ -203,10 +203,18 @@ In Google Cloud Console, project `khata-9479`:
    matches on package and certificate.
 2. **Data Access:** `drive.file`, and nothing else. A broader Drive scope would make
    the app verification-eligible and give it reach it has no use for.
-3. **Audience: published, not Testing.** Grants under Testing status expire on a
-   seven-day clock, which would mean reconnecting Drive every week forever. Because
-   `drive.file` is non-sensitive, publishing requires no verification, no review and
-   no demonstration video.
+3. **Audience: publish if it is free to.** Because `drive.file` is non-sensitive,
+   publishing needs no verification, no review and no demonstration video, so take it
+   if the Console asks for nothing more than a confirmation. Do **not** fill in the
+   Branding page to get there: a logo, homepage or privacy policy are inputs to
+   verification, and uploading a logo is what makes verification apply.
+
+   Testing status is documented to issue **refresh tokens** expiring in seven days.
+   This design requests none — no `requestOfflineAccess`, no `serverAuthCode`, just
+   hour-long access tokens minted against a grant Google holds — so whether the clock
+   reaches us is unknown rather than settled. It is safe to find out empirically,
+   because a lapsed grant is already a handled state: §7 turns it into "Reconnect to
+   Drive", one tap, while the local backup carries on untouched.
 
 ---
 
