@@ -1,11 +1,14 @@
 package com.wasif.khata.core.data.di
 
+import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.repository.ReferenceDataRepositoryImpl
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
+import com.wasif.khata.feature.widget.RecentCategoryIds
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -23,4 +26,10 @@ abstract class RepositoryModule {
     abstract fun bindReferenceDataRepository(
         impl: ReferenceDataRepositoryImpl,
     ): ReferenceDataRepository
+
+    companion object {
+        @Provides
+        fun provideRecentCategoryIds(dao: TransactionDao) =
+            RecentCategoryIds { accountId, limit -> dao.observeRecentCategoryIds(accountId, limit) }
+    }
 }
