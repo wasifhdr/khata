@@ -55,7 +55,7 @@ Spec §2, §3. The crypto and the format, together, because they are read togeth
 **Interfaces:**
 - Produces: `object BackupFile` with `fun deriveKey(passphrase: String, salt: ByteArray): ByteArray`, `fun write(plain: ByteArray, key: ByteArray, schemaVersion: Int): ByteArray`, `fun read(bytes: ByteArray, key: ByteArray, appSchemaVersion: Int): BackupResult`, `fun saltOf(bytes: ByteArray): ByteArray?`, and `sealed interface BackupResult`. Tasks 2–4 consume these.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```kotlin
 package com.wasif.khata.core.backup
@@ -119,12 +119,12 @@ class BackupFileTest {
 }
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "*BackupFileTest*"`
 Expected: FAIL — "Unresolved reference 'BackupFile'".
 
-- [ ] **Step 3: Write it**
+- [x] **Step 3: Write it**
 
 ```kotlin
 package com.wasif.khata.core.backup
@@ -232,12 +232,12 @@ object BackupFile {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "*BackupFileTest*"`
 Expected: PASS, 5 tests. PBKDF2 at 210k iterations makes each test take a moment; that is the cost being paid deliberately.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/com/wasif/khata/core/backup/BackupFile.kt \
@@ -259,7 +259,7 @@ Spec §1, §5.
 - Consumes: `BackupFile` (Task 1), `KhataDatabase`, `KhataClock`.
 - Produces: `BackupRepository` with `suspend fun backUp(key: ByteArray): File?`, `suspend fun restore(bytes: ByteArray, key: ByteArray): BackupResult`, `fun latest(): File?`, `fun backupDir(): File`. Tasks 3 and 4 consume these.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 The checkpoint test is the one that matters: it is the failure that would otherwise appear only during a restore.
 
@@ -289,7 +289,7 @@ The checkpoint test is the one that matters: it is the failure that would otherw
     }
 ```
 
-- [ ] **Step 2: Write it**
+- [x] **Step 2: Write it**
 
 ```kotlin
 package com.wasif.khata.core.backup
@@ -368,12 +368,12 @@ class BackupRepository @Inject constructor(
 }
 ```
 
-- [ ] **Step 3: Run the tests**
+- [x] **Step 3: Run the tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "*BackupRepositoryTest*"`
 Expected: PASS. Build the repository against a real Room database opened at a file path — `Room.databaseBuilder` with a name, not `inMemoryDatabaseBuilder`, because the checkpoint and the file copy are the things under test. Delete the file in `@After`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add app/src/main/java/com/wasif/khata/core/backup/BackupRepository.kt \
@@ -394,7 +394,7 @@ Spec §2, §7.
 **Interfaces:**
 - Produces: `KhataPreferences.backupKey: String?` (the derived key, Base64) and `PreferencesRepository.setBackupPassphrase(passphrase: String?)`.
 
-- [ ] **Step 1: Write the round-trip test**
+- [x] **Step 1: Write the round-trip test**
 
 This is the load-bearing test of the whole feature.
 
@@ -422,7 +422,7 @@ This is the load-bearing test of the whole feature.
     }
 ```
 
-- [ ] **Step 2: Store the derived key, never the passphrase**
+- [x] **Step 2: Store the derived key, never the passphrase**
 
 `KhataPreferences` gains:
 
@@ -465,7 +465,7 @@ Add `override suspend fun setBackupPassphrase(passphrase: String?) = Unit` to th
 
 **A restore on a new phone derives from the file's own salt**, not this one — `BackupFile.saltOf(bytes)`. That is why the salt is in the header.
 
-- [ ] **Step 3: Add the Settings field**
+- [x] **Step 3: Add the Settings field**
 
 Below the AI fallback section, a `SectionLabel("Backup")` and a passphrase field shaped exactly like `GeminiKeyField` — `PasswordVisualTransformation`, never rendering the stored value back. Its supporting text is the warning, in these words:
 
@@ -475,7 +475,7 @@ and when unset:
 
 > "Not set. No backups are being taken."
 
-- [ ] **Step 4: Run the suite and commit**
+- [x] **Step 4: Run the suite and commit**
 
 Run: `./gradlew :app:assembleDebug :app:testDebugUnitTest`
 
@@ -497,7 +497,7 @@ Spec §4, §5, §6.
 **Interfaces:**
 - Consumes: `BackupRepository` (Task 2), `KhataPreferences.backupKey` (Task 3).
 
-- [ ] **Step 1: The worker and its scheduler**
+- [x] **Step 1: The worker and its scheduler**
 
 Copy the shape of `SnapshotWorker` exactly — a `@HiltWorker` plus a `@Singleton` scheduler with `enqueueUniquePeriodicWork` under `KEEP` and an initial delay to 02:00 Dhaka. No test, for the reason the snapshot job gave: every line is a `WorkManager` call.
 
@@ -512,7 +512,7 @@ Copy the shape of `SnapshotWorker` exactly — a `@HiltWorker` plus a `@Singleto
 
 Schedule it from `KhataApplication` beside `snapshots.scheduleNightly()`.
 
-- [ ] **Step 2: The FileProvider**
+- [x] **Step 2: The FileProvider**
 
 `res/xml/file_paths.xml`:
 
@@ -536,7 +536,7 @@ In the manifest, inside `<application>`:
         </provider>
 ```
 
-- [ ] **Step 3: Three Settings actions**
+- [x] **Step 3: Three Settings actions**
 
 `ActionRow`s under the Backup section:
 
@@ -557,7 +557,7 @@ The restore result maps to four distinct messages, and nothing else:
 
 On `Restored`, finish the activity: Room is holding a handle to a file that has been replaced underneath it, and only a fresh process is safe.
 
-- [ ] **Step 4: Build, run the suite, verify on hardware**
+- [x] **Step 4: Build, run the suite, verify on hardware**
 
 Run: `./gradlew :app:assembleDebug :app:testDebugUnitTest`
 
@@ -571,7 +571,7 @@ Then, on the device:
 6. Restore again with a wrong passphrase: "Wrong passphrase, or the file has been altered."
 7. Restore with any non-backup file: "That is not a Khata backup file."
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
