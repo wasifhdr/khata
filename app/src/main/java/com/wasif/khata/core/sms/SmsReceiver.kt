@@ -6,17 +6,11 @@ import android.content.Intent
 import android.provider.Telephony
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class SmsReceiver : BroadcastReceiver() {
 
-    @Inject lateinit var pipeline: IngestionPipeline
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject lateinit var ingestion: IngestionScheduler
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
@@ -28,17 +22,11 @@ class SmsReceiver : BroadcastReceiver() {
         // the bodies keeps a long bank SMS parseable as a whole.
         val sender = messages.first().originatingAddress ?: return
         val body = messages.joinToString("") { it.messageBody.orEmpty() }
-        val receivedAt = messages.first().timestampMillis
 
-        // goAsync keeps the process alive past onReceive returning, which a database
-        // write on a background dispatcher would otherwise race.
-        val pending = goAsync()
-        scope.launch {
-            try {
-                pipeline.ingest(sender, body, receivedAt)
-            } finally {
-                pending.finish()
-            }
-        }
+        // Enqueued rather than parsed here. goAsync() held the process for about ten
+        // seconds, which was ample -- but a parse that outran it dropped the message,
+        // recoverable only by a later backfill. Work retries instead, and no window
+        // needs holding open because enqueueing returns immediately.
+        ingestion.message(sender, body, messages.first().timestampMillis)
     }
 }
