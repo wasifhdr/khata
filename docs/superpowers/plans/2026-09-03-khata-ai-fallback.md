@@ -31,7 +31,6 @@ Every task's requirements implicitly include this section.
 ## File Structure
 
 **Create:**
-- `app/src/main/java/com/wasif/khata/core/sms/ai/Redaction.kt` — pure; the privacy boundary.
 - `app/src/main/java/com/wasif/khata/core/sms/ai/GeminiClient.kt` — request, transport, response, behind one interface so tests never touch a network.
 - `app/src/main/java/com/wasif/khata/core/sms/ai/RuleDrafter.kt` — turns a response into a `ParsingRuleEntity`, or into nothing.
 - Tests: `GeminiResponseTest.kt`, `RuleDrafterTest.kt`, `TeachModeTest.kt`
@@ -131,7 +130,7 @@ private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
                 if (current == null) {
                     "Not set. Messages no rule matches stay in the review list."
                 } else {
-                    "Set. A message no rule matches is sent, redacted, to draft a rule."
+                    "Set. A message no rule matches is sent to Gemini to draft a rule."
                 },
             )
         },

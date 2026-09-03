@@ -63,12 +63,9 @@ retry, and the feature would fail permanently with no visible reason. Substituti
 different digits of the same shape would have avoided both problems; the user chose to
 send the body as-is instead.
 
-**The kill switch is the mitigation that remains.** With no key set, nothing is sent at
-all.
-
-**The kill switch is real.** With AI off — which is simply no key set — an unmatched
-message queues exactly as it does today and is taught by hand in the rule editor.
-Nothing degrades; the work is just yours.
+**The kill switch is the mitigation that remains, and it is a real one.** With no key
+set nothing is sent at all: an unmatched message queues exactly as it does today and is
+taught by hand in the rule editor. Nothing degrades; the work is just yours.
 
 ---
 
@@ -97,8 +94,8 @@ One POST to one endpoint, from a worker that already provides retry and backoff.
 `HttpURLConnection` and `org.json` are in the JDK and the Android platform respectively.
 
 An HTTP client earns its place in an app that talks to many endpoints; this one talks to
-exactly one, rarely. The official Kotlin SDK would also hide the redaction boundary (§3)
-behind a client whose request-building is not ours.
+exactly one, rarely. The official Kotlin SDK would also put the request-building — and
+so what is actually sent (§3) — behind a client that is not ours.
 
 **Gemini Flash with structured output.** The request pins a `responseMimeType` of
 `application/json` and a response schema, because this is field extraction and a prose
@@ -109,7 +106,7 @@ reply would need parsing of its own.
 ## 6. Where it runs
 
 `IngestionWorker` already has a `mode` input. A fourth mode, `TEACH`, takes a raw
-message id: redact, request, write the rule, then reparse.
+message id: request, write the rule, then reparse.
 
 It is enqueued when the pipeline classifies a message `UNMATCHED` and a key is set. Not
 under the whole-inbox unique name — a teach is small, and must not be dropped for
