@@ -38,7 +38,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val GeminiKey = stringPreferencesKey("gemini_key")
         val BackupKey = stringPreferencesKey("backup_key")
         val BackupSalt = stringPreferencesKey("backup_salt")
-        val DriveAccount = stringPreferencesKey("drive_account")
+        val DriveConnected = intPreferencesKey("drive_connected")
         val DriveFolderId = stringPreferencesKey("drive_folder_id")
         val DriveLastUploadAt = longPreferencesKey("drive_last_upload_at")
         val DriveNeedsReconnect = intPreferencesKey("drive_needs_reconnect")
@@ -74,7 +74,7 @@ class PreferencesRepositoryImpl @Inject constructor(
                 geminiKey = p[Keys.GeminiKey],
                 backupKey = p[Keys.BackupKey],
                 backupSalt = p[Keys.BackupSalt],
-                driveAccount = p[Keys.DriveAccount],
+                driveConnected = p[Keys.DriveConnected] == 1,
                 driveFolderId = p[Keys.DriveFolderId],
                 driveLastUploadAt = p[Keys.DriveLastUploadAt],
                 driveNeedsReconnect = p[Keys.DriveNeedsReconnect] == 1,
@@ -140,19 +140,19 @@ class PreferencesRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Clearing the account clears everything that depended on it. A stale folder id
-     * would have the next connection upload into a folder the new account cannot
-     * see, and a stale timestamp would claim an offsite copy that is gone.
+     * Disconnecting clears everything that depended on the connection. A stale folder
+     * id would have the next connection upload into a folder a different account
+     * cannot see, and a stale timestamp would claim an offsite copy that is gone.
      */
-    override suspend fun setDriveAccount(email: String?) {
+    override suspend fun setDriveConnected(connected: Boolean) {
         store.edit { p ->
-            if (email.isNullOrBlank()) {
-                p.clear(Keys.DriveAccount)
+            if (connected) {
+                p.clear(Keys.DriveNeedsReconnect)
+                p[Keys.DriveConnected] = 1
+            } else {
+                p.clear(Keys.DriveConnected)
                 p.clear(Keys.DriveFolderId)
                 p.clear(Keys.DriveLastUploadAt)
-                p.clear(Keys.DriveNeedsReconnect)
-            } else {
-                p[Keys.DriveAccount] = email
                 p.clear(Keys.DriveNeedsReconnect)
             }
         }

@@ -13,7 +13,7 @@ interface PreferencesRepository {
     suspend fun setBackfilled()
     suspend fun setGeminiKey(key: String?)
     suspend fun setBackupPassphrase(passphrase: String?)
-    suspend fun setDriveAccount(email: String?)
+    suspend fun setDriveConnected(connected: Boolean)
     suspend fun setDriveFolderId(id: String?)
     suspend fun setDriveUploaded(at: Long)
     suspend fun setDriveNeedsReconnect()

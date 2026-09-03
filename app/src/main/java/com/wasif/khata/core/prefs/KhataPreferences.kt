@@ -43,11 +43,12 @@ data class KhataPreferences(
     /** The salt [backupKey] was derived from; it goes into every backup's header. */
     val backupSalt: String? = null,
     /**
-     * The Google account backups are uploaded to; null means Drive is off. The
-     * account name is the only thing stored -- no token, no refresh token. Play
-     * Services holds the grant, so a stolen phone yields no lasting Drive access.
+     * Whether backups are uploaded to Drive. A flag, not an account name: the
+     * authorize path never exposes the address, and it turned out not to be needed.
+     * Play Services holds the grant and remembers which account gave it, so the app
+     * stores no identifier and a stolen phone yields no lasting Drive access.
      */
-    val driveAccount: String? = null,
+    val driveConnected: Boolean = false,
     /** The Khata folder in Drive. Recreated if it 404s, so a stale id is not fatal. */
     val driveFolderId: String? = null,
     /** When the last upload succeeded. Null with an account set means none yet. */
@@ -69,7 +70,7 @@ data class KhataPreferences(
             geminiKey = null,
             backupKey = null,
             backupSalt = null,
-            driveAccount = null,
+            driveConnected = false,
             driveFolderId = null,
             driveLastUploadAt = null,
             driveNeedsReconnect = false,

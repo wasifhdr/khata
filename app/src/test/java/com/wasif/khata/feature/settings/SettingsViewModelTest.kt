@@ -14,6 +14,7 @@ import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.drive.DriveAuth
 import com.wasif.khata.core.drive.DriveBackups
 import com.wasif.khata.core.drive.DriveFile
+import com.wasif.khata.core.drive.UploadOutcome
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.IngestionPipeline
@@ -66,7 +67,7 @@ class SettingsViewModelTest {
         override suspend fun setBackfilled() = Unit
         override suspend fun setGeminiKey(key: String?) = Unit
         override suspend fun setBackupPassphrase(passphrase: String?) = Unit
-        override suspend fun setDriveAccount(email: String?) = Unit
+        override suspend fun setDriveConnected(connected: Boolean) = Unit
         override suspend fun setDriveFolderId(id: String?) = Unit
         override suspend fun setDriveUploaded(at: Long) = Unit
         override suspend fun setDriveNeedsReconnect() = Unit
@@ -142,6 +143,7 @@ class SettingsViewModelTest {
             override suspend fun list(): List<DriveFile> = emptyList()
             override suspend fun download(id: String): ByteArray? = null
         },
+        driveUploader = { UploadOutcome.SKIPPED },
     )
 
     @Test

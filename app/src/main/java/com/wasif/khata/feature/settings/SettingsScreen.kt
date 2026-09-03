@@ -581,9 +581,9 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
     ) { result -> viewModel.onConnectResult(result.data) }
 
     // Null while looking, so the chooser can say so rather than claim Drive is empty.
-    LaunchedEffect(choosing, prefs.driveAccount) {
+    LaunchedEffect(choosing, prefs.driveConnected) {
         driveFiles = null
-        if (choosing && prefs.driveAccount != null) driveFiles = viewModel.driveBackupList()
+        if (choosing && prefs.driveConnected) driveFiles = viewModel.driveBackupList()
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -607,11 +607,10 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
                 if (prefs.backupKey == null) {
                     "Not set. No backups are being taken."
                 } else {
-                    // Said here, in these words, because there is no recovery path and
-                    // there cannot be one -- that is what makes the file safe to put
-                    // anywhere.
-                    "Set. If you lose this passphrase, every backup becomes unreadable. " +
-                        "There is no way to recover them."
+                    // Kept to one line, but it still has to say the thing that matters:
+                    // there is no recovery path and there cannot be one, which is what
+                    // makes the file safe to put anywhere.
+                    "Set. Lose it and every backup is unreadable."
                 },
             )
         },
@@ -650,19 +649,19 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
     )
 
     ActionRow(
-        title = if (prefs.driveAccount == null) "Connect Google Drive" else "Disconnect Google Drive",
+        title = if (!prefs.driveConnected) "Connect Google Drive" else "Disconnect Google Drive",
         // Not decoration. A backup system that quietly stops is worse than one that
         // never existed, because it is trusted -- this line is the only thing that
         // says the offsite copy is real.
         subtitle = when {
-            prefs.driveAccount == null -> "Not connected. Backups stay on this phone."
+            !prefs.driveConnected -> "Not connected. Backups stay on this phone."
             prefs.driveNeedsReconnect -> "Uploads have stopped. Tap to reconnect."
             prefs.driveLastUploadAt != null ->
-                "${prefs.driveAccount} - last uploaded ${stamp(prefs.driveLastUploadAt!!)}"
-            else -> "${prefs.driveAccount} - nothing uploaded yet"
+                "Connected - last uploaded ${stamp(prefs.driveLastUploadAt!!)}"
+            else -> "Connected - nothing uploaded yet"
         },
         onClick = {
-            if (prefs.driveAccount != null && !prefs.driveNeedsReconnect) {
+            if (prefs.driveConnected && !prefs.driveNeedsReconnect) {
                 viewModel.onDisconnectDrive()
             } else {
                 (context as? Activity)?.let { activity ->
@@ -710,7 +709,7 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
                         }
                     }
 
-                    if (prefs.driveAccount != null) {
+                    if (prefs.driveConnected) {
                         SectionLabel("In Drive")
                         val found = driveFiles
                         when {
@@ -756,9 +755,15 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
         )
     }
 
+    // Cleared as the dialog opens, not only after a successful restore. It is
+    // rememberSaveable, so a second attempt used to append to the first -- typing
+    // the right passphrase into a field that already held one, and being told it
+    // was wrong.
+    LaunchedEffect(pending) { if (pending != null) restorePassphrase = "" }
+
     pending?.let { bytes ->
         AlertDialog(
-            onDismissRequest = { pending = null },
+            onDismissRequest = { pending = null; restorePassphrase = "" },
             title = { Text("Restore this backup?") },
             text = {
                 Column {
@@ -783,7 +788,9 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
                     },
                 ) { Text("Restore") }
             },
-            dismissButton = { TextButton(onClick = { pending = null }) { Text("Cancel") } },
+            dismissButton = {
+                TextButton(onClick = { pending = null; restorePassphrase = "" }) { Text("Cancel") }
+            },
         )
     }
 

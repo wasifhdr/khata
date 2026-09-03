@@ -19,6 +19,8 @@ import com.wasif.khata.core.backup.BackupResult
 import com.wasif.khata.core.drive.DriveAuth
 import com.wasif.khata.core.drive.DriveBackups
 import com.wasif.khata.core.drive.DriveFile
+import com.wasif.khata.core.drive.DriveUploader
+import com.wasif.khata.core.drive.UploadOutcome
 import com.wasif.khata.core.prefs.PreferencesRepository
 import java.io.File
 import com.wasif.khata.core.sms.IngestProgress
@@ -64,6 +66,7 @@ class SettingsViewModel @Inject constructor(
     private val clock: com.wasif.khata.core.time.KhataClock,
     private val driveAuth: DriveAuth,
     private val driveBackups: DriveBackups,
+    private val driveUploader: DriveUploader,
 ) : ViewModel() {
 
     /** Only what a pass cannot say for itself, like the cash reset. */
@@ -162,15 +165,23 @@ class SettingsViewModel @Inject constructor(
         val prefs = repository.preferences.first()
         val key = prefs.backupKey ?: return@launch
         val salt = prefs.backupSalt ?: return@launch
-        _lastAction.value = if (
-            backups.backUp(
-                Base64.decode(key, Base64.NO_WRAP),
-                Base64.decode(salt, Base64.NO_WRAP),
-            ) != null
-        ) {
-            "Backed up"
-        } else {
-            "Could not back up"
+
+        val file = backups.backUp(
+            Base64.decode(key, Base64.NO_WRAP),
+            Base64.decode(salt, Base64.NO_WRAP),
+        )
+        if (file == null) {
+            _lastAction.value = "Could not back up"
+            return@launch
+        }
+
+        // The same upload the nightly worker does. Without it "Back up now" would
+        // write a local copy and quietly leave Drive a day behind, which is the one
+        // thing the status line is there to rule out.
+        _lastAction.value = when (driveUploader.upload(file)) {
+            UploadOutcome.UPLOADED -> "Backed up, and uploaded"
+            UploadOutcome.SKIPPED -> "Backed up"
+            UploadOutcome.FAILED -> "Backed up, but the upload failed"
         }
     }
 
@@ -185,7 +196,7 @@ class SettingsViewModel @Inject constructor(
     fun onConnectResult(data: android.content.Intent?) =
         viewModelScope.launch { driveAuth.completeConnect(data) }
 
-    fun onDisconnectDrive() = viewModelScope.launch { repository.setDriveAccount(null) }
+    fun onDisconnectDrive() = viewModelScope.launch { repository.setDriveConnected(false) }
 
     /** Empty when Drive is unreachable, which the chooser reports as such. */
     suspend fun driveBackupList(): List<DriveFile> = driveBackups.list()

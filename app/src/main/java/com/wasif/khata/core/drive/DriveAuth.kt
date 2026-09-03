@@ -1,6 +1,5 @@
 package com.wasif.khata.core.drive
 
-import android.accounts.Account
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -45,26 +44,34 @@ class DriveAuth @Inject constructor(
     private val preferences: PreferencesRepository,
 ) {
 
-    private fun request(account: Account?) = AuthorizationRequest.builder()
+    /**
+     * drive.file, and nothing else.
+     *
+     * No account is pinned and no identity scope is asked for. Both were tried:
+     * AuthorizationResult.toGoogleSignInAccount() returns a null email even when the
+     * email scope is granted, so the address is simply not available on this path.
+     * It turned out not to be needed -- authorize() with no account pinned returns
+     * hasResolution=false once a grant exists, which is the silent success the 02:00
+     * run depends on. Play Services remembers which account granted; the app does
+     * not have to, and now stores no identifier at all.
+     */
+    private fun request() = AuthorizationRequest.builder()
         .setRequestedScopes(listOf(Scope(DRIVE_FILE_SCOPE)))
-        .apply { account?.let(::setAccount) }
         .build()
 
     /**
      * A token for the stored account, without UI. Called from the worker.
      *
-     * setAccount is what stops an account picker appearing at 02:00, where nothing
-     * could answer it.
+     * No picker appears at 02:00: once a grant exists, authorize() resolves against
+     * it silently.
      */
     suspend fun token(): TokenResult = withContext(Dispatchers.IO) {
-        val email = preferences.preferences.first().driveAccount
-            ?: return@withContext TokenResult.NotConnected
+        if (!preferences.preferences.first().driveConnected) {
+            return@withContext TokenResult.NotConnected
+        }
 
         val result = runCatching {
-            Tasks.await(
-                Identity.getAuthorizationClient(context)
-                    .authorize(request(Account(email, "com.google"))),
-            )
+            Tasks.await(Identity.getAuthorizationClient(context).authorize(request()))
         }.getOrElse { return@withContext TokenResult.NeedsReconnect }
 
         // hasResolution means consent is needed again, and a worker cannot show it.
@@ -83,7 +90,7 @@ class DriveAuth @Inject constructor(
      */
     suspend fun beginConnect(activity: Activity): IntentSender? = withContext(Dispatchers.IO) {
         val result = runCatching {
-            Tasks.await(Identity.getAuthorizationClient(activity).authorize(request(null)))
+            Tasks.await(Identity.getAuthorizationClient(activity).authorize(request()))
         }.getOrElse { return@withContext null }
 
         if (result.hasResolution()) {
@@ -103,9 +110,10 @@ class DriveAuth @Inject constructor(
         remember(result)
     }
 
+    /** Connected means the scope came back granted -- the only fact that matters. */
     private suspend fun remember(result: AuthorizationResult): Boolean {
-        val email = result.toGoogleSignInAccount()?.email ?: return false
-        preferences.setDriveAccount(email)
-        return true
+        val granted = result.grantedScopes.contains(DRIVE_FILE_SCOPE)
+        if (granted) preferences.setDriveConnected(true)
+        return granted
     }
 }

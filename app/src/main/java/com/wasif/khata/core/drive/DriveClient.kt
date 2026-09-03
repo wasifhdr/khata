@@ -156,8 +156,17 @@ class DriveClient @Inject constructor(
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", contentType)
             connection.outputStream.use { it.write(body) }
-            if (connection.responseCode !in 200..299) null
-            else connection.inputStream.bufferedReader().readText()
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                // The one line worth keeping. Drive refuses for reasons the UI cannot
+                // usefully distinguish -- an API not enabled on the project, a quota,
+                // a revoked grant -- and they all surface as "the upload failed".
+                // Without this they are indistinguishable from a flaky connection too.
+                android.util.Log.w("KhataDrive", "POST " + url.take(60) + " -> " + code)
+                null
+            } else {
+                connection.inputStream.bufferedReader().readText()
+            }
         } catch (e: IOException) {
             // Null rather than a throw, everywhere: the worker turns this into a
             // retry with backoff, which is the right answer to a flaky connection,
