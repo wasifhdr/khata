@@ -6,6 +6,7 @@ import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.time.KhataClock
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -150,5 +151,23 @@ class ReparseUseCaseTest {
         assertEquals(1, first.ignored)
         assertEquals(2, second.duplicates)
         assertEquals(1, db.transactionDao().allActive().size)
+    }
+
+    @Test
+    fun `the unmatched pass reads only unmatched messages`() = runTest {
+        // Hiding one message used to re-read the whole inbox: thousands of messages on
+        // a real phone, to apply a rule that takes max+1 and so cannot outrank
+        // anything already matched. The pass has to be the size of the work.
+        pipeline.ingest("bKash", BKASH_PAYMENT, receivedAt = 1000)
+        pipeline.ingest("bKash", "an unrecognised format", receivedAt = 2000)
+
+        assertEquals(1, db.rawMessageDao().countByStatus(RawMessageStatus.PARSED))
+        assertEquals(1, db.rawMessageDao().countByStatus(RawMessageStatus.UNMATCHED))
+
+        val whole = reparse.run().last()
+        val narrow = reparse.runUnmatched().last()
+
+        assertEquals(2, whole.total)
+        assertEquals(1, narrow.total)
     }
 }

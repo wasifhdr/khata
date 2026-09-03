@@ -28,6 +28,12 @@ interface RawMessageDao {
     @Query("SELECT * FROM raw_messages WHERE deletedAt IS NULL ORDER BY receivedAt")
     suspend fun allForReparse(): List<RawMessageEntity>
 
+    @Query(
+        "SELECT * FROM raw_messages WHERE status = :status AND deletedAt IS NULL " +
+            "ORDER BY receivedAt",
+    )
+    suspend fun allByStatus(status: RawMessageStatus): List<RawMessageEntity>
+
     // Newest first: a format that broke recently is the one worth a rule now.
     @Query(
         "SELECT * FROM raw_messages WHERE status = :status AND deletedAt IS NULL " +

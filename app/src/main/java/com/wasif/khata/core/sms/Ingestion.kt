@@ -1,6 +1,8 @@
 package com.wasif.khata.core.sms
 
 import com.wasif.khata.core.data.dao.RawMessageDao
+import com.wasif.khata.core.data.entity.RawMessageEntity
+import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.time.KhataClock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -83,9 +85,22 @@ class ReparseUseCase @Inject constructor(
      * the answer shows a button reading "Saving..." for the better part of a
      * minute with no sign it is doing anything.
      */
-    fun run(): Flow<IngestProgress> = flow {
+    fun run(): Flow<IngestProgress> = pass { rawMessageDao.allForReparse() }
+
+    /**
+     * The same pass over unmatched messages alone.
+     *
+     * For a rule that cannot outrank an existing one -- RuleEngine sorts ascending, so
+     * a rule taking max+1 is the lowest -- nothing already parsed can change, and
+     * walking the whole inbox to discover that costs thousands of messages on a real
+     * phone. Hiding one message should not re-read years of them.
+     */
+    fun runUnmatched(): Flow<IngestProgress> =
+        pass { rawMessageDao.allByStatus(RawMessageStatus.UNMATCHED) }
+
+    private fun pass(load: suspend () -> List<RawMessageEntity>): Flow<IngestProgress> = flow {
         val now = clock.now()
-        val messages = rawMessageDao.allForReparse()
+        val messages = load()
         var summary = IngestSummary()
         emit(IngestProgress(processed = 0, total = messages.size, summary = summary))
 
