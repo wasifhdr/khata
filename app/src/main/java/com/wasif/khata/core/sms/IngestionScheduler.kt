@@ -21,6 +21,16 @@ fun interface StartBackfill {
     operator fun invoke()
 }
 
+/**
+ * Asking for a message to be taught, as a function type. IngestionPipeline cannot
+ * depend on the scheduler that runs the worker that calls the pipeline -- and the
+ * binding is also where "is a key set" is decided, so the pipeline does not need to
+ * know that the AI exists at all.
+ */
+fun interface TeachRequest {
+    suspend operator fun invoke(rawMessageId: Long)
+}
+
 /** What a whole-inbox pass is doing, and what the last one came to. */
 data class PassState(
     val running: IngestProgress? = null,
@@ -51,6 +61,23 @@ class IngestionScheduler @Inject constructor(
                         KEY_SENDER to sender,
                         KEY_BODY to body,
                         KEY_RECEIVED_AT to receivedAt,
+                    ),
+                )
+                .build(),
+        )
+    }
+
+    /**
+     * Off the whole-inbox unique name for the same reason a single message is: a teach
+     * is small and must not be dropped for colliding with a backfill.
+     */
+    fun teach(rawMessageId: Long) {
+        workManager.enqueue(
+            OneTimeWorkRequestBuilder<IngestionWorker>()
+                .setInputData(
+                    workDataOf(
+                        KEY_MODE to IngestionMode.TEACH.name,
+                        KEY_RAW_ID to rawMessageId,
                     ),
                 )
                 .build(),

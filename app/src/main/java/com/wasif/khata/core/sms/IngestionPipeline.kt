@@ -61,6 +61,9 @@ class IngestionPipeline @Inject constructor(
     private val engine: RuleEngine,
     private val pairing: TransferPairing,
     private val clock: KhataClock,
+    // Defaulted to a no-op so the many tests that build a pipeline directly are not
+    // all about the AI. The real binding decides whether a key is set.
+    private val teach: TeachRequest = TeachRequest {},
 ) {
 
     suspend fun ingest(sender: String, body: String, receivedAt: Long): IngestResult {
@@ -92,7 +95,14 @@ class IngestionPipeline @Inject constructor(
         )
         if (rawId == -1L) return IngestResult.Duplicate
 
-        return process(rawId, sender, body, receivedAt, now)
+        val result = process(rawId, sender, body, receivedAt, now)
+
+        // Only from here, never from process(): process is also the reparse path, and
+        // a backfill over years of messages would otherwise fire hundreds of requests
+        // before the user had seen a screen. Whether a key is set is the binding's
+        // question, not this one's.
+        if (result is IngestResult.Unmatched) teach(rawId)
+        return result
     }
 
     /** Shared by [ingest] and reparse: everything after the raw message exists. */

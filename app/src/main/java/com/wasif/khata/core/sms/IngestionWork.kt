@@ -3,12 +3,13 @@ package com.wasif.khata.core.sms
 import androidx.work.Data
 import androidx.work.workDataOf
 
-enum class IngestionMode { BACKFILL, REPARSE, MESSAGE }
+enum class IngestionMode { BACKFILL, REPARSE, MESSAGE, TEACH }
 
 const val KEY_MODE = "mode"
 const val KEY_SENDER = "sender"
 const val KEY_BODY = "body"
 const val KEY_RECEIVED_AT = "received_at"
+const val KEY_RAW_ID = "raw_id"
 
 private const val KEY_PROCESSED = "processed"
 private const val KEY_TOTAL = "total"

@@ -7,12 +7,17 @@ import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
 import com.wasif.khata.core.data.repository.BudgetRepository
 import com.wasif.khata.core.data.repository.MonthLimits
+import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.sms.IngestionScheduler
+import com.wasif.khata.core.sms.TeachRequest
+import com.wasif.khata.core.sms.ai.GeminiClient
+import com.wasif.khata.core.sms.ai.RuleSuggester
 import com.wasif.khata.core.sms.StartBackfill
 import com.wasif.khata.feature.widget.RecentCategoryIds
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
+import kotlinx.coroutines.flow.first
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -38,6 +43,18 @@ abstract class RepositoryModule {
 
         @Provides
         fun provideStartBackfill(scheduler: IngestionScheduler) = StartBackfill { scheduler.backfill() }
+
+        @Provides
+        fun provideTeachRequest(
+            scheduler: IngestionScheduler,
+            preferences: PreferencesRepository,
+        ) = TeachRequest { rawMessageId ->
+            // No key is the kill switch, and this is the one place it is checked.
+            if (preferences.preferences.first().geminiKey != null) scheduler.teach(rawMessageId)
+        }
+
+        @Provides
+        fun provideRuleSuggester(client: GeminiClient): RuleSuggester = client
 
         @Provides
         fun provideMonthLimits(budgets: BudgetRepository) =
