@@ -3,6 +3,16 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // isSystem was written true on all sixteen seeded categories and read by
+        // nothing. It now means "cannot be deleted", which is true of exactly one:
+        // Uncategorised is found by uuid in BudgetCarryOver and is the fallback label
+        // for a transaction with no category at all.
+        db.execSQL("UPDATE categories SET isSystem = 0 WHERE uuid != 'seed-cat-uncategorized'")
+    }
+}
+
 val MIGRATION_5_6 = object : Migration(5, 6) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

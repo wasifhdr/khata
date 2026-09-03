@@ -84,9 +84,16 @@ class WalletViewModelTest {
         override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
     }
 
+    // Two flows, not one: the point of the split is that they can disagree, and a
+    // fake that returned the same list for both could not catch a label lookup
+    // reading the wrong one.
+    private val liveCategories = MutableStateFlow<List<Category>>(emptyList())
+    private val allCategories = MutableStateFlow<List<Category>>(emptyList())
+
     private val reference = object : ReferenceDataRepository {
         override fun observeAccounts(): Flow<List<Account>> = accounts
-        override fun observeCategories(): Flow<List<Category>> = flowOf(emptyList())
+        override fun observeCategories(): Flow<List<Category>> = liveCategories
+        override fun observeCategoriesIncludingDeleted(): Flow<List<Category>> = allCategories
         override fun observeNetWorth(): Flow<Money> = netWorth
     }
 

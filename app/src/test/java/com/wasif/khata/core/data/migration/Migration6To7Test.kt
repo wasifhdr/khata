@@ -7,29 +7,31 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
-import com.wasif.khata.core.data.entity.BalanceSnapshotEntity
+
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
-import org.junit.Assert.assertEquals
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-private const val TEST_DB = "migration-4-5-test.db"
+private const val TEST_DB = "migration-6-7-test.db"
 private const val SCHEMA_DIR = "schemas/com.wasif.khata.core.data.KhataDatabase"
 
 /**
- * Builds a real version-4 database from the exported schema and migrates it, rather
+ * Builds a real version-6 database from the exported schema and migrates it, rather
  * than using MigrationTestHelper, which cannot agree with Robolectric about database
  * paths. Validation is not lost: the test reopens the migrated file through Room
  * itself, so Room's own identity-hash and column checks run against the result.
  */
 @RunWith(RobolectricTestRunner::class)
-class Migration4To5Test {
+class Migration6To7Test {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -54,13 +56,13 @@ class Migration4To5Test {
         return JSONObject(file!!.readText()).getJSONObject("database")
     }
 
-    /** Recreates schema v4 exactly as Room would have, identity hash included. */
-    private fun createV4Database(): SupportSQLiteDatabase {
-        val database = schemaJson(4)
+    /** Recreates schema v6 exactly as Room would have, identity hash included. */
+    private fun createV6Database(): SupportSQLiteDatabase {
+        val database = schemaJson(6)
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(TEST_DB)
-                .callback(object : SupportSQLiteOpenHelper.Callback(4) {
+                .callback(object : SupportSQLiteOpenHelper.Callback(6) {
                     override fun onCreate(db: SupportSQLiteDatabase) = Unit
                     override fun onUpgrade(db: SupportSQLiteDatabase, old: Int, new: Int) = Unit
                 })
@@ -85,38 +87,32 @@ class Migration4To5Test {
             "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
             arrayOf(database.getString("identityHash")),
         )
-        db.version = 4
+        db.version = 6
         return db
     }
 
     @Test
-    fun `the snapshots table arrives and Room accepts the result`() = runTest {
-        // Opening writableDatabase is what creates and stamps the v4 file.
-        createV4Database().use { }
+    fun `only Uncategorised survives as a system category`() = runTest {
+        createV6Database().use { db ->
+            db.execSQL(
+                "INSERT INTO categories (uuid, name, icon, colorToken, parentId, isSystem, " +
+                    "createdAt, updatedAt, deletedAt) VALUES " +
+                    "('seed-cat-uncategorized','Uncategorized','help_outline','category_neutral'," +
+                    "NULL,1,1,1,NULL), " +
+                    "('seed-cat-fuel','Fuel','local_gas_station','category_slate',NULL,1,1,1,NULL)",
+            )
+        }
 
-        // Room applies the migration itself and restamps the identity hash, then
-        // verifies every column on open. Pre-migrating with a raw helper instead
-        // leaves the old hash in room_master_table and Room rejects the result.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
-        val dao = db.balanceSnapshotDao()
 
-        val row = BalanceSnapshotEntity(
-            uuid = "snap-1",
-            accountId = 1,
-            dayIndex = 20_000,
-            balanceMinor = 5_000,
-            createdAt = 1,
-            updatedAt = 1,
-        )
-        dao.insertAll(listOf(row))
-        // The same account and day twice must not produce two rows -- the fill routine
-        // leans on this uniqueness rather than checking first.
-        dao.insertAll(listOf(row.copy(uuid = "snap-2")))
-
-        assertEquals(1, dao.existingDayIndices(accountId = 1).size)
+        val byUuid = db.categoryDao().observeAllIncludingDeleted().first().associateBy { it.uuid }
+        assertTrue(byUuid.getValue("seed-cat-uncategorized").isSystem)
+        // Fuel was seeded system for no reason; a user with no car must be able to
+        // delete it.
+        assertFalse(byUuid.getValue("seed-cat-fuel").isSystem)
         db.close()
     }
 }

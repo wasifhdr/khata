@@ -83,6 +83,7 @@ class TransactionEditorViewModelTest {
     private val referenceData = object : ReferenceDataRepository {
         override fun observeAccounts(): Flow<List<Account>> = flowOf(listOf(bkash))
         override fun observeCategories(): Flow<List<Category>> = flowOf(listOf(groceries))
+        override fun observeCategoriesIncludingDeleted(): Flow<List<Category>> = flowOf(listOf(groceries))
         override fun observeNetWorth(): Flow<Money> = flowOf(Money.ZERO)
     }
 

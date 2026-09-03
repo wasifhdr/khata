@@ -8,5 +8,8 @@ import kotlinx.coroutines.flow.Flow
 interface ReferenceDataRepository {
     fun observeAccounts(): Flow<List<Account>>
     fun observeCategories(): Flow<List<Category>>
+
+    /** Deleted ones too, for turning a stored categoryId into a label. */
+    fun observeCategoriesIncludingDeleted(): Flow<List<Category>>
     fun observeNetWorth(): Flow<Money>
 }

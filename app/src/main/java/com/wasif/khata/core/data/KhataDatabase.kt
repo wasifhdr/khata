@@ -32,7 +32,7 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         BalanceSnapshotEntity::class,
         CategoryBudgetEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {

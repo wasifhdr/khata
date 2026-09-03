@@ -97,7 +97,7 @@ class Migration5To6Test {
         // Room applies the migration itself and restamps the identity hash, then
         // verifies every column on open.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_5_6)
+            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
 

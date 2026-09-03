@@ -199,5 +199,6 @@ private class FakeReferenceDataRepository(
 ) : ReferenceDataRepository {
     override fun observeAccounts(): Flow<List<Account>> = flowOf(accounts)
     override fun observeCategories(): Flow<List<Category>> = flowOf(emptyList())
+    override fun observeCategoriesIncludingDeleted(): Flow<List<Category>> = flowOf(emptyList())
     override fun observeNetWorth(): Flow<Money> = flowOf(Money.ZERO)
 }

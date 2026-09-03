@@ -65,9 +65,7 @@ class LedgerViewModelTest {
         override fun now(): Long = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
     }
 
-    private val referenceData = object : ReferenceDataRepository {
-        override fun observeAccounts(): Flow<List<Account>> = flowOf(emptyList())
-        override fun observeCategories(): Flow<List<Category>> = flowOf(
+    private val categoryFlow: Flow<List<Category>> = flowOf(
             listOf(
                 Category(
                     id = 11,
@@ -78,6 +76,11 @@ class LedgerViewModelTest {
                 ),
             ),
         )
+
+    private val referenceData = object : ReferenceDataRepository {
+        override fun observeAccounts(): Flow<List<Account>> = flowOf(emptyList())
+        override fun observeCategories(): Flow<List<Category>> = categoryFlow
+        override fun observeCategoriesIncludingDeleted(): Flow<List<Category>> = categoryFlow
         override fun observeNetWorth(): Flow<Money> = flowOf(Money.ZERO)
     }
 

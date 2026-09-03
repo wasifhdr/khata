@@ -21,6 +21,9 @@ class ReferenceDataRepositoryImpl @Inject constructor(
     override fun observeCategories(): Flow<List<Category>> =
         categoryDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
+    override fun observeCategoriesIncludingDeleted(): Flow<List<Category>> =
+        categoryDao.observeAllIncludingDeleted().map { entities -> entities.map { it.toDomain() } }
+
     override fun observeNetWorth(): Flow<Money> =
         accountDao.observeNetWorthMinor().map { Money(it) }
 }

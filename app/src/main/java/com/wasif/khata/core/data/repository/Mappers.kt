@@ -43,4 +43,5 @@ fun CategoryEntity.toDomain() = Category(
     name = name,
     colorToken = colorToken,
     parentId = parentId,
+    isSystem = isSystem,
 )

@@ -50,7 +50,9 @@ class DatabaseSeeder @Inject constructor(
                         icon = seed.icon,
                         colorToken = seed.colorToken,
                         parentId = null,
-                        isSystem = true,
+                        // Only the fallback label is permanent; the rest are the
+                        // user's to keep or remove.
+                        isSystem = seed.slug == "uncategorized",
                         createdAt = now,
                         updatedAt = now,
                     )

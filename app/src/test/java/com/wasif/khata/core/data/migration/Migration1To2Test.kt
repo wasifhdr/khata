@@ -93,7 +93,7 @@ class Migration1To2Test {
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(TEST_DB)
-                .callback(object : SupportSQLiteOpenHelper.Callback(6) {
+                .callback(object : SupportSQLiteOpenHelper.Callback(7) {
                     override fun onCreate(db: SupportSQLiteDatabase) = Unit
                     override fun onUpgrade(db: SupportSQLiteDatabase, old: Int, new: Int) {
                         MIGRATION_1_2.migrate(db)
@@ -101,6 +101,7 @@ class Migration1To2Test {
                         MIGRATION_3_4.migrate(db)
                         MIGRATION_4_5.migrate(db)
                         MIGRATION_5_6.migrate(db)
+                        MIGRATION_6_7.migrate(db)
                     }
                 })
                 .build()
@@ -199,7 +200,7 @@ class Migration1To2Test {
         // Room verifies the identity hash and every column on open. A migration that
         // produced a schema Room did not expect throws here rather than passing quietly.
         val room = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
 
         val accounts = room.accountDao().getAll()

@@ -6,4 +6,6 @@ data class Category(
     val name: String,
     val colorToken: String,
     val parentId: Long?,
+    /** Only Uncategorised. It is the fallback label and cannot be deleted. */
+    val isSystem: Boolean = false,
 )
