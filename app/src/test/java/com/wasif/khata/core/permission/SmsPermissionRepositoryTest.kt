@@ -35,6 +35,7 @@ class SmsPermissionRepositoryTest {
             requested.value = true
         }
         override suspend fun setBackfilled() = Unit
+        override suspend fun setGeminiKey(key: String?) = Unit
     }
 
     private fun repository(checker: FakeChecker) = SmsPermissionRepository(checker, prefs)

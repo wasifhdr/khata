@@ -11,4 +11,5 @@ interface PreferencesRepository {
     suspend fun setMonthlyBudget(minor: Long?)
     suspend fun setSmsPermissionRequested()
     suspend fun setBackfilled()
+    suspend fun setGeminiKey(key: String?)
 }

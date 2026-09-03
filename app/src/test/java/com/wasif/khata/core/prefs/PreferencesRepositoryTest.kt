@@ -116,4 +116,17 @@ class PreferencesRepositoryTest {
 
         assertTrue(repo.preferences.first().hasBackfilled)
     }
+
+    @Test
+    fun `the key round-trips, and blank clears it`() = runTest {
+        assertNull(repo.preferences.first().geminiKey)
+
+        repo.setGeminiKey("placeholder-not-a-real-key")
+        assertEquals("placeholder-not-a-real-key", repo.preferences.first().geminiKey)
+
+        // Clearing the key is how the AI fallback is switched off; there is no second
+        // toggle to disagree with it.
+        repo.setGeminiKey(null)
+        assertNull(repo.preferences.first().geminiKey)
+    }
 }

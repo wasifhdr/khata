@@ -45,6 +45,7 @@ class MainViewModelTest {
         override suspend fun setMonthlyBudget(minor: Long?) = Unit
         override suspend fun setSmsPermissionRequested() = Unit
         override suspend fun setBackfilled() { backfilledFlag = true }
+        override suspend fun setGeminiKey(key: String?) = Unit
     }
 
     @Before

@@ -142,6 +142,8 @@ class SettingsViewModel @Inject constructor(
      */
     fun onHomeViewSelected(view: HomeView) = viewModelScope.launch { repository.setHomeView(view) }
 
+    fun onGeminiKeyChanged(key: String?) = viewModelScope.launch { repository.setGeminiKey(key) }
+
     // Reads the store rather than state.value. `state` is WhileSubscribed, so
     // with no collector it never leaves its initial value -- and a save made
     // before the first collection would then overwrite the stored theme with

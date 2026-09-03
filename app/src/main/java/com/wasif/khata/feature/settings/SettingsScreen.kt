@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,6 +88,7 @@ fun SettingsScreen(
         onOpenUnmatched = onOpenUnmatched,
         onOpenReconcile = onOpenReconcile,
         onOpenCategories = onOpenCategories,
+        onGeminiKeyChanged = viewModel::onGeminiKeyChanged,
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onFieldSelected = viewModel::onFieldSelected,
         onGroundSelected = viewModel::onGroundSelected,
@@ -108,6 +110,7 @@ fun SettingsContent(
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
     onOpenCategories: () -> Unit,
+    onGeminiKeyChanged: (String?) -> Unit,
     onHomeViewSelected: (HomeView) -> Unit,
     onFieldSelected: (FieldPalette) -> Unit,
     onGroundSelected: (Color) -> Unit,
@@ -134,6 +137,9 @@ fun SettingsContent(
                     .padding(top = CollapsingHeaderHeight, bottom = spacing.xxl)
                     .windowInsetsPadding(WindowInsets.navigationBars),
             ) {
+
+                SectionLabel("AI fallback")
+                GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
 
                 SectionLabel("Categories")
                 ActionRow(
@@ -507,4 +513,38 @@ private fun SwatchGrid(
             }
         }
     }
+}
+
+/**
+ * The stored key is never rendered back. Nothing needs to read it on screen, and a key
+ * on a screen is a key in a screenshot -- so the field starts empty and the supporting
+ * text says only whether one is set.
+ */
+@Composable
+private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
+    val spacing = LocalSpacing.current
+    var text by rememberSaveable { mutableStateOf("") }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            text = input
+            onChange(input.ifBlank { null })
+        },
+        label = { Text("Gemini API key") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            Text(
+                if (current == null) {
+                    "Not set. A message no rule matches stays in the review list."
+                } else {
+                    "Set. A message no rule matches is sent to Gemini to draft a rule."
+                },
+            )
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.screenHorizontal),
+    )
 }

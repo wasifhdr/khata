@@ -27,6 +27,11 @@ data class KhataPreferences(
      * it would rescan the whole inbox on every launch, forever.
      */
     val hasBackfilled: Boolean = false,
+    /**
+     * Null means the AI fallback is off. There is deliberately no separate toggle: a
+     * switch that could disagree with whether a key exists is a switch that will.
+     */
+    val geminiKey: String? = null,
 ) {
     companion object {
         val Default = KhataPreferences(
@@ -35,6 +40,7 @@ data class KhataPreferences(
             monthlyBudgetMinor = null,
             hasRequestedSmsPermission = false,
             hasBackfilled = false,
+            geminiKey = null,
         )
     }
 }
