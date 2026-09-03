@@ -132,7 +132,11 @@ fun QuickEntryScreen(
                     )
                 }
 
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    // Without this the wrapped rows sit flush and the chips touch.
+                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
                     state.categories.forEach { category ->
                         Pill(
                             text = category.name,

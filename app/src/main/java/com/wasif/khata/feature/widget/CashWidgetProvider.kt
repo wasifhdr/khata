@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.toArgb
 import com.wasif.khata.R
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.prefs.PreferencesRepository
+import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.ThemeSpec
 import com.wasif.khata.core.ui.theme.composeScheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -75,12 +76,9 @@ class CashWidgetProvider : AppWidgetProvider() {
                     "setBackgroundTintList",
                     ColorStateList.valueOf(scheme.surface.toArgb()),
                 )
-                listOf(R.id.spent_glyph, R.id.received_glyph).forEach {
-                    setTextColor(it, scheme.primary.toArgb())
-                }
-                listOf(R.id.spent_label, R.id.received_label).forEach {
-                    setTextColor(it, scheme.onSurfaceVariant.toArgb())
-                }
+                setTextColor(R.id.spent, KhataPalette.moneyOut.toArgb())
+                setTextColor(R.id.received, KhataPalette.moneyIn.toArgb())
+                setInt(R.id.separator, "setBackgroundColor", scheme.outlineVariant.toArgb())
 
                 setOnClickPendingIntent(R.id.spent, activityIntent(context, TransactionDirection.DEBIT))
                 setOnClickPendingIntent(R.id.received, activityIntent(context, TransactionDirection.CREDIT))

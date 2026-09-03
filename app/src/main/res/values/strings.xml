@@ -1,10 +1,10 @@
 <resources>
     <string name="app_name">Khata</string>
 
-    <!-- The words are not decoration: colour is never the only signal, and a bare
-         "+" on a home screen reads as "add something" rather than "money in". -->
-    <string name="widget_spent">Spent</string>
-    <string name="widget_received">Received</string>
+    <!-- Not shown: the widget's targets are glyphs only. These are what a screen
+         reader announces, which is the one reader that cannot see a minus sign. -->
+    <string name="widget_spent">Cash spent</string>
+    <string name="widget_received">Cash received</string>
     <string name="widget_minus">−</string>
     <string name="widget_plus">+</string>
     <string name="widget_description">Record cash in or out</string>

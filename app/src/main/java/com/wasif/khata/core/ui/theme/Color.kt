@@ -47,6 +47,20 @@ object KhataPalette {
     val alert: Color = Color(0xFFFF7A6B)
     val warn: Color = Color(0xFFF2A63E)
 
+    /**
+     * Direction on a control, where out and in are a choice being offered rather
+     * than a row being read. Fixed rather than tuned, for the reason category
+     * colours are: they encode which way money moves, not taste — and an accent
+     * that follows the tuner would turn the "in" target marigold.
+     *
+     * Distinct from the ledger's convention (credits take the accent, debits stay
+     * paper, see MoneyText), which is about finding a credit while scrolling. Both
+     * clear 7:1 on every shipped ground; the glyph still carries the meaning alone,
+     * so colour is reinforcement here and never the signal.
+     */
+    val moneyOut: Color = alert
+    val moneyIn: Color = Color(0xFF6BD99A)
+
     /** Petrol. The gradient the active module card is filled with. */
     val heroStops: List<Color> = listOf(
         Color(0xFF12403F),
