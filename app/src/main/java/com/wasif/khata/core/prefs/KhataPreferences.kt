@@ -42,6 +42,22 @@ data class KhataPreferences(
     val backupKey: String? = null,
     /** The salt [backupKey] was derived from; it goes into every backup's header. */
     val backupSalt: String? = null,
+    /**
+     * The Google account backups are uploaded to; null means Drive is off. The
+     * account name is the only thing stored -- no token, no refresh token. Play
+     * Services holds the grant, so a stolen phone yields no lasting Drive access.
+     */
+    val driveAccount: String? = null,
+    /** The Khata folder in Drive. Recreated if it 404s, so a stale id is not fatal. */
+    val driveFolderId: String? = null,
+    /** When the last upload succeeded. Null with an account set means none yet. */
+    val driveLastUploadAt: Long? = null,
+    /**
+     * Set when a background run found the grant gone. A worker cannot show consent,
+     * so it records this and Settings offers the reconnection, where an Activity
+     * exists to run it.
+     */
+    val driveNeedsReconnect: Boolean = false,
 ) {
     companion object {
         val Default = KhataPreferences(
@@ -53,6 +69,10 @@ data class KhataPreferences(
             geminiKey = null,
             backupKey = null,
             backupSalt = null,
+            driveAccount = null,
+            driveFolderId = null,
+            driveLastUploadAt = null,
+            driveNeedsReconnect = false,
         )
     }
 }

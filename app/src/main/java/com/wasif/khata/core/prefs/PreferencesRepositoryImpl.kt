@@ -2,6 +2,7 @@ package com.wasif.khata.core.prefs
 
 import android.util.Base64
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -37,6 +38,10 @@ class PreferencesRepositoryImpl @Inject constructor(
         val GeminiKey = stringPreferencesKey("gemini_key")
         val BackupKey = stringPreferencesKey("backup_key")
         val BackupSalt = stringPreferencesKey("backup_salt")
+        val DriveAccount = stringPreferencesKey("drive_account")
+        val DriveFolderId = stringPreferencesKey("drive_folder_id")
+        val DriveLastUploadAt = longPreferencesKey("drive_last_upload_at")
+        val DriveNeedsReconnect = intPreferencesKey("drive_needs_reconnect")
     }
 
     override val preferences: Flow<KhataPreferences> = store.data
@@ -69,6 +74,10 @@ class PreferencesRepositoryImpl @Inject constructor(
                 geminiKey = p[Keys.GeminiKey],
                 backupKey = p[Keys.BackupKey],
                 backupSalt = p[Keys.BackupSalt],
+                driveAccount = p[Keys.DriveAccount],
+                driveFolderId = p[Keys.DriveFolderId],
+                driveLastUploadAt = p[Keys.DriveLastUploadAt],
+                driveNeedsReconnect = p[Keys.DriveNeedsReconnect] == 1,
             )
         }
 
@@ -86,10 +95,10 @@ class PreferencesRepositoryImpl @Inject constructor(
         // value, so a later change of default still reaches anyone who has
         // pressed reset.
         store.edit { p ->
-            p.remove(Keys.Field)
-            p.remove(Keys.Ground)
-            p.remove(Keys.Accent)
-            p.remove(Keys.Intensity)
+            p.clear(Keys.Field)
+            p.clear(Keys.Ground)
+            p.clear(Keys.Accent)
+            p.clear(Keys.Intensity)
         }
     }
 
@@ -115,8 +124,8 @@ class PreferencesRepositoryImpl @Inject constructor(
     override suspend fun setBackupPassphrase(passphrase: String?) {
         store.edit { p ->
             if (passphrase.isNullOrBlank()) {
-                p.remove(Keys.BackupKey)
-                p.remove(Keys.BackupSalt)
+                p.clear(Keys.BackupKey)
+                p.clear(Keys.BackupSalt)
             } else {
                 val salt = p[Keys.BackupSalt]?.let { Base64.decode(it, Base64.NO_WRAP) }
                     ?: BackupFile.newSalt().also {
@@ -130,21 +139,69 @@ class PreferencesRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Clearing the account clears everything that depended on it. A stale folder id
+     * would have the next connection upload into a folder the new account cannot
+     * see, and a stale timestamp would claim an offsite copy that is gone.
+     */
+    override suspend fun setDriveAccount(email: String?) {
+        store.edit { p ->
+            if (email.isNullOrBlank()) {
+                p.clear(Keys.DriveAccount)
+                p.clear(Keys.DriveFolderId)
+                p.clear(Keys.DriveLastUploadAt)
+                p.clear(Keys.DriveNeedsReconnect)
+            } else {
+                p[Keys.DriveAccount] = email
+                p.clear(Keys.DriveNeedsReconnect)
+            }
+        }
+    }
+
+    override suspend fun setDriveFolderId(id: String?) {
+        store.edit { p -> if (id == null) p.clear(Keys.DriveFolderId) else p[Keys.DriveFolderId] = id }
+    }
+
+    /** An upload that worked is proof the grant is fine, so the warning comes down. */
+    override suspend fun setDriveUploaded(at: Long) {
+        store.edit { p ->
+            p.clear(Keys.DriveNeedsReconnect)
+            p[Keys.DriveLastUploadAt] = at
+        }
+    }
+
+    override suspend fun setDriveNeedsReconnect() {
+        store.edit { it[Keys.DriveNeedsReconnect] = 1 }
+    }
+
     override suspend fun setGeminiKey(key: String?) {
         store.edit { p ->
-            if (key.isNullOrBlank()) p.remove(Keys.GeminiKey) else p[Keys.GeminiKey] = key
+            if (key.isNullOrBlank()) p.clear(Keys.GeminiKey) else p[Keys.GeminiKey] = key
         }
     }
 
     override suspend fun setMonthlyBudget(minor: Long?) {
         store.edit { p ->
             if (minor == null) {
-                p.remove(Keys.Budget)
+                p.clear(Keys.Budget)
                 p[Keys.BudgetSet] = 0
             } else {
                 p[Keys.Budget] = minor
                 p[Keys.BudgetSet] = 1
             }
         }
+    }
+
+    /**
+     * remove() is declared to return T rather than T?, so where Kotlin treats the
+     * call as an expression -- the last line of an if/else branch, say -- it unboxes
+     * the result, and on an Int or Long key that was never set it unboxes null and
+     * throws. A standalone statement is safe; the same call one line lower is not.
+     *
+     * That is too sharp an edge to leave lying around, so nothing in this file calls
+     * remove() directly. Clearing a key that is not there is a no-op wherever it sits.
+     */
+    private fun <T : Any> MutablePreferences.clear(key: Preferences.Key<T>) {
+        if (contains(key)) remove(key)
     }
 }

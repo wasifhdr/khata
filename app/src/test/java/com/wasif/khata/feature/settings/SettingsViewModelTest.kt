@@ -63,6 +63,10 @@ class SettingsViewModelTest {
         override suspend fun setBackfilled() = Unit
         override suspend fun setGeminiKey(key: String?) = Unit
         override suspend fun setBackupPassphrase(passphrase: String?) = Unit
+        override suspend fun setDriveAccount(email: String?) = Unit
+        override suspend fun setDriveFolderId(id: String?) = Unit
+        override suspend fun setDriveUploaded(at: Long) = Unit
+        override suspend fun setDriveNeedsReconnect() = Unit
     }
 
     private lateinit var db: KhataDatabase

@@ -129,4 +129,61 @@ class PreferencesRepositoryTest {
         repo.setGeminiKey(null)
         assertNull(repo.preferences.first().geminiKey)
     }
+
+    @Test
+    fun `drive settings round trip`() = runTest {
+        repo.setDriveAccount("someone@gmail.com")
+        repo.setDriveFolderId("folder-1")
+        repo.setDriveUploaded(1_700_000_000_000L)
+
+        val prefs = repo.preferences.first()
+
+        assertEquals("someone@gmail.com", prefs.driveAccount)
+        assertEquals("folder-1", prefs.driveFolderId)
+        assertEquals(1_700_000_000_000L, prefs.driveLastUploadAt)
+        assertFalse(prefs.driveNeedsReconnect)
+    }
+
+    @Test
+    fun `a successful upload clears the reconnect flag`() = runTest {
+        repo.setDriveAccount("someone@gmail.com")
+        repo.setDriveNeedsReconnect()
+        assertTrue(repo.preferences.first().driveNeedsReconnect)
+
+        repo.setDriveUploaded(1_700_000_000_000L)
+
+        // An upload that worked is proof the grant is fine. Leaving the warning up
+        // would tell the user to fix something that is not broken.
+        assertFalse(repo.preferences.first().driveNeedsReconnect)
+    }
+
+    @Test
+    fun `disconnecting leaves nothing behind`() = runTest {
+        repo.setDriveAccount("someone@gmail.com")
+        repo.setDriveFolderId("folder-1")
+        repo.setDriveUploaded(1_700_000_000_000L)
+        repo.setDriveNeedsReconnect()
+
+        repo.setDriveAccount(null)
+
+        // A stale folder id would have the next connection upload into a folder the
+        // new account cannot see, and a stale timestamp would claim an offsite copy
+        // that is no longer reachable.
+        val prefs = repo.preferences.first()
+        assertNull(prefs.driveAccount)
+        assertNull(prefs.driveFolderId)
+        assertNull(prefs.driveLastUploadAt)
+        assertFalse(prefs.driveNeedsReconnect)
+    }
+
+    @Test
+    fun `resetting a theme that was never set is a no-op`() = runTest {
+        // Every other test here sets a theme before resetting one, so none of them
+        // covers a fresh install, where none of the theme keys exist. Clearing an
+        // absent Int key is the shape that threw in setDriveAccount, and this pins
+        // down that reset does not have the problem.
+        repo.resetTheme()
+
+        assertEquals(ThemeSpec.Default, repo.preferences.first().themeSpec)
+    }
 }
