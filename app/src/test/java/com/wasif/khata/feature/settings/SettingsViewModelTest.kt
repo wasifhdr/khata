@@ -11,6 +11,9 @@ import com.wasif.khata.core.permission.SmsPermissionRepository
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.drive.DriveAuth
+import com.wasif.khata.core.drive.DriveBackups
+import com.wasif.khata.core.drive.DriveFile
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.IngestionPipeline
@@ -133,6 +136,12 @@ class SettingsViewModelTest {
             db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock,
         ),
         clock = clock,
+        driveAuth = DriveAuth(ApplicationProvider.getApplicationContext(), repo),
+        // No test here reaches Drive; a fake keeps Play Services out of the JVM.
+        driveBackups = object : DriveBackups {
+            override suspend fun list(): List<DriveFile> = emptyList()
+            override suspend fun download(id: String): ByteArray? = null
+        },
     )
 
     @Test

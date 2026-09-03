@@ -34,6 +34,8 @@ import androidx.core.content.FileProvider
 import android.app.Activity
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,8 +57,10 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import com.wasif.khata.core.drive.DriveFile
 import com.wasif.khata.core.permission.AndroidSmsPermissionChecker
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.HomeView
@@ -74,6 +78,7 @@ import com.wasif.khata.core.ui.theme.LocalSpacing
 import com.wasif.khata.core.ui.theme.isLightColor
 import dev.chrisbanes.haze.hazeSource
 import kotlin.system.exitProcess
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -568,6 +573,18 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
     var message by remember { mutableStateOf<String?>(null) }
     var choosing by remember { mutableStateOf(false) }
     var restorePassphrase by rememberSaveable { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    var driveFiles by remember { mutableStateOf<List<DriveFile>?>(null) }
+
+    val connect = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result -> viewModel.onConnectResult(result.data) }
+
+    // Null while looking, so the chooser can say so rather than claim Drive is empty.
+    LaunchedEffect(choosing, prefs.driveAccount) {
+        driveFiles = null
+        if (choosing && prefs.driveAccount != null) driveFiles = viewModel.driveBackupList()
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -633,6 +650,31 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
     )
 
     ActionRow(
+        title = if (prefs.driveAccount == null) "Connect Google Drive" else "Disconnect Google Drive",
+        // Not decoration. A backup system that quietly stops is worse than one that
+        // never existed, because it is trusted -- this line is the only thing that
+        // says the offsite copy is real.
+        subtitle = when {
+            prefs.driveAccount == null -> "Not connected. Backups stay on this phone."
+            prefs.driveNeedsReconnect -> "Uploads have stopped. Tap to reconnect."
+            prefs.driveLastUploadAt != null ->
+                "${prefs.driveAccount} - last uploaded ${stamp(prefs.driveLastUploadAt!!)}"
+            else -> "${prefs.driveAccount} - nothing uploaded yet"
+        },
+        onClick = {
+            if (prefs.driveAccount != null && !prefs.driveNeedsReconnect) {
+                viewModel.onDisconnectDrive()
+            } else {
+                (context as? Activity)?.let { activity ->
+                    viewModel.onConnectDrive(activity) { sender ->
+                        connect.launch(IntentSenderRequest.Builder(sender).build())
+                    }
+                }
+            }
+        },
+    )
+
+    ActionRow(
         title = "Restore a backup",
         subtitle = "Replaces everything in Khata. Pick one of this phone's backups, or a file.",
         onClick = { choosing = true },
@@ -645,8 +687,12 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
             title = { Text("Restore which backup?") },
             text = {
                 Column {
+                    SectionLabel("On this phone")
                     if (local.isEmpty()) {
-                        Text("This phone has no backups yet.")
+                        Text(
+                            text = "This phone has no backups yet.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     } else {
                         local.forEach { file ->
                             Text(
@@ -661,6 +707,39 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
                                     }
                                     .padding(vertical = spacing.sm),
                             )
+                        }
+                    }
+
+                    if (prefs.driveAccount != null) {
+                        SectionLabel("In Drive")
+                        val found = driveFiles
+                        when {
+                            found == null -> Text(
+                                text = "Looking...",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            found.isEmpty() -> Text(
+                                text = "Nothing in Drive, or Drive is unreachable.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            else -> found.forEach { file ->
+                                Text(
+                                    text = driveLabel(file.name),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            choosing = false
+                                            // Downloads, then falls into the same
+                                            // passphrase dialog as a local file.
+                                            scope.launch {
+                                                pending = viewModel.downloadFromDrive(file.id)
+                                            }
+                                        }
+                                        .padding(vertical = spacing.sm),
+                                )
+                            }
                         }
                     }
                 }
@@ -734,6 +813,19 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
             },
         )
     }
+}
+
+/** "3 Sep, 02:00" -- the same shape as backupLabel, without the year. */
+private fun stamp(millis: Long): String = java.time.Instant.ofEpochMilli(millis)
+    .atZone(com.wasif.khata.core.time.DHAKA)
+    .format(java.time.format.DateTimeFormatter.ofPattern("d MMM, HH:mm", java.util.Locale.ENGLISH))
+
+/** The same label as backupLabel, from a Drive name rather than a File. */
+private fun driveLabel(name: String): String {
+    val millis = name.removePrefix("khata-").removeSuffix(".kbk").toLongOrNull() ?: return name
+    return java.time.Instant.ofEpochMilli(millis)
+        .atZone(com.wasif.khata.core.time.DHAKA)
+        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", java.util.Locale.ENGLISH))
 }
 
 /** "3 Sep 2026, 19:56" from the millis in the filename. */

@@ -16,6 +16,9 @@ import android.util.Base64
 import com.wasif.khata.core.backup.BackupFile
 import com.wasif.khata.core.backup.BackupRepository
 import com.wasif.khata.core.backup.BackupResult
+import com.wasif.khata.core.drive.DriveAuth
+import com.wasif.khata.core.drive.DriveBackups
+import com.wasif.khata.core.drive.DriveFile
 import com.wasif.khata.core.prefs.PreferencesRepository
 import java.io.File
 import com.wasif.khata.core.sms.IngestProgress
@@ -59,6 +62,8 @@ class SettingsViewModel @Inject constructor(
     private val accountDao: AccountDao,
     private val transactions: com.wasif.khata.domain.repository.TransactionRepository,
     private val clock: com.wasif.khata.core.time.KhataClock,
+    private val driveAuth: DriveAuth,
+    private val driveBackups: DriveBackups,
 ) : ViewModel() {
 
     /** Only what a pass cannot say for itself, like the cash reset. */
@@ -168,6 +173,24 @@ class SettingsViewModel @Inject constructor(
             "Could not back up"
         }
     }
+
+    /**
+     * [launch] receives the consent sender when one is needed. Nothing is launched
+     * when access was already granted -- the account is stored and there is no
+     * screen to show.
+     */
+    fun onConnectDrive(activity: android.app.Activity, launch: (android.content.IntentSender) -> Unit) =
+        viewModelScope.launch { driveAuth.beginConnect(activity)?.let(launch) }
+
+    fun onConnectResult(data: android.content.Intent?) =
+        viewModelScope.launch { driveAuth.completeConnect(data) }
+
+    fun onDisconnectDrive() = viewModelScope.launch { repository.setDriveAccount(null) }
+
+    /** Empty when Drive is unreachable, which the chooser reports as such. */
+    suspend fun driveBackupList(): List<DriveFile> = driveBackups.list()
+
+    suspend fun downloadFromDrive(id: String): ByteArray? = driveBackups.download(id)
 
     /** The newest backup, or null when there is none to share. */
     fun latestBackup(): File? = backups.latest()
