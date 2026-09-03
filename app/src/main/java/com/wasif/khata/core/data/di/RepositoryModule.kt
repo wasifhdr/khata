@@ -7,6 +7,9 @@ import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
 import com.wasif.khata.core.data.repository.BudgetRepository
 import com.wasif.khata.core.data.repository.MonthLimits
+import com.wasif.khata.core.drive.DriveBackups
+import com.wasif.khata.core.drive.DriveClient
+import com.wasif.khata.core.drive.DriveUploader
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
@@ -35,6 +38,14 @@ abstract class RepositoryModule {
     abstract fun bindReferenceDataRepository(
         impl: ReferenceDataRepositoryImpl,
     ): ReferenceDataRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDriveUploader(impl: DriveClient): DriveUploader
+
+    @Binds
+    @Singleton
+    abstract fun bindDriveBackups(impl: DriveClient): DriveBackups
 
     companion object {
         @Provides
