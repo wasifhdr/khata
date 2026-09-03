@@ -22,6 +22,7 @@ import com.wasif.khata.core.ui.theme.LocalMotion
 import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
 import com.wasif.khata.feature.hub.ModulesScreen
+import com.wasif.khata.feature.insights.InsightsScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
 import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
@@ -39,6 +40,7 @@ object KhataRoutes {
     const val Unmatched = "unmatched"
     const val Reconcile = "reconcile"
     const val Owed = "owed"
+    const val Insights = "insights"
     const val RuleEditor = "rules/new/{rawMessageId}"
     const val EditorNew = "editor/new"
     const val EditorEdit = "editor/edit/{transactionId}"
@@ -116,6 +118,7 @@ fun KhataNavHost(homeView: HomeView) {
                 onOpenHub = if (isRoot) ({ navController.navigate(KhataRoutes.Modules) }) else null,
                 onOpenLedger = { navController.navigate(KhataRoutes.Ledger) },
                 onOpenOwed = { navController.navigate(KhataRoutes.Owed) },
+                onOpenInsights = { navController.navigate(KhataRoutes.Insights) },
             )
         }
 
@@ -156,6 +159,10 @@ fun KhataNavHost(homeView: HomeView) {
                     creationCallback = { factory -> factory.create(rawId) },
                 ),
             )
+        }
+
+        composable(KhataRoutes.Insights) {
+            InsightsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(KhataRoutes.Owed) {

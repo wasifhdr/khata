@@ -59,6 +59,7 @@ fun WalletScreen(
     onOpenHub: (() -> Unit)?,
     onOpenLedger: () -> Unit,
     onOpenOwed: () -> Unit,
+    onOpenInsights: () -> Unit,
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
     WalletContent(
@@ -67,6 +68,7 @@ fun WalletScreen(
         onOpenHub = onOpenHub,
         onOpenLedger = onOpenLedger,
         onOpenOwed = onOpenOwed,
+        onOpenInsights = onOpenInsights,
     )
 }
 
@@ -77,6 +79,7 @@ fun WalletContent(
     onOpenHub: (() -> Unit)?,
     onOpenLedger: () -> Unit,
     onOpenOwed: () -> Unit,
+    onOpenInsights: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
     val scroll = rememberScrollState()
@@ -94,7 +97,11 @@ fun WalletContent(
             ) {
                 // Above the card, not beside ACCOUNTS: sat there they read as
                 // column headers for the table under them.
-                WalletLinks(onOpenOwed = onOpenOwed, onOpenLedger = onOpenLedger)
+                WalletLinks(
+                    onOpenInsights = onOpenInsights,
+                    onOpenOwed = onOpenOwed,
+                    onOpenLedger = onOpenLedger,
+                )
 
                 NetWorthCard(state = state)
 
@@ -148,12 +155,22 @@ private fun walletSubline(state: WalletUiState): String {
 
 /** Right-aligned links out of the wallet. */
 @Composable
-private fun WalletLinks(onOpenOwed: () -> Unit, onOpenLedger: () -> Unit) {
+private fun WalletLinks(
+    onOpenInsights: () -> Unit,
+    onOpenOwed: () -> Unit,
+    onOpenLedger: () -> Unit,
+) {
     val spacing = LocalSpacing.current
     Row(
         Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
         horizontalArrangement = Arrangement.End,
     ) {
+        Text(
+            text = "Insights →",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = spacing.lg).clickable(onClick = onOpenInsights),
+        )
         Text(
             text = "Owed →",
             style = MaterialTheme.typography.labelLarge,
