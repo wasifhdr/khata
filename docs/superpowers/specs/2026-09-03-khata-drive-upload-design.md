@@ -51,6 +51,13 @@ and there is no reason for a second one.
 
 `core/drive/DriveAuth.kt`. Two ways in, one `AuthorizationClient`.
 
+**What is stored is a flag, not an account.** `AuthorizationResult.toGoogleSignInAccount()`
+returns a null email on this path even when the `email` scope is granted -- verified on
+device -- so the address is simply not available. It turned out not to be needed:
+`authorize()` with no account pinned answers `hasResolution=false` once a grant exists,
+which is the silent success the nightly run depends on. Play Services remembers which
+account granted; the app holds no identifier at all.
+
 **Connecting**, from Settings, where an Activity exists:
 
 ```
@@ -121,7 +128,8 @@ by WorkManager, which is simpler than a session protocol and correct at this siz
 ## 5. When it runs, and what is shown
 
 `BackupWorker` uploads after it writes, under a `NetworkType.CONNECTED` constraint.
-"Back up now" takes the same path. **The local backup is written first and its success
+"Back up now" takes the same path -- through the same `DriveUploader`, not a shortcut
+past it -- and reports which of the three outcomes happened. **The local backup is written first and its success
 does not depend on the upload** — an offline phone still gets its nightly file.
 
 Drive keeps the same seven as the phone, oldest deleted after a successful upload. The
@@ -201,11 +209,13 @@ In Google Cloud Console, project `khata-9479`:
 1. An **Android** OAuth client, package `com.wasif.khata`, with that SHA-1. Android
    clients have no secret and nothing is pasted back into the app — Play Services
    matches on package and certificate.
-2. **Data Access:** `drive.file`, and nothing else. A broader Drive scope would make
+3. **Data Access:** `drive.file`, and nothing else. A broader Drive scope would make
    the app verification-eligible and give it reach it has no use for.
-3. **Audience: Testing, with the developer as its one test user.** Publishing was
+4. **Audience: Testing, with the developer as its one test user.** Publishing was
    tried and is gated behind an application home page and privacy policy URL, which
-   is not worth hosting for an app with a single user.
+   is not worth hosting for an app with a single user. The cost is Google's
+   "hasn't verified this app" interstitial on the first connect, which is a one-time
+   Continue.
 
    The cost of staying is bounded. Testing status is documented to issue **refresh
    tokens** expiring in seven days; this design requests none — no
