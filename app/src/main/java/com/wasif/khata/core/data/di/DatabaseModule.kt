@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
+import com.wasif.khata.core.data.dao.BalanceSnapshotDao
 import com.wasif.khata.core.data.dao.CategoryDao
 import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.ParsingRuleDao
@@ -12,6 +13,7 @@ import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.migration.MIGRATION_1_2
 import com.wasif.khata.core.data.migration.MIGRATION_2_3
 import com.wasif.khata.core.data.migration.MIGRATION_3_4
+import com.wasif.khata.core.data.migration.MIGRATION_4_5
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.SystemKhataClock
 import dagger.Binds
@@ -30,7 +32,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KhataDatabase =
         Room.databaseBuilder(context, KhataDatabase::class.java, "khata.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
 
     @Provides fun provideAccountDao(db: KhataDatabase): AccountDao = db.accountDao()
@@ -39,6 +41,7 @@ object DatabaseModule {
     @Provides fun provideMerchantDao(db: KhataDatabase): MerchantDao = db.merchantDao()
     @Provides fun provideRawMessageDao(db: KhataDatabase): RawMessageDao = db.rawMessageDao()
     @Provides fun provideParsingRuleDao(db: KhataDatabase): ParsingRuleDao = db.parsingRuleDao()
+    @Provides fun provideBalanceSnapshotDao(db: KhataDatabase): BalanceSnapshotDao = db.balanceSnapshotDao()
 }
 
 @Module

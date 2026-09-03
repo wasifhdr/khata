@@ -3,12 +3,14 @@ package com.wasif.khata.core.data
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.wasif.khata.core.data.dao.AccountDao
+import com.wasif.khata.core.data.dao.BalanceSnapshotDao
 import com.wasif.khata.core.data.dao.CategoryDao
 import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.data.entity.BalanceSnapshotEntity
 import com.wasif.khata.core.data.entity.CategoryEntity
 import com.wasif.khata.core.data.entity.MerchantAliasEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
@@ -25,8 +27,9 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         MerchantAliasEntity::class,
         RawMessageEntity::class,
         ParsingRuleEntity::class,
+        BalanceSnapshotEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {
@@ -36,4 +39,5 @@ abstract class KhataDatabase : RoomDatabase() {
     abstract fun merchantDao(): MerchantDao
     abstract fun rawMessageDao(): RawMessageDao
     abstract fun parsingRuleDao(): ParsingRuleDao
+    abstract fun balanceSnapshotDao(): BalanceSnapshotDao
 }
