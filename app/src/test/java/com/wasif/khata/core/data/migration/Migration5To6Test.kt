@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
-import com.wasif.khata.core.data.entity.BalanceSnapshotEntity
+import com.wasif.khata.core.data.entity.CategoryBudgetEntity
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
@@ -19,17 +19,17 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-private const val TEST_DB = "migration-4-5-test.db"
+private const val TEST_DB = "migration-5-6-test.db"
 private const val SCHEMA_DIR = "schemas/com.wasif.khata.core.data.KhataDatabase"
 
 /**
- * Builds a real version-4 database from the exported schema and migrates it, rather
+ * Builds a real version-5 database from the exported schema and migrates it, rather
  * than using MigrationTestHelper, which cannot agree with Robolectric about database
  * paths. Validation is not lost: the test reopens the migrated file through Room
  * itself, so Room's own identity-hash and column checks run against the result.
  */
 @RunWith(RobolectricTestRunner::class)
-class Migration4To5Test {
+class Migration5To6Test {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -54,13 +54,13 @@ class Migration4To5Test {
         return JSONObject(file!!.readText()).getJSONObject("database")
     }
 
-    /** Recreates schema v4 exactly as Room would have, identity hash included. */
-    private fun createV4Database(): SupportSQLiteDatabase {
-        val database = schemaJson(4)
+    /** Recreates schema v5 exactly as Room would have, identity hash included. */
+    private fun createV5Database(): SupportSQLiteDatabase {
+        val database = schemaJson(5)
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(TEST_DB)
-                .callback(object : SupportSQLiteOpenHelper.Callback(4) {
+                .callback(object : SupportSQLiteOpenHelper.Callback(5) {
                     override fun onCreate(db: SupportSQLiteDatabase) = Unit
                     override fun onUpgrade(db: SupportSQLiteDatabase, old: Int, new: Int) = Unit
                 })
@@ -85,38 +85,35 @@ class Migration4To5Test {
             "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
             arrayOf(database.getString("identityHash")),
         )
-        db.version = 4
+        db.version = 5
         return db
     }
 
     @Test
-    fun `the snapshots table arrives and Room accepts the result`() = runTest {
-        // Opening writableDatabase is what creates and stamps the v4 file.
-        createV4Database().use { }
+    fun `the budgets table arrives and Room accepts the result`() = runTest {
+        // Opening writableDatabase is what creates and stamps the v5 file.
+        createV5Database().use { }
 
         // Room applies the migration itself and restamps the identity hash, then
-        // verifies every column on open. Pre-migrating with a raw helper instead
-        // leaves the old hash in room_master_table and Room rejects the result.
+        // verifies every column on open.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
-        val dao = db.balanceSnapshotDao()
 
-        val row = BalanceSnapshotEntity(
-            uuid = "snap-1",
-            accountId = 1,
-            dayIndex = 20_000,
-            balanceMinor = 5_000,
-            createdAt = 1,
-            updatedAt = 1,
+        db.categoryBudgetDao().upsert(
+            CategoryBudgetEntity(
+                uuid = "b-1",
+                categoryId = 1,
+                limitMinor = 500_00,
+                effectiveFrom = 1_000,
+                effectiveTo = null,
+                createdAt = 1,
+                updatedAt = 1,
+            ),
         )
-        dao.insertAll(listOf(row))
-        // The same account and day twice must not produce two rows -- the fill routine
-        // leans on this uniqueness rather than checking first.
-        dao.insertAll(listOf(row.copy(uuid = "snap-2")))
 
-        assertEquals(1, dao.existingDayIndices(accountId = 1).size)
+        assertEquals(1, db.categoryBudgetDao().allFor(categoryId = 1).size)
         db.close()
     }
 }
