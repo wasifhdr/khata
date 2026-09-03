@@ -6,9 +6,13 @@ import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.entity.BalanceSnapshotEntity
+import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.time.toDhakaDayIndex
 import app.cash.turbine.test
 import com.wasif.khata.core.model.AccountType
+import com.wasif.khata.core.model.Confidence
+import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.dhakaMonthStart
@@ -241,4 +245,52 @@ class WalletViewModelTest {
         createdAt = 1,
         updatedAt = 1,
     )
+
+    @Test
+    fun `a deleted category still names its own spending`() = runTest(dispatcher) {
+        val accountId = insertAccount("acc-labels", includeInNetWorth = true)
+        val at = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+        db.transactionDao().upsert(
+            TransactionEntity(
+                uuid = "t-labelled",
+                accountId = accountId,
+                amountMinor = 1_000,
+                direction = TransactionDirection.DEBIT,
+                occurredAt = at,
+                merchantRaw = null,
+                merchantId = null,
+                categoryId = 7,
+                note = null,
+                source = TransactionSource.MANUAL,
+                confidence = Confidence.HIGH,
+                rawMessageId = null,
+                transferGroupId = null,
+                feeMinor = null,
+                referenceNumber = null,
+                createdAt = at,
+                updatedAt = at,
+            ),
+        )
+        // Deleted, so it is gone from the picker but not from the past.
+        liveCategories.value = emptyList()
+        allCategories.value = listOf(
+            Category(
+                id = 7,
+                uuid = "c-7",
+                name = "Car & Maintenance",
+                colorToken = "category_bronze",
+                parentId = null,
+                isSystem = false,
+            ),
+        )
+
+        WalletViewModel(
+            transactions, reference, db.transactionDao(), db.balanceSnapshotDao(), clock,
+        ).state.test {
+            advanceUntilIdle()
+            // Falling back to "Uncategorised" here is the bug this exists to prevent.
+            assertEquals("Car & Maintenance", expectMostRecentItem().categories.single().name)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

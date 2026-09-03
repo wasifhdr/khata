@@ -38,7 +38,9 @@ class WalletViewModel @Inject constructor(
         reference.observeAccounts(),
         combine(
             transactionDao.observeSpendByCategory(monthStart, now.dhakaNextMonthStart()),
-            reference.observeCategories(),
+            // Including deleted: this maps a stored categoryId to its label, and a
+            // category deleted last week still named last March's spending.
+            reference.observeCategoriesIncludingDeleted(),
             snapshotDao.observeTotalsFrom(trendFrom.toDhakaDayIndex()),
         ) { rows, categories, daily -> Triple(rows, categories, daily) },
     ) { netWorth, spend, received, accounts, (rows, categories, daily) ->

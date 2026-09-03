@@ -71,7 +71,10 @@ class LedgerViewModel @Inject constructor(
     }
 
     /** categoryId -> chip, so a row resolves its dot and name without a per-row query. */
-    val categoryTokens: StateFlow<Map<Long, CategoryChip>> = referenceData.observeCategories()
+    // Including deleted: this maps a stored categoryId to its chip, and a category
+    // deleted last week still named last March's spending.
+    val categoryTokens: StateFlow<Map<Long, CategoryChip>> =
+        referenceData.observeCategoriesIncludingDeleted()
         .map { categories -> categories.associate { it.id to CategoryChip(it.name, it.colorToken) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 

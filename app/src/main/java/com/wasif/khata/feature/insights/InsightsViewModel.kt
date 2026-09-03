@@ -36,7 +36,9 @@ class InsightsViewModel @Inject constructor(
 
     val state: StateFlow<InsightsUiState> = combine(
         transactionDao.compareCategorySpend(thisFrom, thisTo, lastFrom, thisFrom),
-        reference.observeCategories(),
+        // Including deleted: this maps a stored categoryId to its label, and a
+        // category deleted last week still named last March's spending.
+        reference.observeCategoriesIncludingDeleted(),
         limits(thisFrom),
         transactionDao.observeTopMerchants(thisFrom, thisTo, TOP_MERCHANTS),
     ) { comparison, categories, monthLimits, merchants ->
