@@ -73,6 +73,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
+    onOpenCategories: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     SettingsContent(
@@ -85,6 +86,7 @@ fun SettingsScreen(
         onReparse = viewModel::onReparse,
         onOpenUnmatched = onOpenUnmatched,
         onOpenReconcile = onOpenReconcile,
+        onOpenCategories = onOpenCategories,
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onFieldSelected = viewModel::onFieldSelected,
         onGroundSelected = viewModel::onGroundSelected,
@@ -105,6 +107,7 @@ fun SettingsContent(
     onReparse: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
+    onOpenCategories: () -> Unit,
     onHomeViewSelected: (HomeView) -> Unit,
     onFieldSelected: (FieldPalette) -> Unit,
     onGroundSelected: (Color) -> Unit,
@@ -131,6 +134,14 @@ fun SettingsContent(
                     .padding(top = CollapsingHeaderHeight, bottom = spacing.xxl)
                     .windowInsetsPadding(WindowInsets.navigationBars),
             ) {
+
+                SectionLabel("Categories")
+                ActionRow(
+                    title = "Manage categories",
+                    subtitle = "Add, rename or retire. Past transactions keep whatever " +
+                        "they were filed under.",
+                    onClick = onOpenCategories,
+                )
 
                 MessagesSection(
                     state = ingestion,

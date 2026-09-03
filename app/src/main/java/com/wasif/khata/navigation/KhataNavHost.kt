@@ -21,6 +21,7 @@ import com.wasif.khata.core.ui.motion.sharedAxisXPopExit
 import com.wasif.khata.core.ui.theme.LocalMotion
 import com.wasif.khata.feature.editor.TransactionEditorScreen
 import com.wasif.khata.feature.editor.TransactionEditorViewModel
+import com.wasif.khata.feature.categories.CategoriesScreen
 import com.wasif.khata.feature.hub.ModulesScreen
 import com.wasif.khata.feature.insights.InsightsScreen
 import com.wasif.khata.feature.ledger.LedgerScreen
@@ -41,6 +42,7 @@ object KhataRoutes {
     const val Reconcile = "reconcile"
     const val Owed = "owed"
     const val Insights = "insights"
+    const val Categories = "categories"
     const val RuleEditor = "rules/new/{rawMessageId}"
     const val EditorNew = "editor/new"
     const val EditorEdit = "editor/edit/{transactionId}"
@@ -135,6 +137,7 @@ fun KhataNavHost(homeView: HomeView) {
                 onBack = { navController.popBackStack() },
                 onOpenUnmatched = { navController.navigate(KhataRoutes.Unmatched) },
                 onOpenReconcile = { navController.navigate(KhataRoutes.Reconcile) },
+                onOpenCategories = { navController.navigate(KhataRoutes.Categories) },
             )
         }
 
@@ -159,6 +162,10 @@ fun KhataNavHost(homeView: HomeView) {
                     creationCallback = { factory -> factory.create(rawId) },
                 ),
             )
+        }
+
+        composable(KhataRoutes.Categories) {
+            CategoriesScreen(onBack = { navController.popBackStack() })
         }
 
         composable(KhataRoutes.Insights) {
