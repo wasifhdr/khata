@@ -333,4 +333,47 @@ class TransactionDaoTest {
 
         assertEquals(listOf(9L, 7L), recent)
     }
+
+    @Test
+    fun `a category present in only one month still appears, with zero for the other`() = runTest {
+        val accountId = insertAccount()
+        val thisMonth = Instant.parse("2026-09-10T06:00:00Z").toEpochMilli()
+        val lastMonth = Instant.parse("2026-08-10T06:00:00Z").toEpochMilli()
+        val dao = db.transactionDao()
+
+        dao.upsert(transaction(accountId, thisMonth, "t-new", amountMinor = 500, categoryId = 1))
+        dao.upsert(transaction(accountId, lastMonth, "t-gone", amountMinor = 900, categoryId = 2))
+        dao.upsert(transaction(accountId, thisMonth, "t-both-a", amountMinor = 100, categoryId = 3))
+        dao.upsert(transaction(accountId, lastMonth, "t-both-b", amountMinor = 300, categoryId = 3))
+
+        val rows = dao.compareCategorySpend(
+            thisFrom = thisMonth.dhakaMonthStart(),
+            thisTo = thisMonth.dhakaNextMonthStart(),
+            lastFrom = lastMonth.dhakaMonthStart(),
+            lastTo = lastMonth.dhakaNextMonthStart(),
+        ).first().associateBy { it.categoryId }
+
+        // A category that appeared and one that vanished are both real answers; two
+        // separate queries subtracted in the UI would drop whichever month lacked it.
+        assertEquals(500L to 0L, rows[1]!!.let { it.thisMonthMinor to it.lastMonthMinor })
+        assertEquals(0L to 900L, rows[2]!!.let { it.thisMonthMinor to it.lastMonthMinor })
+        assertEquals(100L to 300L, rows[3]!!.let { it.thisMonthMinor to it.lastMonthMinor })
+    }
+
+    @Test
+    fun `top merchants are ordered by spend and cut to the limit`() = runTest {
+        val accountId = insertAccount()
+        val at = Instant.parse("2026-09-10T06:00:00Z").toEpochMilli()
+        val dao = db.transactionDao()
+
+        dao.upsert(transaction(accountId, at, "m-1", amountMinor = 100, merchantRaw = "SMALL"))
+        dao.upsert(transaction(accountId, at, "m-2", amountMinor = 900, merchantRaw = "BIG"))
+        dao.upsert(transaction(accountId, at, "m-3", amountMinor = 400, merchantRaw = "MID"))
+
+        val top = dao.observeTopMerchants(
+            at.dhakaMonthStart(), at.dhakaNextMonthStart(), limit = 2,
+        ).first()
+
+        assertEquals(listOf("BIG", "MID"), top.map { it.merchantName })
+    }
 }

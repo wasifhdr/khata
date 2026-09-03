@@ -17,6 +17,14 @@ data class OwedRow(
 )
 
 /** One category and what went to it over a window. */
+data class CategoryComparisonRow(
+    val categoryId: Long?,
+    val thisMonthMinor: Long,
+    val lastMonthMinor: Long,
+)
+
+data class MerchantTotalRow(val merchantName: String, val totalMinor: Long)
+
 data class AccountDayNet(val accountId: Long, val dayIndex: Long, val netMinor: Long)
 
 data class CategoryTotalRow(
@@ -235,6 +243,48 @@ interface TransactionDao {
         """,
     )
     fun observeRecentCategoryIds(accountId: Long, limit: Int): Flow<List<Long>>
+
+    // Both months in one pass. Two queries subtracted in the UI would silently drop a
+    // category that exists in only one of them, which is exactly the interesting case.
+    @Query(
+        """
+        SELECT categoryId,
+               COALESCE(SUM(CASE WHEN occurredAt >= :thisFrom AND occurredAt < :thisTo
+                                 THEN amountMinor ELSE 0 END), 0) AS thisMonthMinor,
+               COALESCE(SUM(CASE WHEN occurredAt >= :lastFrom AND occurredAt < :lastTo
+                                 THEN amountMinor ELSE 0 END), 0) AS lastMonthMinor
+        FROM transactions
+        WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND occurredAt >= :lastFrom AND occurredAt < :thisTo
+        GROUP BY categoryId
+        """,
+    )
+    fun compareCategorySpend(
+        thisFrom: Long,
+        thisTo: Long,
+        lastFrom: Long,
+        lastTo: Long,
+    ): Flow<List<CategoryComparisonRow>>
+
+    // The merchant's canonical name where one was resolved, the raw text otherwise --
+    // an unresolved merchant is still where the money went.
+    @Query(
+        """
+        SELECT COALESCE(m.canonicalName, t.merchantRaw) AS merchantName,
+               SUM(t.amountMinor) AS totalMinor
+        FROM transactions t
+        LEFT JOIN merchants m ON m.id = t.merchantId
+        WHERE t.deletedAt IS NULL AND t.direction = 'DEBIT' AND t.transferGroupId IS NULL
+          AND t.kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND t.occurredAt >= :fromInclusive AND t.occurredAt < :toExclusive
+          AND COALESCE(m.canonicalName, t.merchantRaw) IS NOT NULL
+        GROUP BY merchantName
+        ORDER BY totalMinor DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeTopMerchants(fromInclusive: Long, toExclusive: Long, limit: Int): Flow<List<MerchantTotalRow>>
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY occurredAt DESC, id DESC LIMIT 1")
     fun observeMostRecent(): Flow<TransactionEntity?>
