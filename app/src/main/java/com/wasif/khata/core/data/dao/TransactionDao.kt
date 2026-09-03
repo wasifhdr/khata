@@ -17,6 +17,8 @@ data class OwedRow(
 )
 
 /** One category and what went to it over a window. */
+data class AccountDayNet(val accountId: Long, val dayIndex: Long, val netMinor: Long)
+
 data class CategoryTotalRow(
     val categoryId: Long?,
     val totalMinor: Long,
@@ -209,6 +211,21 @@ interface TransactionDao {
         """,
     )
     fun observeSpendByCategory(fromInclusive: Long, toExclusive: Long): Flow<List<CategoryTotalRow>>
+
+    // Signed daily movement per account, which is all the walk in SnapshotWriter
+    // needs. One query rather than one per day per account, which would be hundreds
+    // of round trips on a multi-year ledger.
+    @Query(
+        """
+        SELECT accountId, ((occurredAt + 21600000) / 86400000) AS dayIndex,
+               SUM(CASE WHEN direction = 'CREDIT' THEN amountMinor ELSE -amountMinor END) AS netMinor
+        FROM transactions
+        WHERE deletedAt IS NULL
+        GROUP BY accountId, dayIndex
+        ORDER BY dayIndex
+        """,
+    )
+    suspend fun dailyMovementByAccount(): List<AccountDayNet>
 
     // ponytail: recency only. The spec asks for "recent and frequent"; for a
     // handful of repeated cash categories both orderings converge, and this is one
