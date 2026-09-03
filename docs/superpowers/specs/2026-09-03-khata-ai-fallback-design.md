@@ -43,19 +43,32 @@ always wins over a guessed one. `origin` is `"AI"`, beside the existing `"BUILTI
 
 ---
 
-## 3. What leaves the device, and what does not
+## 3. What leaves the device
 
 Only the body of a message that matched **no** rule, and only once per format.
 
-**Redaction happens before the request is built, not inside it.** Account numbers, card
-masks and phone numbers are stripped, because the parser needs the *shape* of the
-sentence and never the identifiers. This is the one place data leaves the device, so it
-is a hard gate: the redactor is a pure function with its own tests, and the request
-builder takes already-redacted text.
+**The body is sent as it arrived. There is no redaction** (user decision, 2026-09-03,
+made after the trade-off below was put to them).
 
-**The kill switch is real.** With AI off, an unmatched message queues exactly as it does
-today and is taught by hand in the rule editor. Nothing degrades; the work is just
-yours.
+The privacy cost is real and is accepted knowingly: on the AI Studio free tier prompts
+may be retained and human-reviewed, so EBL account tails and any phone numbers in an
+unmatched message reach Google. This is a single-user personal build, the key is the
+user's own, and the messages are their own.
+
+The engineering argument ran the other way, which is why the decision is not merely a
+shortcut. Replacing a mask like `115***352` with a placeholder means the model sees the
+placeholder and may write a pattern matching *that* — which then matches nothing in the
+real message. §6's drafter would discard the rule for not matching, the worker would
+retry, and the feature would fail permanently with no visible reason. Substituting
+different digits of the same shape would have avoided both problems; the user chose to
+send the body as-is instead.
+
+**The kill switch is the mitigation that remains.** With no key set, nothing is sent at
+all.
+
+**The kill switch is real.** With AI off — which is simply no key set — an unmatched
+message queues exactly as it does today and is taught by hand in the rule editor.
+Nothing degrades; the work is just yours.
 
 ---
 
@@ -115,8 +128,6 @@ backfill are taught when they next arrive, or by hand.
 
 ## 7. Testing
 
-- **The redactor**, hardest: account tails, card masks, phone numbers in every shape the
-  corpus contains, and that an amount is never mistaken for an account number.
 - **The response parser**: a well-formed reply produces a rule; a malformed one, a
   refusal, and an empty candidate list each produce nothing rather than a broken rule.
 - **A proposed rule that matches nothing is discarded.**

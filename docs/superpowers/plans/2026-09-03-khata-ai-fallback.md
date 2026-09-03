@@ -4,7 +4,7 @@
 
 **Goal:** A message no rule matches is sent to Gemini, which drafts a parsing rule; the rule is stored and every message of that format — past and future — is parsed by the engine that parses everything else.
 
-**Architecture:** The AI writes a rule, never a transaction, so one call fixes a format forever and a wrong answer is repairable in the rule editor. Redaction is a pure function that runs before the request is built, because that is the one place data leaves the device. The key lives in app-private DataStore, entered in Settings, never in source. A fourth `IngestionWorker` mode does the work, so retry and backoff come free. No new dependencies: `HttpURLConnection` and `org.json`. Four tasks: the redactor, the key, the client, then the worker mode and its wiring.
+**Architecture:** The AI writes a rule, never a transaction, so one call fixes a format forever and a wrong answer is repairable in the rule editor. The key lives in app-private DataStore, entered in Settings, never in source — and with no key nothing is sent at all, which is the only gate between a message and Google. A fourth `IngestionWorker` mode does the work, so retry and backoff come free. No new dependencies: `HttpURLConnection` and `org.json`. Three tasks: the key, the client and rule drafter, then the worker mode and its wiring.
 
 **Tech Stack:** Kotlin · WorkManager · Hilt · DataStore · `HttpURLConnection` · `org.json` · JUnit4 + Robolectric.
 
@@ -16,7 +16,7 @@ Every task's requirements implicitly include this section.
 
 - `minSdk 33`, `compileSdk` / `targetSdk 37`, package `com.wasif.khata`.
 - **The API key is never in source, never in a test fixture, and never committed.** Tests use a placeholder string. This is not negotiable and is the load-bearing half of spec §13.2.
-- **Redaction runs before the request is built, not inside it.** The request builder takes already-redacted text, so no path exists that sends a raw body.
+- **The body is sent unredacted** (spec §3, user decision). The only thing standing between a message and Google is whether a key is set.
 - **Only unmatched bodies are ever sent.** Nothing that parsed, and nothing a rule claimed.
 - **The AI writes rules, never transactions.** No code path in this plan writes a `TransactionEntity`.
 - **No new dependencies.** `HttpURLConnection` is in the JDK, `org.json` is in the Android platform.
@@ -34,7 +34,7 @@ Every task's requirements implicitly include this section.
 - `app/src/main/java/com/wasif/khata/core/sms/ai/Redaction.kt` — pure; the privacy boundary.
 - `app/src/main/java/com/wasif/khata/core/sms/ai/GeminiClient.kt` — request, transport, response, behind one interface so tests never touch a network.
 - `app/src/main/java/com/wasif/khata/core/sms/ai/RuleDrafter.kt` — turns a response into a `ParsingRuleEntity`, or into nothing.
-- Tests: `RedactionTest.kt`, `GeminiResponseTest.kt`, `RuleDrafterTest.kt`, `TeachModeTest.kt`
+- Tests: `GeminiResponseTest.kt`, `RuleDrafterTest.kt`, `TeachModeTest.kt`
 
 **Modify:**
 - `core/prefs/KhataPreferences.kt`, `PreferencesRepository.kt`, `PreferencesRepositoryImpl.kt` — the key.
@@ -45,135 +45,7 @@ Every task's requirements implicitly include this section.
 
 ---
 
-### Task 1: The redactor
-
-Spec §3, §7. The privacy boundary, and the piece that gets tested hardest.
-
-**Files:**
-- Create: `core/sms/ai/Redaction.kt`
-- Test: `test/.../core/sms/ai/RedactionTest.kt`
-
-**Interfaces:**
-- Produces: `fun redactForAi(body: String): String`. Task 3 consumes it.
-
-- [ ] **Step 1: Write the failing test**
-
-```kotlin
-package com.wasif.khata.core.sms.ai
-
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
-
-class RedactionTest {
-
-    @Test
-    fun `an account mask keeps its shape and loses its digits`() {
-        // The parser needs to know a mask was there, not which account it was.
-        val redacted = redactForAi("Your A/C 115***352 Balance Tk 41.98")
-
-        assertFalse(redacted.contains("115"))
-        assertFalse(redacted.contains("352"))
-        assertTrue(redacted.contains("Balance Tk 41.98"))
-    }
-
-    @Test
-    fun `a card mask goes the same way`() {
-        val redacted = redactForAi("using Card 4402XXXXXX1234 on 31/08/2026")
-
-        assertFalse(redacted.contains("1234"))
-        assertTrue(redacted.contains("31/08/2026"))
-    }
-
-    @Test
-    fun `a phone number is removed`() {
-        val redacted = redactForAi("Send Money to 01712345678 successful")
-
-        assertFalse(redacted.contains("01712345678"))
-    }
-
-    @Test
-    fun `an amount is never mistaken for an identifier`() {
-        // The single most damaging failure here: redacting the amount leaves the
-        // model nothing to extract, and the drafted rule would be useless.
-        val redacted = redactForAi("Payment of Tk 1,234.00 to FOODPANDA is successful")
-
-        assertTrue(redacted.contains("1,234.00"))
-        assertTrue(redacted.contains("FOODPANDA"))
-    }
-
-    @Test
-    fun `a transaction id survives, because the rule has to capture it`() {
-        val redacted = redactForAi("TrxID DHV41FIPGY at 31/08/2026 19:01")
-
-        assertTrue(redacted.contains("DHV41FIPGY"))
-    }
-
-    @Test
-    fun `redaction is idempotent`() {
-        val once = redactForAi("Your A/C 115***352 Balance Tk 41.98")
-
-        // A redacted body may be re-sent on retry; running it twice must not eat
-        // more of the message each time.
-        assertEquals(once, redactForAi(once))
-    }
-}
-```
-
-- [ ] **Step 2: Run it to verify it fails**
-
-Run: `./gradlew :app:testDebugUnitTest --tests "*RedactionTest*"`
-Expected: FAIL — "Unresolved reference 'redactForAi'".
-
-- [ ] **Step 3: Write the redactor**
-
-```kotlin
-package com.wasif.khata.core.sms.ai
-
-/** What a removed identifier is replaced with: the shape survives, the value does not. */
-private const val MASK = "#"
-
-// A masked account or card: digits with X or * inside, or a long bare digit run. The
-// amount patterns are deliberately not matched -- see the ordering note below.
-private val MASKED_IDENTIFIER = Regex("""\b\d[\dXx*]{4,}\d\b""")
-
-// Bangladeshi mobile numbers, the one bare digit run long enough to be unambiguous.
-private val PHONE = Regex("""\b01\d{9}\b""")
-
-/**
- * Strips identifiers a parser never needs, before anything leaves the device.
- *
- * What survives is deliberate: amounts, dates, merchant names and transaction ids all
- * stay, because the rule being drafted has to capture them. What goes is account and
- * card masks and phone numbers, which the parser only ever needs the *shape* of.
- *
- * Phones are removed before masks, because 01712345678 would otherwise match the
- * masked-identifier pattern and be replaced by a different number of hashes.
- */
-fun redactForAi(body: String): String = body
-    .replace(PHONE, MASK.repeat(4))
-    .replace(MASKED_IDENTIFIER, MASK.repeat(4))
-```
-
-If a test fails because an amount like `1,234.00` matches `MASKED_IDENTIFIER`, tighten the pattern to require no comma or period inside the run — the amount test exists precisely to catch that.
-
-- [ ] **Step 4: Run the tests to verify they pass**
-
-Run: `./gradlew :app:testDebugUnitTest --tests "*RedactionTest*"`
-Expected: PASS, 6 tests.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add app/src/main/java/com/wasif/khata/core/sms/ai/Redaction.kt \
-        app/src/test/java/com/wasif/khata/core/sms/ai/RedactionTest.kt
-git commit -m "feat(ai): strip identifiers before anything leaves the device"
-```
-
----
-
-### Task 2: The key, in Settings
+### Task 1: The key, in Settings
 
 Spec §4.
 
@@ -182,7 +54,7 @@ Spec §4.
 - Test: `test/.../core/prefs/PreferencesRepositoryTest.kt`
 
 **Interfaces:**
-- Produces: `KhataPreferences.geminiKey: String?` and `PreferencesRepository.setGeminiKey(key: String?)`. Tasks 3 and 4 consume the first.
+- Produces: `KhataPreferences.geminiKey: String?` and `PreferencesRepository.setGeminiKey(key: String?)`. Tasks 2 and 3 consume the first.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -286,7 +158,7 @@ git commit -m "feat(ai): a key you enter in Settings, and nowhere else"
 
 ---
 
-### Task 3: The client, and the rule it drafts
+### Task 2: The client, and the rule it drafts
 
 Spec §1, §5. Behind an interface, so no test ever opens a socket.
 
@@ -295,8 +167,7 @@ Spec §1, §5. Behind an interface, so no test ever opens a socket.
 - Test: `test/.../core/sms/ai/GeminiResponseTest.kt`, `RuleDrafterTest.kt`
 
 **Interfaces:**
-- Consumes: `redactForAi` (Task 1).
-- Produces: `data class DraftedRule(val name: String, val senderPattern: String, val bodyPattern: String, val direction: TransactionDirection?, val kind: RuleKind)`; `fun interface RuleSuggester { suspend operator fun invoke(sender: String, redactedBody: String): DraftedRule? }`; `class GeminiClient` implementing it; `fun parseSuggestion(json: String): DraftedRule?`; `class RuleDrafter` turning a `DraftedRule` into a stored `ParsingRuleEntity`. Task 4 consumes `RuleSuggester` and `RuleDrafter`.
+- Produces: `data class DraftedRule(val name: String, val senderPattern: String, val bodyPattern: String, val direction: TransactionDirection?, val kind: RuleKind)`; `fun interface RuleSuggester { suspend operator fun invoke(sender: String, body: String): DraftedRule? }`; `class GeminiClient` implementing it; `fun parseSuggestion(json: String): DraftedRule?`; `class RuleDrafter` turning a `DraftedRule` into a stored `ParsingRuleEntity`. Task 3 consumes `RuleSuggester` and `RuleDrafter`.
 
 - [ ] **Step 1: Write the failing response-parsing test**
 
@@ -390,7 +261,7 @@ data class DraftedRule(
  * GeminiClient, so its test needs no network and no key.
  */
 fun interface RuleSuggester {
-    suspend operator fun invoke(sender: String, redactedBody: String): DraftedRule?
+    suspend operator fun invoke(sender: String, body: String): DraftedRule?
 }
 
 private const val ENDPOINT =
@@ -439,7 +310,7 @@ class GeminiClient @Inject constructor(
     private val preferences: PreferencesRepository,
 ) : RuleSuggester {
 
-    override suspend fun invoke(sender: String, redactedBody: String): DraftedRule? =
+    override suspend fun invoke(sender: String, body: String): DraftedRule? =
         withContext(Dispatchers.IO) {
             val key = preferences.preferences.first().geminiKey ?: return@withContext null
 
@@ -452,7 +323,7 @@ class GeminiClient @Inject constructor(
             }
 
             try {
-                connection.outputStream.use { it.write(requestBody(sender, redactedBody).toByteArray()) }
+                connection.outputStream.use { it.write(requestBody(sender, body).toByteArray()) }
                 if (connection.responseCode !in 200..299) return@withContext null
                 parseSuggestion(connection.inputStream.bufferedReader().readText())
             } catch (e: java.io.IOException) {
@@ -468,15 +339,15 @@ class GeminiClient @Inject constructor(
      * Structured output, not prose: this is field extraction, and a sentence reply
      * would need a parser of its own.
      */
-    private fun requestBody(sender: String, redactedBody: String): String {
+    private fun requestBody(sender: String, body: String): String {
         val instruction = """
             You are given one SMS from a Bangladeshi bank or mobile money service that an
-            existing rule set failed to parse. Identifiers have already been removed.
+            existing rule set failed to parse.
             Produce a Kotlin-compatible regular expression that extracts this message
             FORMAT, not this message. Use named groups from: amount, merchant, datetime,
             balance, account, reference. Do not match literal amounts or names.
             Sender: $sender
-            Message: $redactedBody
+            Message: $body
         """.trimIndent()
 
         val schema = JSONObject()
@@ -634,7 +505,7 @@ git commit -m "feat(ai): ask for a rule, and refuse one that matches nothing"
 
 ---
 
-### Task 4: The TEACH mode, and when it fires
+### Task 3: The TEACH mode, and when it fires
 
 Spec §2, §6.
 
@@ -643,7 +514,7 @@ Spec §2, §6.
 - Test: `test/.../core/sms/TeachModeTest.kt`
 
 **Interfaces:**
-- Consumes: `RuleSuggester`, `RuleDrafter` (Task 3), `redactForAi` (Task 1).
+- Consumes: `RuleSuggester`, `RuleDrafter` (Task 2).
 - Produces: `IngestionMode.TEACH` and `IngestionScheduler.teach(rawMessageId: Long)`.
 
 - [ ] **Step 1: Write the failing test**
@@ -694,7 +565,7 @@ In `IngestionWorker`, inject `RuleSuggester`, `RuleDrafter` and `RawMessageDao`,
             IngestionMode.TEACH -> {
                 val raw = rawMessages.findById(inputData.getLong(KEY_RAW_ID, -1))
                     ?: return Result.failure()
-                val drafted = suggester(raw.sender, redactForAi(raw.body))
+                val drafted = suggester(raw.sender, raw.body)
                     // Retry rather than fail: a rate limit or a dropped connection
                     // should come back, and the message stays unmatched until it does.
                     ?: return Result.retry()
