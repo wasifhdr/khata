@@ -26,6 +26,7 @@ import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.KhataIcons
 import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.BengaliBodyStyle
 import com.wasif.khata.core.ui.theme.LocalSpacing
@@ -49,6 +50,8 @@ fun UnmatchedScreen(
         onBack = onBack,
         onWriteRule = onWriteRule,
         onNotATransaction = viewModel::onNotATransaction,
+        onAskGemini = viewModel::onAskGemini,
+        canAskGemini = state.canAskGemini,
     )
 }
 
@@ -58,6 +61,8 @@ fun UnmatchedContent(
     onBack: () -> Unit,
     onWriteRule: (Long) -> Unit,
     onNotATransaction: (Long) -> Unit,
+    onAskGemini: (Long) -> Unit,
+    canAskGemini: Boolean,
 ) {
     val spacing = LocalSpacing.current
     val listState = rememberLazyListState()
@@ -71,6 +76,11 @@ fun UnmatchedContent(
                   .imePadding()
                   .windowInsetsPadding(WindowInsets.navigationBars),
           ) {
+            // The header offset belongs to whichever child comes first. Giving it to
+            // both the notice and the list below stacked two full header heights of
+            // empty space, with the notice stranded in the middle of it.
+            val topInset = if (state.line == null) CollapsingHeaderHeight else spacing.sm
+
             state.line?.let { notice ->
                 Text(
                     text = notice,
@@ -85,14 +95,14 @@ fun UnmatchedContent(
             }
 
             if (state.isEmpty) {
-                Box(Modifier.padding(top = CollapsingHeaderHeight)) { EmptyNote() }
+                Box(Modifier.padding(top = topInset)) { EmptyNote() }
             } else {
                 // No glass on rows: one blur pass per row per frame (DESIGN.md §5).
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     state = listState,
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        top = CollapsingHeaderHeight,
+                        top = topInset,
                         bottom = spacing.xxl,
                     ),
                 ) {
@@ -102,6 +112,8 @@ fun UnmatchedContent(
                             enabled = !state.isWorking,
                             onWriteRule = { onWriteRule(message.id) },
                             onNotATransaction = { onNotATransaction(message.id) },
+                            onAskGemini = { onAskGemini(message.id) },
+                            canAskGemini = canAskGemini,
                         )
                     }
                 }
@@ -152,6 +164,8 @@ private fun UnmatchedRow(
     enabled: Boolean,
     onWriteRule: () -> Unit,
     onNotATransaction: () -> Unit,
+    onAskGemini: () -> Unit,
+    canAskGemini: Boolean,
 ) {
     val spacing = LocalSpacing.current
     val received = Instant.ofEpochMilli(message.receivedAt).atZone(DHAKA).toLocalDate()
@@ -189,11 +203,24 @@ private fun UnmatchedRow(
         // Two answers, because most of what a bank sends is not a transaction at
         // all. Teaching is the emphasised one; hiding is quieter but present, or
         // the list of verification codes never ends.
+        //
+        // Ask Gemini appears only with a key set. The automatic fallback fires as a
+        // message arrives, so anything already sitting here when the key was added
+        // would never be offered otherwise.
         Row(
             Modifier.padding(top = spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
             Pill("Write a rule", selected = true, enabled = enabled, onClick = onWriteRule)
+            if (canAskGemini) {
+                Pill(
+                    text = "Ask Gemini",
+                    selected = false,
+                    enabled = enabled,
+                    leadingIcon = KhataIcons.Sparkle,
+                    onClick = onAskGemini,
+                )
+            }
             Pill("Not a transaction", selected = false, enabled = enabled, onClick = onNotATransaction)
         }
     }

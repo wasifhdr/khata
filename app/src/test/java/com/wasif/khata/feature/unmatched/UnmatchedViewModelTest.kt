@@ -8,10 +8,17 @@ import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.model.RuleKind
 import com.wasif.khata.core.sms.IngestionPipeline
+import com.wasif.khata.core.prefs.HomeView
+import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.prefs.PreferencesRepository
+import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.RuleEngine
 import com.wasif.khata.core.sms.TransferPairing
 import com.wasif.khata.core.time.KhataClock
+import com.wasif.khata.core.ui.theme.ThemeSpec
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.launch
@@ -95,6 +102,27 @@ class UnmatchedViewModelTest {
         )
     )
 
+    /** Flipped by the test that cares whether the Ask Gemini action is offered. */
+    private var geminiKey: String? = null
+
+    private class FakePreferences(private val key: String?) : PreferencesRepository {
+        override val preferences: Flow<KhataPreferences> =
+            flowOf(KhataPreferences.Default.copy(geminiKey = key))
+
+        override suspend fun setTheme(spec: ThemeSpec) = Unit
+        override suspend fun resetTheme() = Unit
+        override suspend fun setHomeView(view: HomeView) = Unit
+        override suspend fun setMonthlyBudget(minor: Long?) = Unit
+        override suspend fun setSmsPermissionRequested() = Unit
+        override suspend fun setBackfilled() = Unit
+        override suspend fun setGeminiKey(key: String?) = Unit
+        override suspend fun setBackupPassphrase(passphrase: String?) = Unit
+        override suspend fun setDriveConnected(connected: Boolean) = Unit
+        override suspend fun setDriveFolderId(id: String?) = Unit
+        override suspend fun setDriveUploaded(at: Long) = Unit
+        override suspend fun setDriveNeedsReconnect() = Unit
+    }
+
     /**
      * state is WhileSubscribed, so without a collector it never leaves its initial
      * value and every assertion below would read the empty default.
@@ -105,6 +133,8 @@ class UnmatchedViewModelTest {
             ruleDao = db.parsingRuleDao(),
             reparse = ReparseUseCase(db.rawMessageDao(), pipeline, clock),
             clock = clock,
+            scheduler = IngestionScheduler(ApplicationProvider.getApplicationContext()),
+            preferences = FakePreferences(geminiKey),
         ).also { vm ->
             backgroundScope.launch { vm.state.collect {} }
         }

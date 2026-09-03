@@ -3,6 +3,9 @@ package com.wasif.khata.core.ui.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +40,7 @@ fun Pill(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     contentDescription: String? = null,
+    leadingIcon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
@@ -67,15 +71,29 @@ fun Pill(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = when {
-                !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
-                selected -> MaterialTheme.colorScheme.onSecondaryContainer
-                else -> MaterialTheme.colorScheme.onSurface
-            },
-        )
+        val content = when {
+            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+            selected -> MaterialTheme.colorScheme.onSecondaryContainer
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    // The label already says what this does; the mark is decoration
+                    // beside it, and a screen reader repeating it would be noise.
+                    contentDescription = null,
+                    tint = content,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(spacing.xs))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = content,
+            )
+        }
     }
 }
 

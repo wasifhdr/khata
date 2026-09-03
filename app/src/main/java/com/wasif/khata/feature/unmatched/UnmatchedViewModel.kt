@@ -8,8 +8,10 @@ import com.wasif.khata.core.data.entity.ParsingRuleEntity
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.model.RuleKind
 import com.wasif.khata.core.sms.IngestProgress
+import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.deriveIgnorePattern
+import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.time.KhataClock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -42,6 +44,8 @@ data class UnmatchedUiState(
     val notice: String? = null,
     val isWorking: Boolean = false,
     val progress: IngestProgress? = null,
+    /** No key, no button: asking would fail silently and read as the model refusing. */
+    val canAskGemini: Boolean = false,
 ) {
     val isEmpty: Boolean get() = messages.isEmpty()
 
@@ -56,6 +60,8 @@ class UnmatchedViewModel @Inject constructor(
     private val ruleDao: ParsingRuleDao,
     private val reparse: ReparseUseCase,
     private val clock: KhataClock,
+    private val scheduler: IngestionScheduler,
+    preferences: PreferencesRepository,
 ) : ViewModel() {
 
     private val _notice = MutableStateFlow<String?>(null)
@@ -68,7 +74,8 @@ class UnmatchedViewModel @Inject constructor(
         _notice,
         _working,
         _progress,
-    ) { rows, notice, working, progress ->
+        preferences.preferences.map { it.geminiKey != null },
+    ) { rows, notice, working, progress, hasKey ->
         UnmatchedUiState(
             messages = rows.map {
                 UnmatchedMessage(
@@ -82,6 +89,7 @@ class UnmatchedViewModel @Inject constructor(
             notice = notice,
             isWorking = working,
             progress = progress,
+            canAskGemini = hasKey,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnmatchedUiState())
 
@@ -145,7 +153,10 @@ class UnmatchedViewModel @Inject constructor(
                         ),
                     ),
                 )
-                reparse.run().collect { _progress.value = it }
+                // Unmatched only: this rule takes max+1, the lowest rank there is,
+                // so nothing already parsed can change and re-reading the whole
+                // inbox would be thousands of messages to prove it.
+                reparse.runUnmatched().collect { _progress.value = it }
             }.fold(
                 onSuccess = {
                     _notice.value = if (like == 1) {
@@ -159,5 +170,18 @@ class UnmatchedViewModel @Inject constructor(
             _progress.value = null
             _working.value = false
         }
+    }
+
+    /**
+     * Hands one message to the AI fallback by hand.
+     *
+     * The automatic trigger fires only as a message arrives (IngestionPipeline, so a
+     * backfill over years of inbox does not fire hundreds of requests at once), which
+     * means anything already unmatched when the key was set would never be offered.
+     * This is that path, one message at a time, asked for rather than guessed.
+     */
+    fun onAskGemini(id: Long) {
+        _notice.value = "Asking Gemini to write a rule…"
+        scheduler.teach(id)
     }
 }
