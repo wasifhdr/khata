@@ -33,6 +33,21 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Not exported: the only caller is our own widget's PendingIntent.
+          excludeFromRecents so a five-second cash entry does not become a card in
+          the recents list. adjustResize for the same reason MainActivity needs it:
+          without it the window pans and the amount leaves the screen when the IME
+          opens for a note.
+        -->
+        <activity
+            android:name=".feature.widget.QuickEntryActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Khata.QuickEntry"
+            android:windowSoftInputMode="adjustResize" />
+
         <receiver
             android:name=".core.sms.SmsReceiver"
             android:exported="true"

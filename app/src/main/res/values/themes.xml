@@ -16,4 +16,18 @@
     <style name="Theme.Khata" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">#061214</item>
     </style>
+
+    <!--
+      The sheet draws its own scrim in Compose so it can animate on LocalMotion and
+      take the tuner's colours; the platform dim would be a second, fixed one
+      underneath it. windowBackground is transparent rather than the ground, which
+      is also why this window needs no splash: rendering nothing until DataStore
+      arrives is invisible here.
+    -->
+    <style name="Theme.Khata.QuickEntry" parent="Theme.Khata">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
