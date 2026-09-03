@@ -11,11 +11,9 @@ import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.prefs.PreferencesRepository
-import com.wasif.khata.core.sms.BackfillUseCase
-import com.wasif.khata.core.sms.IncomingMessage
+import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.IngestionPipeline
-import com.wasif.khata.core.sms.MessageSource
-import com.wasif.khata.core.sms.ReparseUseCase
+import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.RuleEngine
 import com.wasif.khata.core.sms.TransferPairing
 import com.wasif.khata.core.time.KhataClock
@@ -39,12 +37,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import androidx.work.testing.WorkManagerTestInitHelper
 import org.robolectric.RobolectricTestRunner
-
-/** A shape the seeded bKash rules do match, so backfill records rather than shrugs. */
-private const val PAYMENT =
-    "Payment of Tk 856.00 to FOODPANDA BANGLADESH LIMITED is successful. " +
-        "Balance Tk 41.98. TrxID DHV41FIPGY at 31/08/2026 19:01"
 
 @RunWith(RobolectricTestRunner::class)
 class SettingsViewModelTest {
@@ -69,7 +63,6 @@ class SettingsViewModelTest {
 
     private lateinit var db: KhataDatabase
     private lateinit var pipeline: IngestionPipeline
-    private var inbox: List<IncomingMessage> = emptyList()
     private var granted = true
     private var rationale = false
 
@@ -85,6 +78,12 @@ class SettingsViewModelTest {
     @Before
     fun setUp() = runTest(dispatcher) {
         Dispatchers.setMain(dispatcher)
+        // The app removes WorkManager's own initializer, so a test that builds the
+        // ViewModel has to stand one up itself -- observePass() asks for the
+        // instance the moment the state flow is assembled.
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            ApplicationProvider.getApplicationContext(),
+        )
         db = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
@@ -118,13 +117,7 @@ class SettingsViewModelTest {
     private fun viewModel() = SettingsViewModel(
         repository = repo,
         smsPermission = SmsPermissionRepository(checker, repo),
-        backfill = BackfillUseCase(
-            source = object : MessageSource {
-                override suspend fun readAll(): List<IncomingMessage> = inbox
-            },
-            pipeline = pipeline,
-        ),
-        reparse = ReparseUseCase(db.rawMessageDao(), pipeline, clock),
+        scheduler = IngestionScheduler(ApplicationProvider.getApplicationContext()),
         rawMessageDao = db.rawMessageDao(),
         accountDao = db.accountDao(),
         transactions = TransactionRepositoryImpl(
@@ -166,61 +159,26 @@ class SettingsViewModelTest {
 
     // --- The MESSAGES section ---------------------------------------------
 
-    @Test
-    fun `backfill reports progress rather than only a final answer`() = runTest(dispatcher) {
-        inbox = List(3) { IncomingMessage("bKash", PAYMENT.replace("DHV41FIPGY", "TRX0000$it"), 1000L + it) }
-        val vm = viewModel()
-        backgroundScope.launch { vm.ingestion.collect { } }
-        advanceUntilIdle()
-
-        vm.onBackfill()
-        advanceUntilIdle()
-
-        // A multi-year inbox blocking silently reads as a hang, so the count is
-        // what the screen has to be able to show while it works.
-        val done = vm.ingestion.value.backfill!!
-        assertEquals(3, done.total)
-        assertEquals(3, done.processed)
-        assertTrue(done.isComplete)
-    }
+    // Backfill's own behaviour -- progress, classification, and that re-running
+    // reports duplicates rather than doubling the ledger -- is BackfillProgressTest's,
+    // and the worker that now carries it is IngestionWorkerTest's. Driving it through
+    // this ViewModel tested the same thing through a longer pipe, and the ViewModel
+    // no longer runs the pass at all: it relays what the work reports.
 
     @Test
-    fun `the run is reported in words a person can act on`() = runTest(dispatcher) {
-        inbox = listOf(IncomingMessage("bKash", PAYMENT, 1000L))
-        val vm = viewModel()
-        backgroundScope.launch { vm.ingestion.collect { } }
-        advanceUntilIdle()
+    fun `a finished run is put in words a person can act on`() {
+        val summary = IngestSummary(total = 4, recorded = 1, updated = 2, ignored = 1)
 
-        vm.onBackfill()
-        advanceUntilIdle()
-
-        assertEquals("1 recorded", vm.ingestion.value.lastRun)
-    }
-
-    @Test
-    fun `a second backfill reports duplicates rather than doubling the ledger`() = runTest(dispatcher) {
-        inbox = listOf(IncomingMessage("bKash", PAYMENT, 1000L))
-        val vm = viewModel()
-        backgroundScope.launch { vm.ingestion.collect { } }
-        advanceUntilIdle()
-        vm.onBackfill()
-        advanceUntilIdle()
-
-        vm.onBackfill()
-        advanceUntilIdle()
-
-        // The row it says "safe to run twice" under has to actually be safe.
-        assertEquals(1, db.transactionDao().allActive().size)
+        // The words are what the MESSAGES row shows when a pass finishes, and a
+        // zero must not appear as "0 updated" noise.
+        assertEquals("1 recorded · 2 updated · 1 ignored", summary.inWords())
     }
 
     @Test
     fun `an unreadable message is counted so the row can say how many are waiting`() = runTest(dispatcher) {
-        inbox = listOf(IncomingMessage("bKash", "Some entirely new wording nobody planned for", 1000L))
+        pipeline.ingest("bKash", "Some entirely new wording nobody planned for", 1000L)
         val vm = viewModel()
         backgroundScope.launch { vm.ingestion.collect { } }
-        advanceUntilIdle()
-
-        vm.onBackfill()
         advanceUntilIdle()
 
         assertEquals(1, vm.ingestion.value.unmatchedCount)

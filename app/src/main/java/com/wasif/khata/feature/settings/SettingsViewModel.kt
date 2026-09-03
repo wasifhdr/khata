@@ -14,15 +14,13 @@ import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.sms.IngestProgress
-import com.wasif.khata.core.sms.BackfillUseCase
 import com.wasif.khata.core.sms.IngestSummary
-import com.wasif.khata.core.sms.ReparseUseCase
+import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.ThemeSpec
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,28 +48,35 @@ data class IngestionState(
 class SettingsViewModel @Inject constructor(
     private val repository: PreferencesRepository,
     private val smsPermission: SmsPermissionRepository,
-    private val backfill: BackfillUseCase,
-    private val reparse: ReparseUseCase,
+    private val scheduler: IngestionScheduler,
     rawMessageDao: RawMessageDao,
     private val accountDao: AccountDao,
     private val transactions: com.wasif.khata.domain.repository.TransactionRepository,
     private val clock: com.wasif.khata.core.time.KhataClock,
 ) : ViewModel() {
 
-    private val _backfill = MutableStateFlow<IngestProgress?>(null)
-    private val _lastRun = MutableStateFlow<String?>(null)
+    /** Only what a pass cannot say for itself, like the cash reset. */
+    private val _lastAction = MutableStateFlow<String?>(null)
 
     val ingestion: StateFlow<IngestionState> = combine(
         smsPermission.observe(),
         // Drives the row's own count, so it says how much is waiting before you open it.
         rawMessageDao.observeByStatus(RawMessageStatus.UNMATCHED).map { it.size },
-        _backfill,
-        _lastRun,
+        scheduler.observePass(),
+        _lastAction,
         accountDao.observeAll().map { accounts ->
             Money(accounts.firstOrNull { it.type == AccountType.CASH }?.currentBalanceMinor ?: 0L)
         },
-    ) { permission, unmatched, progress, lastRun, cash ->
-        IngestionState(permission, unmatched, progress, lastRun, cash)
+    ) { permission, unmatched, pass, lastAction, cash ->
+        IngestionState(
+            permission = permission,
+            unmatchedCount = unmatched,
+            backfill = pass.running,
+            // A finished pass speaks for itself; _lastAction carries only what it
+            // cannot say.
+            lastRun = pass.finished?.inWords() ?: lastAction,
+            cashBalance = cash,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -86,10 +91,11 @@ class SettingsViewModel @Inject constructor(
     fun onPermissionRequested() = viewModelScope.launch { smsPermission.onRequested() }
 
     /**
-     * Reading a multi-year inbox is thousands of messages, so progress is
-     * collected rather than awaited -- a silent block reads as a hang.
+     * Enqueued, not collected. A pass now outlives this screen, and the unique-work
+     * policy is what stops a second one starting -- the guard that used to live here
+     * was forgotten the moment the ViewModel died.
      */
-    fun onBackfill() = runPass(backfill.run(), "Could not read messages. Please try again.")
+    fun onBackfill() = scheduler.backfill()
 
     /**
      * Six years of ATM withdrawals with no cash spending entered against them leave
@@ -100,31 +106,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val cash = accountDao.getAll().firstOrNull { it.type == AccountType.CASH } ?: return@launch
             transactions.resetToZero(cash.id, clock.now()).fold(
-                onSuccess = { _lastRun.value = "Cash starts again from zero" },
-                onFailure = { _lastRun.value = "Could not reset cash. Please try again." },
+                onSuccess = { _lastAction.value = "Cash starts again from zero" },
+                onFailure = { _lastAction.value = "Could not reset cash. Please try again." },
             )
         }
     }
 
-    fun onReparse() = runPass(reparse.run(), "Could not re-read messages. Please try again.")
-
-    /** One whole-inbox pass, reported as progress then as a summary. */
-    private fun runPass(pass: Flow<IngestProgress>, failure: String) {
-        if (_backfill.value?.isComplete == false) return
-        _backfill.value = null
-        _lastRun.value = null
-        viewModelScope.launch {
-            runCatching {
-                pass.collect { _backfill.value = it }
-            }.fold(
-                onSuccess = { _lastRun.value = _backfill.value?.summary?.inWords() },
-                onFailure = {
-                    _backfill.value = null
-                    _lastRun.value = failure
-                },
-            )
-        }
-    }
+    fun onReparse() = scheduler.reparse()
 
     val state: StateFlow<KhataPreferences> = repository.preferences.stateIn(
         scope = viewModelScope,
