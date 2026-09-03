@@ -2,10 +2,12 @@ package com.wasif.khata.feature.wallet
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wasif.khata.core.data.dao.BalanceSnapshotDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.dhakaMonthStart
+import com.wasif.khata.core.time.toDhakaDayIndex
 import com.wasif.khata.core.time.dhakaNextMonthStart
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
@@ -21,6 +23,7 @@ class WalletViewModel @Inject constructor(
     transactions: TransactionRepository,
     reference: ReferenceDataRepository,
     transactionDao: TransactionDao,
+    snapshotDao: BalanceSnapshotDao,
     clock: KhataClock,
 ) : ViewModel() {
 
@@ -36,7 +39,7 @@ class WalletViewModel @Inject constructor(
         combine(
             transactionDao.observeSpendByCategory(monthStart, now.dhakaNextMonthStart()),
             reference.observeCategories(),
-            transactionDao.observeDailyNet(trendFrom),
+            snapshotDao.observeTotalsFrom(trendFrom.toDhakaDayIndex()),
         ) { rows, categories, daily -> Triple(rows, categories, daily) },
     ) { netWorth, spend, received, accounts, (rows, categories, daily) ->
         val names = categories.associateBy { it.id }
@@ -56,7 +59,7 @@ class WalletViewModel @Inject constructor(
                     share = row.totalMinor.toFloat() / total,
                 )
             },
-            netWorthTrend = netWorthTrend(netWorth.minor, daily.map { it.netMinor }),
+            netWorthTrend = daily.map { it.totalMinor },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -68,24 +71,4 @@ class WalletViewModel @Inject constructor(
         const val TREND_DAYS = 90L
         const val DAY_MILLIS = 86_400_000L
     }
-}
-
-/**
- * Walks the daily movements backwards from today's known net worth to give a value
- * for the end of each day, oldest first.
- *
- * ponytail: derived, not stored. No snapshot table, so the *shape* is exact but
- * historic absolute values drift by whatever the ledger cannot explain -- deleted
- * messages, mostly. Add snapshots if the absolute past ever needs to be trusted
- * rather than glanced at.
- */
-internal fun netWorthTrend(netWorthMinor: Long, dailyNet: List<Long>): List<Long> {
-    if (dailyNet.size < 2) return emptyList()
-    val series = ArrayList<Long>(dailyNet.size)
-    var running = netWorthMinor
-    for (delta in dailyNet.asReversed()) {
-        series += running
-        running -= delta
-    }
-    return series.asReversed()
 }

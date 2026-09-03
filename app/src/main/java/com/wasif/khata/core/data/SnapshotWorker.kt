@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -41,12 +43,28 @@ class SnapshotScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     /**
-     * KEEP, so relaunching does not reschedule and shift the run time. The first run
-     * is also the backfill: on a fresh upgrade it fills years, and after that it finds
-     * nothing missing.
+     * Runs now, and every night after.
+     *
+     * The immediate run is not redundant with the periodic one: the periodic request's
+     * initial delay runs to 00:05, so on the launch right after an upgrade the chart
+     * would sit empty until midnight -- the exact regression the backfill exists to
+     * prevent. It also means the chart catches up when the app is opened, rather than
+     * only at midnight. The routine writes only missing days, so a run with nothing to
+     * do costs a query and returns.
+     *
+     * Both are KEEP: relaunching must not reschedule the nightly run and shift its
+     * time, nor stack fills behind one already pending.
      */
     fun scheduleNightly() {
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        val workManager = WorkManager.getInstance(context)
+
+        workManager.enqueueUniqueWork(
+            FILL_NOW,
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<SnapshotWorker>().build(),
+        )
+
+        workManager.enqueueUniquePeriodicWork(
             NIGHTLY,
             ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<SnapshotWorker>(Duration.ofDays(1))
@@ -69,6 +87,7 @@ class SnapshotScheduler @Inject constructor(
 
     private companion object {
         const val NIGHTLY = "net-worth-snapshot"
+        const val FILL_NOW = "net-worth-snapshot-now"
         val DHAKA: ZoneId = ZoneId.of("Asia/Dhaka")
     }
 }

@@ -25,12 +25,6 @@ data class CategoryTotalRow(
     val entries: Int,
 )
 
-/** Net movement on one Dhaka day, for rebuilding a net-worth line. */
-data class DailyNetRow(
-    val dhakaDayIndex: Long,
-    val netMinor: Long,
-)
-
 /** One row per Dhaka day that has any spending. */
 data class DayTotalRow(
     val dhakaDayIndex: Long,
@@ -241,20 +235,6 @@ interface TransactionDao {
         """,
     )
     fun observeRecentCategoryIds(accountId: Long, limit: Int): Flow<List<Long>>
-
-    // Everything, including transfers between your own accounts: they net to zero
-    // across the pair, and dropping one side would invent a cliff.
-    @Query(
-        """
-        SELECT ((occurredAt + 21600000) / 86400000) AS dhakaDayIndex,
-               SUM(CASE WHEN direction = 'CREDIT' THEN amountMinor ELSE -amountMinor END) AS netMinor
-        FROM transactions
-        WHERE deletedAt IS NULL AND occurredAt >= :fromInclusive
-        GROUP BY dhakaDayIndex
-        ORDER BY dhakaDayIndex
-        """,
-    )
-    fun observeDailyNet(fromInclusive: Long): Flow<List<DailyNetRow>>
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY occurredAt DESC, id DESC LIMIT 1")
     fun observeMostRecent(): Flow<TransactionEntity?>

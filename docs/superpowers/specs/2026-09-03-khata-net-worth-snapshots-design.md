@@ -85,6 +85,14 @@ A `PeriodicWorkRequest` every 24 hours, with an initial delay to the next 00:05 
 `Asia/Dhaka`, enqueued as unique periodic work with `KEEP` so relaunching does not
 reschedule it.
 
+**Plus a one-time run at every launch** (revised during implementation). The periodic
+request's initial delay runs to 00:05, so on the launch right after an upgrade the
+table stayed empty and the chart drew nothing until midnight — the exact regression §3
+exists to prevent, found by installing over a populated database rather than by any
+test. The immediate run also means the chart catches up when the app is opened rather
+than only overnight. It costs nothing when there is nothing to fill, which is the
+property §2 was built for.
+
 Scheduled from `KhataApplication`. This is safe where the first-launch backfill was
 not: enqueueing touches no `Context` permission check and no platform state, which is
 what made an application-scope collector wrong last time

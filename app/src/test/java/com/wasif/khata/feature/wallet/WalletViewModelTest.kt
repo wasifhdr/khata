@@ -4,6 +4,9 @@ import androidx.paging.PagingData
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.data.entity.BalanceSnapshotEntity
+import com.wasif.khata.core.time.toDhakaDayIndex
 import app.cash.turbine.test
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
@@ -124,7 +127,7 @@ class WalletViewModelTest {
         received.value = Money(85_000_00)
         netWorth.value = Money(3_14_820_00)
 
-        WalletViewModel(transactions, reference, db.transactionDao(), clock).state.test {
+        WalletViewModel(transactions, reference, db.transactionDao(), db.balanceSnapshotDao(), clock).state.test {
             advanceUntilIdle()
             val s = expectMostRecentItem()
             assertEquals(Money(47_382_50), s.monthSpend)
@@ -158,7 +161,7 @@ class WalletViewModelTest {
             account("EBL", balance = 2_98_606_00, reported = 2_98_846_00),
         )
 
-        WalletViewModel(transactions, reference, db.transactionDao(), clock).state.test {
+        WalletViewModel(transactions, reference, db.transactionDao(), db.balanceSnapshotDao(), clock).state.test {
             advanceUntilIdle()
             val s = expectMostRecentItem()
             assertTrue(s.accounts.single { it.name == "EBL" }.hasBalanceDrift)
@@ -173,10 +176,62 @@ class WalletViewModelTest {
         // balance is not a discrepancy.
         accounts.value = listOf(account("Cash", balance = 8_000_00, reported = null))
 
-        WalletViewModel(transactions, reference, db.transactionDao(), clock).state.test {
+        WalletViewModel(transactions, reference, db.transactionDao(), db.balanceSnapshotDao(), clock).state.test {
             advanceUntilIdle()
             assertTrue(!expectMostRecentItem().accounts.single().hasBalanceDrift)
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `the chart is the stored totals, oldest first, and only what counts as net worth`() =
+        runTest(dispatcher) {
+            val counted = insertAccount("acc-counted", includeInNetWorth = true)
+            val excluded = insertAccount("acc-excluded", includeInNetWorth = false)
+            // Inside the 90-day window the ViewModel asks for, relative to its clock.
+            val day = clock.now().toDhakaDayIndex() - 2
+
+            db.balanceSnapshotDao().insertAll(
+                listOf(
+                    snapshot(counted, day, 1_000),
+                    snapshot(counted, day + 1, 1_500),
+                    // Excluded from net worth, so it must not move the line.
+                    snapshot(excluded, day, 9_999_999),
+                ),
+            )
+
+            WalletViewModel(
+                transactions, reference, db.transactionDao(), db.balanceSnapshotDao(), clock,
+            ).state.test {
+                advanceUntilIdle()
+                assertEquals(listOf(1_000L, 1_500L), expectMostRecentItem().netWorthTrend)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    private suspend fun insertAccount(uuid: String, includeInNetWorth: Boolean): Long =
+        db.accountDao().upsert(
+            AccountEntity(
+                uuid = uuid,
+                name = uuid,
+                type = AccountType.CASH,
+                openingBalanceMinor = 0,
+                currentBalanceMinor = 0,
+                reportedBalanceMinor = null,
+                reportedBalanceAt = null,
+                includeInNetWorth = includeInNetWorth,
+                smsIdentifiers = "",
+                createdAt = 1000,
+                updatedAt = 1000,
+            ),
+        )
+
+    private fun snapshot(accountId: Long, dayIndex: Long, minor: Long) = BalanceSnapshotEntity(
+        uuid = "snap-$accountId-$dayIndex",
+        accountId = accountId,
+        dayIndex = dayIndex,
+        balanceMinor = minor,
+        createdAt = 1,
+        updatedAt = 1,
+    )
 }

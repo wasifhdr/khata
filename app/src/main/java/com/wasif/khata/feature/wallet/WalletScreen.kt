@@ -175,7 +175,8 @@ private fun WalletLinks(onOpenOwed: () -> Unit, onOpenLedger: () -> Unit) {
  *
  * Says four things a bare line does not: how much it moved and in which direction,
  * the high and the low it moved between, and where the window starts. Values are
- * end-of-day, walked back from today's figure -- see [netWorthTrend].
+ * end-of-day balances read from balance_snapshots -- what was written down each
+ * night, not what today's figure implies about the past.
  */
 @Composable
 private fun NetWorthChart(points: List<Long>, haze: HazeState) {
