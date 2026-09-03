@@ -3,6 +3,7 @@ package com.wasif.khata
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.wasif.khata.core.data.SnapshotScheduler
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.feature.widget.CashWidgetProvider
@@ -24,6 +25,8 @@ class KhataApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var preferences: PreferencesRepository
 
+    @Inject lateinit var snapshots: SnapshotScheduler
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -42,5 +45,10 @@ class KhataApplication : Application(), Configuration.Provider {
                 .distinctUntilChanged()
                 .collect { CashWidgetProvider.refresh(this@KhataApplication, it) }
         }
+
+        // Enqueueing touches no permission check and no platform state, so unlike the
+        // first-launch SMS backfill this is safe to do from the Application. The first
+        // run doubles as the backfill over existing history.
+        snapshots.scheduleNightly()
     }
 }
