@@ -3,11 +3,15 @@ package com.wasif.khata.core.backup
 import android.content.Context
 import android.util.Base64
 import androidx.hilt.work.HiltWorker
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.wasif.khata.core.drive.DriveUploader
+import com.wasif.khata.core.drive.UploadOutcome
 import com.wasif.khata.core.prefs.PreferencesRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -26,6 +30,7 @@ class BackupWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val repository: BackupRepository,
     private val preferences: PreferencesRepository,
+    private val uploader: DriveUploader,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -34,18 +39,22 @@ class BackupWorker @AssistedInject constructor(
         val key = prefs.backupKey ?: return Result.success()
         val salt = prefs.backupSalt ?: return Result.success()
 
-        return runCatching {
+        val file = runCatching {
             repository.backUp(
                 Base64.decode(key, Base64.NO_WRAP),
                 Base64.decode(salt, Base64.NO_WRAP),
             )
+            // Retry: tonight's copy is worth having, and a failed write leaves the
+            // previous seven untouched.
+        }.getOrElse { return Result.retry() } ?: return Result.success()
+
+        // The local copy is already on disk and stays there whatever happens next. A
+        // retry re-runs a backup that already succeeded, which is cheap; the
+        // alternative is a night with no offsite copy.
+        return when (uploader.upload(file)) {
+            UploadOutcome.UPLOADED, UploadOutcome.SKIPPED -> Result.success()
+            UploadOutcome.FAILED -> Result.retry()
         }
-            .fold(
-                onSuccess = { Result.success() },
-                // Retry: tonight's copy is worth having, and a failed write leaves the
-                // previous seven untouched.
-                onFailure = { Result.retry() },
-            )
     }
 }
 
@@ -60,6 +69,14 @@ class BackupScheduler @Inject constructor(
             ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<BackupWorker>(Duration.ofDays(1))
                 .setInitialDelay(untilNextRun())
+                // The local write does not need a network, but the upload that
+                // follows it does, and deferring the pair is cheaper than running
+                // the backup twice.
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build(),
+                )
                 .build(),
         )
     }
