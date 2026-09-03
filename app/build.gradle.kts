@@ -105,6 +105,13 @@ dependencies {
   ksp(libs.hilt.compiler)
   implementation(libs.androidx.hilt.navigation.compose)
 
+  implementation(libs.androidx.work.runtime)
+  implementation(libs.androidx.hilt.work)
+  // A separate processor from Dagger's hilt-android-compiler above; @HiltWorker
+  // needs this one and neither replaces the other.
+  ksp(libs.androidx.hilt.compiler)
+  testImplementation(libs.androidx.work.testing)
+
   implementation(libs.androidx.paging.runtime)
   implementation(libs.androidx.paging.compose)
 
