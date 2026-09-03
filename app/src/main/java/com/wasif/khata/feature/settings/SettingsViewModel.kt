@@ -142,10 +142,6 @@ class SettingsViewModel @Inject constructor(
      */
     fun onHomeViewSelected(view: HomeView) = viewModelScope.launch { repository.setHomeView(view) }
 
-    fun onMonthlyBudgetChanged(minor: Long?) = viewModelScope.launch {
-        repository.setMonthlyBudget(minor)
-    }
-
     // Reads the store rather than state.value. `state` is WhileSubscribed, so
     // with no collector it never leaves its initial value -- and a save made
     // before the first collection would then overwrite the stored theme with

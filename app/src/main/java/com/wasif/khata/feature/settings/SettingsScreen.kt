@@ -86,7 +86,6 @@ fun SettingsScreen(
         onOpenUnmatched = onOpenUnmatched,
         onOpenReconcile = onOpenReconcile,
         onHomeViewSelected = viewModel::onHomeViewSelected,
-        onMonthlyBudgetChanged = viewModel::onMonthlyBudgetChanged,
         onFieldSelected = viewModel::onFieldSelected,
         onGroundSelected = viewModel::onGroundSelected,
         onAccentSelected = viewModel::onAccentSelected,
@@ -107,7 +106,6 @@ fun SettingsContent(
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
     onHomeViewSelected: (HomeView) -> Unit,
-    onMonthlyBudgetChanged: (Long?) -> Unit,
     onFieldSelected: (FieldPalette) -> Unit,
     onGroundSelected: (Color) -> Unit,
     onAccentSelected: (Color) -> Unit,
@@ -174,12 +172,6 @@ fun SettingsContent(
                     ),
                 )
 
-                SectionLabel("Monthly budget")
-                MonthlyBudgetField(
-                    current = prefs.monthlyBudgetMinor,
-                    onChange = onMonthlyBudgetChanged,
-                )
-
                 SectionLabel("Field")
                 SwatchGrid(
                     swatches = KhataPalette.fields.map { it.name to it.keyStop },
@@ -244,45 +236,6 @@ fun SettingsContent(
     }
 }
 
-@Composable
-private fun MonthlyBudgetField(current: Long?, onChange: (Long?) -> Unit) {
-    val spacing = LocalSpacing.current
-    // Keyed on the stored value so an external change re-seeds the field, but
-    // held locally so a half-typed number is not fighting the store on every
-    // keystroke.
-    var text by rememberSaveable(current) {
-        mutableStateOf(current?.let { (it / 100).toString() } ?: "")
-    }
-
-    OutlinedTextField(
-        value = text,
-        onValueChange = { input ->
-            val digits = input.filter { it.isDigit() }.take(9)
-            text = digits
-            // Empty means unset, not zero -- the ring keys off the difference.
-            onChange(if (digits.isEmpty()) null else digits.toLong() * 100)
-        },
-        label = { Text("Taka per month") },
-        supportingText = {
-            Text(
-                if (text.isEmpty()) {
-                    "No budget — the ring is hidden"
-                } else {
-                    "Shown as a ring on the wallet card"
-                },
-            )
-        },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-    )
-}
-
-/**
- * SMS capture, the two repair runs, and the two screens that show what needs a
- * person. Sits first because it is the only section that can be *wrong* -- the
- * theme below it is only ever a preference.
- */
 @Composable
 private fun MessagesSection(
     state: IngestionState,

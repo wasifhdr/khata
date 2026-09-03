@@ -5,6 +5,8 @@ import com.wasif.khata.core.data.repository.ReferenceDataRepositoryImpl
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
+import com.wasif.khata.core.data.repository.BudgetRepository
+import com.wasif.khata.core.data.repository.MonthLimits
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.StartBackfill
 import com.wasif.khata.feature.widget.RecentCategoryIds
@@ -36,5 +38,9 @@ abstract class RepositoryModule {
 
         @Provides
         fun provideStartBackfill(scheduler: IngestionScheduler) = StartBackfill { scheduler.backfill() }
+
+        @Provides
+        fun provideMonthLimits(budgets: BudgetRepository) =
+            MonthLimits { monthStart -> budgets.observeLimitsForMonth(monthStart) }
     }
 }

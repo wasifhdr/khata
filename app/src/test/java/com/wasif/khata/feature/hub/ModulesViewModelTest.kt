@@ -2,14 +2,11 @@ package com.wasif.khata.feature.hub
 
 import androidx.paging.PagingData
 import app.cash.turbine.test
+import com.wasif.khata.core.data.repository.MonthLimits
 import com.wasif.khata.core.model.Money
-import com.wasif.khata.core.prefs.HomeView
-import com.wasif.khata.core.prefs.KhataPreferences
-import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.dhakaMonthStart
 import com.wasif.khata.core.time.dhakaNextMonthStart
-import com.wasif.khata.core.ui.theme.ThemeSpec
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
@@ -34,7 +31,6 @@ class ModulesViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private val spend = MutableStateFlow(Money.ZERO)
-    private val prefs = MutableStateFlow(KhataPreferences.Default)
     private var requestedSpendWindow: Pair<Long, Long>? = null
 
     private val clock = object : KhataClock {
@@ -65,15 +61,9 @@ class ModulesViewModelTest {
         override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
     }
 
-    private val preferences = object : PreferencesRepository {
-        override val preferences: Flow<KhataPreferences> = prefs
-        override suspend fun setTheme(spec: ThemeSpec) = Unit
-        override suspend fun resetTheme() = Unit
-        override suspend fun setHomeView(view: HomeView) = Unit
-        override suspend fun setMonthlyBudget(minor: Long?) = Unit
-        override suspend fun setSmsPermissionRequested() = Unit
-        override suspend fun setBackfilled() = Unit
-    }
+    /** What each category is allowed this month; the ring shows their sum. */
+    private val limits = MutableStateFlow<Map<Long, Long>>(emptyMap())
+    private val monthLimits = MonthLimits { limits }
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -85,7 +75,7 @@ class ModulesViewModelTest {
     fun `month spend comes from the Dhaka month window`() = runTest(dispatcher) {
         spend.value = Money(47_382_50)
 
-        val vm = ModulesViewModel(transactions, preferences, clock)
+        val vm = ModulesViewModel(transactions, monthLimits, clock)
 
         vm.state.test {
             // stateIn emits its initialValue before the upstream combine has run
@@ -116,7 +106,7 @@ class ModulesViewModelTest {
         // user never entered. Absent is the honest state.
         spend.value = Money(47_382_50)
 
-        ModulesViewModel(transactions, preferences, clock).state.test {
+        ModulesViewModel(transactions, monthLimits, clock).state.test {
             advanceUntilIdle()
             assertNull(expectMostRecentItem().budgetFraction)
             cancelAndIgnoreRemainingEvents()
@@ -126,9 +116,9 @@ class ModulesViewModelTest {
     @Test
     fun `the budget fraction is spend over budget, clamped at one`() = runTest(dispatcher) {
         spend.value = Money(75_000_00)
-        prefs.value = KhataPreferences.Default.copy(monthlyBudgetMinor = 50_000_00)
+        limits.value = mapOf(1L to 30_000_00L, 2L to 20_000_00L)
 
-        ModulesViewModel(transactions, preferences, clock).state.test {
+        ModulesViewModel(transactions, monthLimits, clock).state.test {
             // Overspending is real and must show as a full ring, never as 150%
             // of a circle.
             advanceUntilIdle()
@@ -140,9 +130,9 @@ class ModulesViewModelTest {
     @Test
     fun `a zero budget does not divide by zero`() = runTest(dispatcher) {
         spend.value = Money(1_000_00)
-        prefs.value = KhataPreferences.Default.copy(monthlyBudgetMinor = 0)
+        limits.value = mapOf(1L to 0L)
 
-        ModulesViewModel(transactions, preferences, clock).state.test {
+        ModulesViewModel(transactions, monthLimits, clock).state.test {
             advanceUntilIdle()
             assertEquals(1f, expectMostRecentItem().budgetFraction)
             cancelAndIgnoreRemainingEvents()

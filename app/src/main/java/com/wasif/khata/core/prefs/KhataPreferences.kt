@@ -8,7 +8,12 @@ enum class HomeView { Modules, Wallet }
 data class KhataPreferences(
     val themeSpec: ThemeSpec,
     val homeView: HomeView,
-    /** Null means no budget set, which is a different answer from a budget of zero. */
+    /**
+     * Retired as a user-facing setting; budgets are per category now. It survives only
+     * so BudgetCarryOver can find a value set before the change and move it into a
+     * row. Nothing else reads it, and nothing writes it but that carry-over clearing
+     * itself.
+     */
     val monthlyBudgetMinor: Long?,
     /**
      * Separates "never asked" from "asked and refused". Android's

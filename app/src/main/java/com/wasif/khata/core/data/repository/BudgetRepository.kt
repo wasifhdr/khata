@@ -11,6 +11,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 /**
+ * The month's limits, as a function type. The hub only needs their sum, and standing
+ * up a database to test a ring fraction is heavier than the thing being tested --
+ * the same reason RecentCategoryIds and StartBackfill exist.
+ */
+fun interface MonthLimits {
+    operator fun invoke(monthStart: Long): Flow<Map<Long, Long>>
+}
+
+/**
  * Which limit applied to a month, and how a change is recorded.
  *
  * One place, because the rule is easy to get quietly wrong: a reader that decided for

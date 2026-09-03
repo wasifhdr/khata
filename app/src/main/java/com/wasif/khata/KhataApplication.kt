@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.wasif.khata.core.data.SnapshotScheduler
+import com.wasif.khata.core.data.repository.BudgetCarryOver
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.feature.widget.CashWidgetProvider
@@ -27,6 +28,8 @@ class KhataApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var snapshots: SnapshotScheduler
 
+    @Inject lateinit var budgetCarryOver: BudgetCarryOver
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -35,6 +38,10 @@ class KhataApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         applicationScope.launch { seeder.seedIfEmpty() }
+
+        // Moves a pre-existing global budget into a category row so nothing the user
+        // set is silently dropped by the change to per-category limits.
+        applicationScope.launch { budgetCarryOver.runIfNeeded() }
 
         // The widget is RemoteViews, so it does not observe DataStore the way
         // Glance would. The theme can only be changed from Settings, which means
