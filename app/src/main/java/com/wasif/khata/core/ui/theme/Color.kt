@@ -61,6 +61,15 @@ object KhataPalette {
     val moneyOut: Color = alert
     val moneyIn: Color = Color(0xFF6BD99A)
 
+    /**
+     * A setting is in place, or it is not. Same two hues as money, named separately
+     * because the meaning is unrelated -- a green tick here says "stored", not
+     * "credit". Both are paired with a distinct glyph, so the colour reinforces and
+     * never carries the meaning on its own.
+     */
+    val ok: Color = moneyIn
+    val absent: Color = alert
+
     /** Petrol. The gradient the active module card is filled with. */
     val heroStops: List<Color> = listOf(
         Color(0xFF12403F),

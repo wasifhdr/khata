@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
@@ -79,6 +80,26 @@ import com.wasif.khata.core.ui.theme.isLightColor
 import dev.chrisbanes.haze.hazeSource
 import kotlin.system.exitProcess
 import kotlinx.coroutines.launch
+
+/**
+ * A tick or a cross, then the explanation. Replaces the words "Set" and "Not set":
+ * the state is the first thing you look for and a glyph finds it faster than a
+ * sentence does. The glyph carries the meaning on its own -- DESIGN.md 1.3 -- so the
+ * colour is only reinforcement.
+ */
+@Composable
+private fun StatusSupport(isSet: Boolean, text: String) {
+    val spacing = LocalSpacing.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = if (isSet) Icons.Filled.Check else Icons.Filled.Close,
+            contentDescription = if (isSet) "Set" else "Not set",
+            tint = if (isSet) KhataPalette.ok else KhataPalette.absent,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(text, Modifier.padding(start = spacing.xs))
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -151,19 +172,6 @@ fun SettingsContent(
                     .windowInsetsPadding(WindowInsets.navigationBars),
             ) {
 
-                SectionLabel("AI fallback")
-                GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
-
-                BackupSection(prefs = prefs, viewModel = viewModel)
-
-                SectionLabel("Categories")
-                ActionRow(
-                    title = "Manage categories",
-                    subtitle = "Add, rename or retire. Past transactions keep whatever " +
-                        "they were filed under.",
-                    onClick = onOpenCategories,
-                )
-
                 MessagesSection(
                     state = ingestion,
                     onPermissionRequested = onPermissionRequested,
@@ -173,6 +181,20 @@ fun SettingsContent(
                     onOpenUnmatched = onOpenUnmatched,
                     onOpenReconcile = onOpenReconcile,
                 )
+
+                SectionLabel("Categories")
+                ActionRow(
+                    title = "Manage categories",
+                    subtitle = "Add, rename or retire. Past transactions keep whatever " +
+                        "they were filed under.",
+                    onClick = onOpenCategories,
+                )
+
+                BackupSection(prefs = prefs, viewModel = viewModel)
+
+                SectionLabel("AI fallback")
+                GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
+
 
                 SectionLabel("Home view")
                 Row(
@@ -550,11 +572,12 @@ private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         supportingText = {
-            Text(
-                if (current == null) {
-                    "Not set. A message no rule matches stays in the review list."
+            StatusSupport(
+                isSet = current != null,
+                text = if (current == null) {
+                    "A message no rule matches stays in the review list."
                 } else {
-                    "Set. A message no rule matches is sent to Gemini to draft a rule."
+                    "A message no rule matches is sent to Gemini to draft a rule."
                 },
             )
         },
@@ -603,14 +626,15 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         supportingText = {
-            Text(
-                if (prefs.backupKey == null) {
-                    "Not set. No backups are being taken."
+            StatusSupport(
+                isSet = prefs.backupKey != null,
+                // One line, and still the thing that matters: there is no recovery
+                // path and there cannot be one, which is what makes the file safe to
+                // put anywhere.
+                text = if (prefs.backupKey == null) {
+                    "No backups are being taken."
                 } else {
-                    // Kept to one line, but it still has to say the thing that matters:
-                    // there is no recovery path and there cannot be one, which is what
-                    // makes the file safe to put anywhere.
-                    "Set. Lose it and every backup is unreadable."
+                    "Keep it somewhere safe, don't lose it."
                 },
             )
         },
