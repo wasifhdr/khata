@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
  * `deepenAccent()` had no test of its own -- its fitted 1.45/0.90 constants
@@ -12,6 +14,7 @@ import org.junit.Test
  * failed nothing. These assert the derived colour, not just that the
  * function ran.
  */
+@RunWith(RobolectricTestRunner::class)
 class DeepenAccentTest {
 
     // Reproducing the shipped pair to the exact byte would tie this test to

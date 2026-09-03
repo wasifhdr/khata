@@ -7,32 +7,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.wasif.khata.core.model.RuleKind
@@ -346,54 +337,25 @@ private fun Saved(summary: String, onDone: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = spacing.xs),
         )
-        Box(
-            Modifier
-                .padding(top = spacing.md)
-                .fillMaxWidth()
-                .height(spacing.minTouchTarget)
-                .clip(MaterialTheme.shapes.small)
-                .background(MaterialTheme.colorScheme.secondaryContainer)
-                .clickable(onClick = onDone),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "Done",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
+        Pill(
+            text = "Done",
+            selected = true,
+            modifier = Modifier.padding(top = spacing.md).fillMaxWidth(),
+            onClick = onDone,
+        )
     }
 }
 
 @Composable
 private fun SaveButton(enabled: Boolean, label: String, onSave: () -> Unit) {
     val spacing = LocalSpacing.current
-    Box(
-        Modifier
+    Pill(
+        text = label,
+        selected = true,
+        enabled = enabled,
+        modifier = Modifier
             .padding(horizontal = spacing.screenHorizontal, vertical = spacing.md)
-            .fillMaxWidth()
-            .height(spacing.minTouchTarget)
-            .clip(MaterialTheme.shapes.small)
-            .background(
-                if (enabled) {
-                    MaterialTheme.colorScheme.secondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainer
-                },
-            )
-            .clickable(enabled = enabled, onClick = onSave),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            // outline is borders and disabled controls only, never live text, so a
-            // disabled label stays on a text tier.
-            color = if (enabled) {
-                MaterialTheme.colorScheme.onSecondaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-    }
+            .fillMaxWidth(),
+        onClick = onSave,
+    )
 }

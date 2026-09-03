@@ -23,17 +23,4 @@ data class Transaction(
     val confidence: Confidence,
     val transferGroupId: String?,
     val updatedAt: Long,
-) {
-    val signedAmount: Money
-        get() = if (direction == TransactionDirection.DEBIT) -amount else amount
-
-    val isTransfer: Boolean get() = transferGroupId != null
-
-    /** True when this row moved money without anything being bought or earned. */
-    val isSettlement: Boolean
-        get() = isTransfer || if (direction == TransactionDirection.DEBIT) {
-            !kind.countsAsSpending
-        } else {
-            !kind.countsAsIncome
-        }
-}
+)

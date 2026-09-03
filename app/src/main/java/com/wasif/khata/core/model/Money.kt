@@ -30,11 +30,6 @@ value class Money(val minor: Long) : Comparable<Money> {
 
         val ZERO = Money(0)
 
-        // Overflow throws here but returns null in parse(): a bad argument is a
-        // programming error worth failing fast on, a bad string is untrusted input.
-        fun ofTaka(taka: Long, paisa: Int = 0) =
-            Money(Math.addExact(Math.multiplyExact(taka, 100L), paisa.toLong()))
-
         fun parse(input: String): Money? {
             val cleaned = input.replace(SYMBOL, "")
                 .replace("Tk", "", ignoreCase = true)

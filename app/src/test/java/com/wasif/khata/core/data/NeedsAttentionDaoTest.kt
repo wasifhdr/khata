@@ -11,6 +11,7 @@ import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -86,7 +87,7 @@ class NeedsAttentionDaoTest {
         insert("medium", Confidence.MEDIUM)
         insert("low", Confidence.LOW)
 
-        assertEquals(2, db.transactionDao().countNeedsAttention())
+        assertEquals(2, db.transactionDao().observeNeedsAttentionCount().first())
     }
 
     @Test
@@ -94,6 +95,6 @@ class NeedsAttentionDaoTest {
         val id = insert("medium", Confidence.MEDIUM)
         db.transactionDao().softDelete(id, deletedAt = 5000)
 
-        assertEquals(0, db.transactionDao().countNeedsAttention())
+        assertEquals(0, db.transactionDao().observeNeedsAttentionCount().first())
     }
 }

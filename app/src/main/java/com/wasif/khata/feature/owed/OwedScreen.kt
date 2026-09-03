@@ -10,22 +10,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -34,6 +28,7 @@ import com.wasif.khata.core.time.DHAKA
 import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.SectionLabel
 import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.LocalSpacing
@@ -80,19 +75,19 @@ fun OwedContent(
             ) {
 
                 if (state.owesYou.isNotEmpty()) {
-                    SectionTitle("Owes you")
+                    SectionLabel("Owes you")
                     state.owesYou.forEach { PersonRow(it) }
                 }
 
                 if (state.youOwe.isNotEmpty()) {
-                    SectionTitle("You owe")
+                    SectionLabel("You owe")
                     state.youOwe.forEach { PersonRow(it) }
                 }
 
                 // Naming is what turns a pile of loans into a ledger, so the ones
                 // still missing a name are listed rather than quietly netted away.
                 if (state.unnamed.isNotEmpty()) {
-                    SectionTitle("Not named yet")
+                    SectionLabel("Not named yet")
                     Text(
                         text = "Tap one to say who it was with.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -131,22 +126,6 @@ fun OwedContent(
             )
         }
     }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    val spacing = LocalSpacing.current
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
-            start = spacing.screenHorizontal,
-            end = spacing.screenHorizontal,
-            top = spacing.lg,
-            bottom = spacing.sm,
-        ),
-    )
 }
 
 @Composable

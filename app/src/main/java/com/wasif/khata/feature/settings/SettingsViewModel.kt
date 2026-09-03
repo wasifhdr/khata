@@ -22,6 +22,7 @@ import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.ThemeSpec
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -88,22 +89,7 @@ class SettingsViewModel @Inject constructor(
      * Reading a multi-year inbox is thousands of messages, so progress is
      * collected rather than awaited -- a silent block reads as a hang.
      */
-    fun onBackfill() {
-        if (_backfill.value?.isComplete == false) return
-        _backfill.value = null
-        _lastRun.value = null
-        viewModelScope.launch {
-            runCatching {
-                backfill.run().collect { _backfill.value = it }
-            }.fold(
-                onSuccess = { _lastRun.value = _backfill.value?.summary?.inWords() },
-                onFailure = {
-                    _backfill.value = null
-                    _lastRun.value = "Could not read messages. Please try again."
-                },
-            )
-        }
-    }
+    fun onBackfill() = runPass(backfill.run(), "Could not read messages. Please try again.")
 
     /**
      * Six years of ATM withdrawals with no cash spending entered against them leave
@@ -120,18 +106,21 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onReparse() {
+    fun onReparse() = runPass(reparse.run(), "Could not re-read messages. Please try again.")
+
+    /** One whole-inbox pass, reported as progress then as a summary. */
+    private fun runPass(pass: Flow<IngestProgress>, failure: String) {
         if (_backfill.value?.isComplete == false) return
         _backfill.value = null
         _lastRun.value = null
         viewModelScope.launch {
             runCatching {
-                reparse.run().collect { _backfill.value = it }
+                pass.collect { _backfill.value = it }
             }.fold(
                 onSuccess = { _lastRun.value = _backfill.value?.summary?.inWords() },
                 onFailure = {
                     _backfill.value = null
-                    _lastRun.value = "Could not re-read messages. Please try again."
+                    _lastRun.value = failure
                 },
             )
         }

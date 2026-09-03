@@ -19,9 +19,6 @@ data class Motion(
     val enter: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f),
     val exit: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f),
 ) {
-    /** True when the user has asked for no motion, so callers can skip work rather than animate to nowhere. */
-    val isInstant: Boolean get() = standard == 0
-
     companion object {
         /**
          * "Remove animations" in Accessibility settings reports itself as an

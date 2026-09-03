@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -57,6 +56,8 @@ import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.Pill
+import com.wasif.khata.core.ui.component.SectionLabel
 import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.collapseFraction
@@ -143,38 +144,17 @@ fun SettingsContent(
                     onOpenReconcile = onOpenReconcile,
                 )
 
-                Section("Home view")
+                SectionLabel("Home view")
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
                     HomeView.entries.forEach { view ->
-                        val selected = prefs.homeView == view
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .height(spacing.minTouchTarget)
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.secondaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainer
-                                    },
-                                )
-                                .clickable { onHomeViewSelected(view) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = view.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
+                        Pill(
+                            text = view.name,
+                            selected = prefs.homeView == view,
+                            modifier = Modifier.weight(1f),
+                        ) { onHomeViewSelected(view) }
                     }
                 }
                 // I6: KhataNavHost freezes its start destination for the process
@@ -194,65 +174,44 @@ fun SettingsContent(
                     ),
                 )
 
-                Section("Monthly budget")
+                SectionLabel("Monthly budget")
                 MonthlyBudgetField(
                     current = prefs.monthlyBudgetMinor,
                     onChange = onMonthlyBudgetChanged,
                 )
 
-                Section("Field")
+                SectionLabel("Field")
                 SwatchGrid(
                     swatches = KhataPalette.fields.map { it.name to it.keyStop },
                     selectedIndex = KhataPalette.fields.indexOf(prefs.themeSpec.field),
                     onSelect = { onFieldSelected(KhataPalette.fields[it]) },
                 )
 
-                Section("Ground")
+                SectionLabel("Ground")
                 SwatchGrid(
                     swatches = KhataPalette.grounds.map { it.name to it.color },
                     selectedIndex = KhataPalette.grounds.indexOfFirst { it.color == prefs.themeSpec.ground },
                     onSelect = { onGroundSelected(KhataPalette.grounds[it].color) },
                 )
 
-                Section("Accent")
+                SectionLabel("Accent")
                 SwatchGrid(
                     swatches = KhataPalette.accents.map { it.name to it.color },
                     selectedIndex = KhataPalette.accents.indexOfFirst { it.color == prefs.themeSpec.accent },
                     onSelect = { onAccentSelected(KhataPalette.accents[it].color) },
                 )
 
-                Section("Field intensity")
+                SectionLabel("Field intensity")
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
                     FieldIntensity.entries.forEach { level ->
-                        val selected = prefs.themeSpec.intensity == level
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .height(spacing.minTouchTarget)
-                                .clip(MaterialTheme.shapes.small)
-                                .background(
-                                    if (selected) {
-                                        MaterialTheme.colorScheme.secondaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainer
-                                    },
-                                )
-                                .clickable { onIntensitySelected(level) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = level.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        }
+                        Pill(
+                            text = level.name,
+                            selected = prefs.themeSpec.intensity == level,
+                            modifier = Modifier.weight(1f),
+                        ) { onIntensitySelected(level) }
                     }
                 }
 
@@ -340,7 +299,7 @@ private fun MessagesSection(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { onPermissionRequested() }
 
-    Section("Messages")
+    SectionLabel("Messages")
 
     // Permission is described by what it does, not by its enum name.
     ActionRow(
@@ -481,22 +440,6 @@ private fun ActionRow(
             )
         }
     }
-}
-
-@Composable
-private fun Section(title: String) {
-    val spacing = LocalSpacing.current
-    Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
-            start = spacing.screenHorizontal,
-            end = spacing.screenHorizontal,
-            top = spacing.lg,
-            bottom = spacing.sm,
-        ),
-    )
 }
 
 /**

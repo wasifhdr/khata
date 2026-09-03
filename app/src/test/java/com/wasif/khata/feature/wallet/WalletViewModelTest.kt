@@ -1,6 +1,9 @@
 package com.wasif.khata.feature.wallet
 
 import androidx.paging.PagingData
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.wasif.khata.core.data.KhataDatabase
 import app.cash.turbine.test
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
@@ -16,6 +19,7 @@ import com.wasif.khata.domain.repository.TransactionRepository
 import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -29,10 +33,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+// Robolectric only for a real TransactionDao: the insight queries are the
+// ViewModel's own, and a hand-written fake of that interface would be twenty
+// methods of nothing.
+@RunWith(RobolectricTestRunner::class)
 class WalletViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
+    private lateinit var db: KhataDatabase
     private val netWorth = MutableStateFlow(Money.ZERO)
     private val accounts = MutableStateFlow(emptyList<Account>())
     private val spend = MutableStateFlow(Money.ZERO)
@@ -45,13 +56,12 @@ class WalletViewModelTest {
     }
 
     private val transactions = object : TransactionRepository {
-        override fun pagedTransactions(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactionsBetween(
             fromInclusive: Long,
             toExclusive: Long,
         ): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
-            pagedTransactions()
+            flowOf(PagingData.empty())
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
@@ -88,7 +98,25 @@ class WalletViewModelTest {
     )
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
-    @After fun tearDown() = Dispatchers.resetMain()
+    @Before
+    fun openDatabase() {
+        db = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            KhataDatabase::class.java,
+        )
+            // Room otherwise delivers Flow results on its own executor, which
+            // advanceUntilIdle() cannot drive -- the combine never emits.
+            .setQueryExecutor(dispatcher.asExecutor())
+            .setTransactionExecutor(dispatcher.asExecutor())
+            .allowMainThreadQueries()
+            .build()
+    }
+
+    @After
+    fun tearDown() {
+        db.close()
+        Dispatchers.resetMain()
+    }
 
     @Test
     fun `the month figures come from the Dhaka month window`() = runTest(dispatcher) {
@@ -96,7 +124,7 @@ class WalletViewModelTest {
         received.value = Money(85_000_00)
         netWorth.value = Money(3_14_820_00)
 
-        WalletViewModel(transactions, reference, clock).state.test {
+        WalletViewModel(transactions, reference, db.transactionDao(), clock).state.test {
             advanceUntilIdle()
             val s = expectMostRecentItem()
             assertEquals(Money(47_382_50), s.monthSpend)
@@ -130,7 +158,7 @@ class WalletViewModelTest {
             account("EBL", balance = 2_98_606_00, reported = 2_98_846_00),
         )
 
-        WalletViewModel(transactions, reference, clock).state.test {
+        WalletViewModel(transactions, reference, db.transactionDao(), clock).state.test {
             advanceUntilIdle()
             val s = expectMostRecentItem()
             assertTrue(s.accounts.single { it.name == "EBL" }.hasBalanceDrift)
@@ -145,7 +173,7 @@ class WalletViewModelTest {
         // balance is not a discrepancy.
         accounts.value = listOf(account("Cash", balance = 8_000_00, reported = null))
 
-        WalletViewModel(transactions, reference, clock).state.test {
+        WalletViewModel(transactions, reference, db.transactionDao(), clock).state.test {
             advanceUntilIdle()
             assertTrue(!expectMostRecentItem().accounts.single().hasBalanceDrift)
             cancelAndIgnoreRemainingEvents()

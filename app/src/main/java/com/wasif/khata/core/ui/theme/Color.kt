@@ -1,8 +1,10 @@
 package com.wasif.khata.core.ui.theme
 
+import android.graphics.Color as AndroidColor
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import kotlin.math.pow
 
 /** One palette option for the mesh field behind the glass. */
@@ -217,56 +219,21 @@ private fun relativeLuminance(color: Color): Double {
  */
 fun isLightColor(color: Color): Boolean = relativeLuminance(color) > 0.5
 
-private fun rgbToHsv(r: Float, g: Float, b: Float): Triple<Float, Float, Float> {
-    val max = maxOf(r, g, b)
-    val min = minOf(r, g, b)
-    val delta = max - min
-    val v = max
-    val s = if (max == 0f) 0f else delta / max
-    var h = 0f
-    if (delta != 0f) {
-        h = when (max) {
-            r -> ((g - b) / delta).mod(6f)
-            g -> (b - r) / delta + 2f
-            else -> (r - g) / delta + 4f
-        }
-        h *= 60f
-    }
-    return Triple(h, s, v)
-}
-
-private fun hsvToRgb(h: Float, s: Float, v: Float): Triple<Float, Float, Float> {
-    val c = v * s
-    val x = c * (1f - kotlin.math.abs((h / 60f).mod(2f) - 1f))
-    val m = v - c
-    val (r, g, b) = when {
-        h < 60f -> Triple(c, x, 0f)
-        h < 120f -> Triple(x, c, 0f)
-        h < 180f -> Triple(0f, c, x)
-        h < 240f -> Triple(0f, x, c)
-        h < 300f -> Triple(x, 0f, c)
-        else -> Triple(c, 0f, x)
-    }
-    return Triple(r + m, g + m, b + m)
-}
-
 /**
  * The tuner exposes one accent stop, but several roles (the selected-chip
  * pair, `secondary`/`tertiary`) need a second, deeper stop of the same hue --
  * "this accent, pressed" rather than some unrelated colour. The relationship
  * is fitted to the shipped pair (accent `#8FE0CE` -> `accentDeep` `#5FC9B2`):
  * converted to HSV, value drops to 90% and saturation rises to 145% of the
- * source, hue held fixed -- reproduces `accentDeep` within rounding
- * (`#60CAB2` vs `#5FC9B2`). Applying the same transform to an arbitrary
- * accent is what lets a tuned accent (e.g. Marigold) get a matching deep stop
- * instead of inheriting the default's.
- *
- * Hand-rolled RGB<->HSV rather than `android.graphics.Color`: that class is
- * an unmocked Android stub under plain JVM unit tests, and this needs to run
- * there, not just on-device.
+ * source, hue held fixed -- reproduces `accentDeep` within rounding.
+ * Applying the same transform to an arbitrary accent is what lets a tuned
+ * accent (e.g. Marigold) get a matching deep stop instead of inheriting the
+ * default's.
  */
 fun deepenAccent(color: Color): Color {
-    val (h, s, v) = rgbToHsv(color.red, color.green, color.blue)
-    val (r2, g2, b2) = hsvToRgb(h, (s * 1.45f).coerceIn(0f, 1f), (v * 0.90f).coerceIn(0f, 1f))
-    return Color(red = r2, green = g2, blue = b2)
+    val hsv = FloatArray(3)
+    AndroidColor.colorToHSV(color.toArgb(), hsv)
+    hsv[1] = (hsv[1] * 1.45f).coerceIn(0f, 1f)
+    hsv[2] = (hsv[2] * 0.90f).coerceIn(0f, 1f)
+    return Color(AndroidColor.HSVToColor(hsv))
 }

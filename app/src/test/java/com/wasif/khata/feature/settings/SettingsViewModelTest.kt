@@ -26,7 +26,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -118,11 +117,7 @@ class SettingsViewModelTest {
 
     private fun viewModel() = SettingsViewModel(
         repository = repo,
-        smsPermission = SmsPermissionRepository(
-            checker = checker,
-            hasRequested = prefs.map { it.hasRequestedSmsPermission },
-            markRequested = { },
-        ),
+        smsPermission = SmsPermissionRepository(checker, repo),
         backfill = BackfillUseCase(
             source = object : MessageSource {
                 override suspend fun readAll(): List<IncomingMessage> = inbox

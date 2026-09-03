@@ -46,7 +46,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -64,6 +63,7 @@ import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.MoneyText
+import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
@@ -142,16 +142,7 @@ fun LedgerContent(
                   .windowInsetsPadding(WindowInsets.statusBars),
           ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-                Box(
-                    Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                NavCircle(Icons.AutoMirrored.Filled.ArrowBack, "Back", onClick = onBack)
             }
 
             // A list of 3,000 rows has no bottom to anchor to, so the ledger gets
@@ -319,10 +310,11 @@ private fun MonthHeader(
 ) {
     val spacing = LocalSpacing.current
     Row(modifier.padding(horizontal = spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-        MonthArrow(
+        NavCircle(
             icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
             description = "Previous month",
             enabled = !isSearching,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             onClick = onPreviousMonth,
         )
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -356,44 +348,12 @@ private fun MonthHeader(
                 modifier = Modifier.padding(top = spacing.xs),
             )
         }
-        MonthArrow(
+        NavCircle(
             icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             description = "Next month",
             enabled = canGoForward && !isSearching,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             onClick = onNextMonth,
-        )
-    }
-}
-
-@Composable
-private fun MonthArrow(
-    icon: ImageVector,
-    description: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val spacing = LocalSpacing.current
-    Box(
-        Modifier
-            .size(spacing.minTouchTarget)
-            .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            // Disabled rather than hidden: a control that vanishes is harder to
-            // understand than one that is visibly unavailable. WCAG exempts a
-            // disabled control from the border floor, but "exempt from 3:1"
-            // is not "exempt from visible" -- outlineVariant (1.34:1 here) was
-            // both, which contradicted this very comment. `outline` is dimmer
-            // than the enabled tint but still plainly present, not a hairline.
-            tint = if (enabled) {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-                MaterialTheme.colorScheme.outline
-            },
         )
     }
 }

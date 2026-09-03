@@ -39,7 +39,6 @@ class TransactionEditorScreenTest {
         id = 11,
         uuid = "seed-cat-groceries",
         name = "Groceries",
-        icon = "shopping_cart",
         colorToken = "category_green",
         parentId = null,
     )
@@ -56,7 +55,6 @@ class TransactionEditorScreenTest {
         override fun onDirectionChange(direction: TransactionDirection) = Unit
         override fun onKindChange(kind: TransactionKind) = Unit
         override fun onCounterpartyChange(value: String) = Unit
-        override fun onDateChange(epochMillis: Long) = Unit
         override fun onSave() { saved = true }
         override fun onDelete() = Unit
     }
@@ -78,7 +76,6 @@ class TransactionEditorScreenTest {
         override fun onDirectionChange(direction: TransactionDirection) = Unit
         override fun onKindChange(kind: TransactionKind) = Unit
         override fun onCounterpartyChange(value: String) = Unit
-        override fun onDateChange(epochMillis: Long) = Unit
         override fun onSave() = Unit
         override fun onDelete() = Unit
     }

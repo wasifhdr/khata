@@ -1,5 +1,16 @@
 package com.wasif.khata.feature.wallet
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,13 +22,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,17 +35,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.model.Money
+import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
+import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.ContextHeader
 import com.wasif.khata.core.ui.component.MoneyText
+import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
+import com.wasif.khata.core.ui.theme.LocalThemeSpec
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.HazeState
 
 @Composable
@@ -65,53 +79,50 @@ fun WalletContent(
     onOpenOwed: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val scroll = rememberScrollState()
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.systemBars),
-        ) {
-            // The back circle is the one thing deliberately outside the thumb arc:
-            // gesture-back is the primary way out, so this is an affordance rather
-            // than a control anyone should have to stretch for.
-            Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
-                // Back when this screen was pushed; a hub glyph when it is the root.
-                // Without the second case, choosing Wallet as home would strand the
-                // user: the settings gear lives only on the hub, and back from a
-                // root exits the app.
-                when {
-                    onBack != null -> NavCircle(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        description = "Back",
-                        onClick = onBack,
-                    )
-                    onOpenHub != null -> NavCircle(
-                        icon = Icons.Filled.Home,
-                        description = "All modules",
-                        onClick = onOpenHub,
-                    )
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .hazeSource(haze)
+                    .verticalScroll(scroll)
+                    .padding(top = CollapsingHeaderHeight, bottom = spacing.lg)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                // Above the card, not beside ACCOUNTS: sat there they read as
+                // column headers for the table under them.
+                WalletLinks(onOpenOwed = onOpenOwed, onOpenLedger = onOpenLedger)
+
+                NetWorthCard(state = state)
+
+                if (state.netWorthTrend.size >= 2) {
+                    NetWorthChart(points = state.netWorthTrend, haze = haze)
+                }
+                MonthPair(state = state, haze = haze)
+                AccountList(state = state)
+
+                if (state.categories.isNotEmpty()) {
+                    CategoryBreakdown(state.categories)
                 }
             }
 
-            // Heading centred in open space; content anchored to the bottom. Same
-            // shape as home, which is what makes the two read as one app.
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                ContextHeader(
-                    heading = "Wallet",
-                    subline = walletSubline(state),
-                )
-            }
-
-            Column(
-                Modifier.fillMaxWidth().padding(bottom = spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                NetWorthCard(state = state)
-                MonthPair(state = state, haze = haze)
-                AccountList(state = state, onOpenLedger = onOpenLedger, onOpenOwed = onOpenOwed)
-            }
-            }
+            // Back when this screen was pushed; a hub glyph when it is the root.
+            // Without the second case, choosing Wallet as home would strand the
+            // user: the settings gear lives only on the hub, and back from a root
+            // exits the app.
+            CollapsingTopBar(
+                heading = "Wallet",
+                subline = walletSubline(state),
+                collapse = scroll.collapseFraction(),
+                hazeState = haze,
+                onBack = onBack ?: onOpenHub,
+                navIcon = if (onBack != null) Icons.AutoMirrored.Filled.ArrowBack else Icons.Filled.Home,
+                navDescription = if (onBack != null) "Back" else "All modules",
+            )
+        }
     }
 }
 
@@ -132,6 +143,185 @@ private fun walletSubline(state: WalletUiState): String {
         "$accounts · $needsChecking"
     } else {
         "$accounts · all reconciled"
+    }
+}
+
+/** Right-aligned links out of the wallet. */
+@Composable
+private fun WalletLinks(onOpenOwed: () -> Unit, onOpenLedger: () -> Unit) {
+    val spacing = LocalSpacing.current
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        Text(
+            text = "Owed →",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = spacing.lg).clickable(onClick = onOpenOwed),
+        )
+        Text(
+            text = "Ledger →",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable(onClick = onOpenLedger),
+        )
+    }
+}
+
+/**
+ * Ninety days of net worth. The line is the accent, so the one coloured thing on
+ * the page is the thing the page is about.
+ *
+ * Says four things a bare line does not: how much it moved and in which direction,
+ * the high and the low it moved between, and where the window starts. Values are
+ * end-of-day, walked back from today's figure -- see [netWorthTrend].
+ */
+@Composable
+private fun NetWorthChart(points: List<Long>, haze: HazeState) {
+    val spacing = LocalSpacing.current
+    val accent = LocalThemeSpec.current.accent
+    val low = points.min()
+    val high = points.max()
+    val change = points.last() - points.first()
+    // Direction is a word, never only a colour or a sign glyph.
+    val movement = if (change >= 0) "up" else "down"
+
+    KhataGlass(
+        hazeState = haze,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(spacing.md)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "LAST 90 DAYS",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "$movement ${Money(kotlin.math.abs(change)).format()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            Canvas(
+                Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .padding(top = spacing.sm)
+                    .clearAndSetSemantics {
+                        contentDescription = "Net worth over ninety days, $movement " +
+                            "${Money(kotlin.math.abs(change)).format()}. " +
+                            "High ${Money(high).format()}, low ${Money(low).format()}."
+                    },
+            ) {
+                val span = (high - low).takeIf { it != 0L }?.toFloat() ?: 1f
+                val stepX = size.width / (points.size - 1).toFloat()
+                fun yOf(v: Long) = if (high == low) size.height / 2f
+                else size.height * (1f - (v - low) / span)
+
+                val line = Path()
+                points.forEachIndexed { i, value ->
+                    val x = i * stepX
+                    if (i == 0) line.moveTo(x, yOf(value)) else line.lineTo(x, yOf(value))
+                }
+
+                // The fill is what turns a squiggle into a quantity.
+                val area = Path().apply {
+                    addPath(line)
+                    lineTo(size.width, size.height)
+                    lineTo(0f, size.height)
+                    close()
+                }
+                drawPath(
+                    area,
+                    brush = Brush.verticalGradient(
+                        listOf(accent.copy(alpha = 0.22f), accent.copy(alpha = 0f)),
+                    ),
+                )
+                drawPath(line, color = accent, style = Stroke(width = 2.dp.toPx()))
+                // Where it stands today, so the eye lands on the end of the line.
+                drawCircle(accent, radius = 3.dp.toPx(), center = Offset(size.width, yOf(points.last())))
+            }
+
+            Row(
+                Modifier.fillMaxWidth().padding(top = spacing.xs),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "low ${Money(low).format()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "high ${Money(high).format()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Where the month went, biggest first. Bars rather than a pie: comparing lengths
+ * on a shared baseline is the one comparison people read accurately, and the
+ * category name has to be legible anyway.
+ */
+@Composable
+private fun CategoryBreakdown(categories: List<CategorySlice>) {
+    val spacing = LocalSpacing.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal)) {
+        Text(
+            text = "BY CATEGORY",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = spacing.sm),
+        )
+        categories.forEach { slice ->
+            val colour = KhataPalette.categories[slice.colorToken] ?: MaterialTheme.colorScheme.onSurfaceVariant
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = spacing.sm)
+                    // One sentence, not three fragments read in a row.
+                    .clearAndSetSemantics {
+                        contentDescription = "${slice.name}, ${slice.amount.format()}"
+                    },
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = slice.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(end = spacing.sm),
+                    )
+                    MoneyText(money = slice.amount, direction = null)
+                }
+                // Colour is never the only signal: the name and the figure carry it,
+                // and the bar is the comparison.
+                Box(
+                    Modifier
+                        .padding(top = spacing.xs)
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(slice.share.coerceAtLeast(0.02f))
+                            .height(4.dp)
+                            .clip(MaterialTheme.shapes.extraSmall)
+                            .background(colour),
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -220,7 +410,7 @@ private fun MonthFigure(
 }
 
 @Composable
-private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit, onOpenOwed: () -> Unit) {
+private fun AccountList(state: WalletUiState) {
     val spacing = LocalSpacing.current
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -235,20 +425,7 @@ private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit, onOpenOw
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = "Owed →",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .padding(end = LocalSpacing.current.md)
-                    .clickable(onClick = onOpenOwed),
-            )
-            Text(
-                text = "Ledger →",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable(onClick = onOpenLedger),
-            )
+
         }
 
         state.accounts.forEach { account ->
@@ -283,24 +460,5 @@ private fun AccountList(state: WalletUiState, onOpenLedger: () -> Unit, onOpenOw
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun NavCircle(
-    icon: ImageVector,
-    description: String,
-    onClick: () -> Unit,
-) {
-    val spacing = LocalSpacing.current
-    Box(
-        Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }

@@ -12,6 +12,7 @@ import com.wasif.khata.core.data.entity.MerchantAliasEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
 import com.wasif.khata.core.data.entity.RawMessageEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
+import com.wasif.khata.core.data.entity.signedMinor
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.RawMessageStatus
@@ -302,11 +303,6 @@ private fun RuleKind.toTransactionKind(): TransactionKind = when (this) {
     RuleKind.FEE -> TransactionKind.FEE
     RuleKind.NORMAL, RuleKind.IGNORE -> TransactionKind.NORMAL
 }
-
-private fun signedMinor(amountMinor: Long, direction: TransactionDirection): Long =
-    if (direction == TransactionDirection.DEBIT) -amountMinor else amountMinor
-
-private fun TransactionEntity.signedMinor(): Long = signedMinor(amountMinor, direction)
 
 private fun sha256(text: String): String =
     MessageDigest.getInstance("SHA-256").digest(text.toByteArray())

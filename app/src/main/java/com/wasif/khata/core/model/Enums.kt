@@ -79,7 +79,4 @@ enum class TransactionKind {
             BORROWED_RETURNED -> 1
             else -> 0
         }
-
-    /** True for the kinds that put someone on the other side of the money. */
-    val involvesAPerson: Boolean get() = owedSign != 0
 }

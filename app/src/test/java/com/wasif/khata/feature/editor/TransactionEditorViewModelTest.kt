@@ -37,13 +37,12 @@ class TransactionEditorViewModelTest {
     private var saveResult: Result<Long> = Result.success(1L)
 
     private val repository = object : TransactionRepository {
-        override fun pagedTransactions(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactionsBetween(
             fromInclusive: Long,
             toExclusive: Long,
         ): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
-            pagedTransactions()
+            flowOf(PagingData.empty())
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
         override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = Result.success(null)
@@ -77,7 +76,6 @@ class TransactionEditorViewModelTest {
         id = 11,
         uuid = "seed-cat-groceries",
         name = "Groceries",
-        icon = "shopping_cart",
         colorToken = "category_green",
         parentId = null,
     )

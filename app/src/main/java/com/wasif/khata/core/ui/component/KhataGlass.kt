@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -17,17 +16,6 @@ import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-
-@Composable
-fun rememberKhataHazeState(): HazeState = remember { HazeState() }
-
-/**
- * Marks a composable as the backdrop the glass samples. Put this on the mesh
- * field, never on a scrolling list: blur cost scales with how often the
- * backdrop changes, and a Paging list changes every frame.
- */
-fun Modifier.khataFieldSource(hazeState: HazeState): Modifier = this.hazeSource(hazeState)
 
 /**
  * The five ingredients. Most glassmorphism ships blur and tint, stops, and

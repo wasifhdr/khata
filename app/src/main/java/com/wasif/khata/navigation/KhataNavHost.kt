@@ -1,8 +1,10 @@
 package com.wasif.khata.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -73,26 +75,17 @@ fun KhataNavHost(homeView: HomeView) {
     }
 
     val motion = LocalMotion.current
+    val crossesHub: AnimatedContentTransitionScope<NavBackStackEntry>.() -> Boolean = {
+        isHubTransition(initialState.destination.route, targetState.destination.route)
+    }
 
     NavHost(
         navController = navController,
         startDestination = start,
-        enterTransition = {
-            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
-            if (hub) sharedAxisXEnter(motion) else fadeThroughEnter(motion)
-        },
-        exitTransition = {
-            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
-            if (hub) sharedAxisXExit(motion) else fadeThroughExit(motion)
-        },
-        popEnterTransition = {
-            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
-            if (hub) sharedAxisXPopEnter(motion) else fadeThroughEnter(motion)
-        },
-        popExitTransition = {
-            val hub = isHubTransition(initialState.destination.route, targetState.destination.route)
-            if (hub) sharedAxisXPopExit(motion) else fadeThroughExit(motion)
-        },
+        enterTransition = { if (crossesHub()) sharedAxisXEnter(motion) else fadeThroughEnter(motion) },
+        exitTransition = { if (crossesHub()) sharedAxisXExit(motion) else fadeThroughExit(motion) },
+        popEnterTransition = { if (crossesHub()) sharedAxisXPopEnter(motion) else fadeThroughEnter(motion) },
+        popExitTransition = { if (crossesHub()) sharedAxisXPopExit(motion) else fadeThroughExit(motion) },
     ) {
         composable(KhataRoutes.Modules) {
             ModulesScreen(

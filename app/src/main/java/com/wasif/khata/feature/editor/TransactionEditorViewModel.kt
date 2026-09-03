@@ -109,8 +109,6 @@ class TransactionEditorViewModel @AssistedInject constructor(
     override fun onCounterpartyChange(value: String) =
         _uiState.update { it.copy(counterpartyInput = value) }
 
-    override fun onDateChange(epochMillis: Long) = _uiState.update { it.copy(occurredAt = epochMillis) }
-
     override fun onSave() {
         val state = _uiState.value
         val amount = state.amount ?: return

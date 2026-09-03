@@ -1,6 +1,12 @@
 package com.wasif.khata.feature.reconcile
 
-import com.wasif.khata.core.data.repository.BalanceDrift
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.data.repository.ReconciliationRepository
+import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
+import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
@@ -8,7 +14,7 @@ import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.domain.repository.TransactionDraft
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -20,43 +26,70 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class DriftViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
-
-    private val drift = MutableStateFlow(emptyList<BalanceDrift>())
-    private var adjusted: Pair<Long, Money>? = null
 
     private val clock = object : KhataClock {
         override fun now(): Long = Instant.parse("2026-09-02T06:00:00Z").toEpochMilli()
     }
 
-    private val recorder = object : AdjustmentRecorder {
-        override suspend fun record(accountId: Long, gap: Money, occurredAt: Long): Result<Long> {
-            adjusted = accountId to gap
-            return Result.success(1L)
-        }
+    private lateinit var db: KhataDatabase
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        db = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            KhataDatabase::class.java,
+        )
+            // Room otherwise delivers Flow results on its own executor, which
+            // advanceUntilIdle() cannot drive.
+            .setQueryExecutor(dispatcher.asExecutor())
+            .setTransactionExecutor(dispatcher.asExecutor())
+            .allowMainThreadQueries()
+            .build()
     }
 
-    @Before fun setUp() = Dispatchers.setMain(dispatcher)
-    @After fun tearDown() = Dispatchers.resetMain()
+    @After
+    fun tearDown() {
+        db.close()
+        Dispatchers.resetMain()
+    }
 
-    private fun viewModel() = DriftViewModel({ drift }, recorder, clock)
-
-    private fun drifting(
-        id: Long = 1,
-        name: String = "EBL Salary",
-        computed: Long = 466000,
-        reported: Long = 500000,
-    ) = BalanceDrift(
-        accountId = id,
-        accountName = name,
-        computed = Money(computed),
-        reported = Money(reported),
-        reportedAt = Instant.parse("2026-08-12T06:00:00Z").toEpochMilli(),
-        gap = Money(reported - computed),
+    private fun viewModel() = DriftViewModel(
+        ReconciliationRepository(db.accountDao()),
+        TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock),
+        clock,
     )
+
+    /** An account the bank says holds [current], of which [unexplained] has no message behind it. */
+    private suspend fun drifting(
+        name: String = "EBL Salary",
+        current: Long = 500000,
+        unexplained: Long = 34000,
+    ) = db.accountDao().upsert(
+        AccountEntity(
+            uuid = "acc-$name",
+            name = name,
+            type = AccountType.BANK,
+            openingBalanceMinor = 0,
+            currentBalanceMinor = current,
+            reportedBalanceMinor = current,
+            reportedBalanceAt = Instant.parse("2026-08-12T06:00:00Z").toEpochMilli(),
+            unexplainedMinor = unexplained,
+            includeInNetWorth = true,
+            smsIdentifiers = "",
+            createdAt = 1,
+            updatedAt = 1,
+        ),
+    )
+
+    private suspend fun recorded() = db.transactionDao().allActive()
 
     @Test
     fun `no drift renders an explicit all-reconciled state, not an empty box`() = runTest(dispatcher) {
@@ -69,7 +102,7 @@ class DriftViewModelTest {
 
     @Test
     fun `a drifting account reports the gap and the date it opened`() = runTest(dispatcher) {
-        drift.value = listOf(drifting())
+        drifting()
         val vm = viewModel()
         advanceUntilIdle()
 
@@ -81,50 +114,57 @@ class DriftViewModelTest {
 
     @Test
     fun `nothing is written until the adjustment is explicitly invoked`() = runTest(dispatcher) {
-        drift.value = listOf(drifting())
+        drifting()
         viewModel()
         advanceUntilIdle()
 
         // The gap is usually real cash spending that was never entered. Absorbing it
         // automatically would destroy exactly the signal this screen exists to show.
-        assertNull(adjusted)
+        assertEquals(emptyList<Any>(), recorded())
     }
 
     @Test
     fun `recording an adjustment writes one transaction for exactly the gap`() = runTest(dispatcher) {
-        drift.value = listOf(drifting())
+        val accountId = drifting()
         val vm = viewModel()
         advanceUntilIdle()
 
         vm.onRecordAdjustment(vm.state.value.drifts.single())
         advanceUntilIdle()
 
-        assertEquals(1L to Money(34000), adjusted)
+        val written = recorded().single()
+        assertEquals(accountId, written.accountId)
+        assertEquals(34000L, written.amountMinor)
+        assertEquals(TransactionDirection.CREDIT, written.direction)
+        assertEquals(TransactionKind.ADJUSTMENT, written.kind)
+        // Cleared, so the same gap cannot be recorded twice.
+        assertTrue(vm.state.value.drifts.isEmpty())
     }
 
     @Test
     fun `a negative gap adjusts in the other direction`() = runTest(dispatcher) {
-        drift.value = listOf(drifting(computed = 500000, reported = 466000))
+        drifting(unexplained = -34000)
         val vm = viewModel()
         advanceUntilIdle()
 
         vm.onRecordAdjustment(vm.state.value.drifts.single())
         advanceUntilIdle()
 
-        assertEquals(Money(-34000), adjusted?.second)
+        val written = recorded().single()
+        assertEquals(34000L, written.amountMinor)
+        assertEquals(TransactionDirection.DEBIT, written.direction)
     }
 
     @Test
     fun `a failed adjustment surfaces durable state rather than a transient effect`() = runTest(dispatcher) {
-        val failing = object : AdjustmentRecorder {
-            override suspend fun record(accountId: Long, gap: Money, occurredAt: Long) =
-                Result.failure<Long>(IllegalStateException("nope"))
-        }
-        drift.value = listOf(drifting())
-        val vm = DriftViewModel({ drift }, failing, clock)
+        drifting()
+        val vm = viewModel()
         advanceUntilIdle()
+        val drift = vm.state.value.drifts.single()
 
-        vm.onRecordAdjustment(vm.state.value.drifts.single())
+        // A real write failure, not a stubbed one: the store is gone underneath it.
+        db.close()
+        vm.onRecordAdjustment(drift)
         advanceUntilIdle()
 
         // Still true after a rotation, so it belongs in state.
@@ -133,22 +173,15 @@ class DriftViewModelTest {
 
     @Test
     fun `the adjustment is dated now, not when the drift opened`() = runTest(dispatcher) {
-        var seenOccurredAt: Long? = null
-        val capturing = object : AdjustmentRecorder {
-            override suspend fun record(accountId: Long, gap: Money, occurredAt: Long): Result<Long> {
-                seenOccurredAt = occurredAt
-                return Result.success(1L)
-            }
-        }
-        drift.value = listOf(drifting())
-        val vm = DriftViewModel({ drift }, capturing, clock)
+        drifting()
+        val vm = viewModel()
         advanceUntilIdle()
 
         vm.onRecordAdjustment(vm.state.value.drifts.single())
         advanceUntilIdle()
 
         // Backdating would silently rewrite a past month's totals.
-        assertEquals(clock.now(), seenOccurredAt)
+        assertEquals(clock.now(), recorded().single().occurredAt)
     }
 
     @Test

@@ -4,7 +4,6 @@ data class Category(
     val id: Long,
     val uuid: String,
     val name: String,
-    val icon: String,
     val colorToken: String,
     val parentId: Long?,
 )

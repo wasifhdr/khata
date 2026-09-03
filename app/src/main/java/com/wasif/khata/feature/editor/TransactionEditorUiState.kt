@@ -78,7 +78,6 @@ interface TransactionEditorActions {
     fun onDirectionChange(direction: TransactionDirection)
     fun onKindChange(kind: TransactionKind)
     fun onCounterpartyChange(value: String)
-    fun onDateChange(epochMillis: Long)
     fun onSave()
     fun onDelete()
 }

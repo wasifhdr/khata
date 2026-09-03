@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.ShaderBrush
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalThemeSpec
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 /**
  * Ground, mesh field, and the [HazeState] the field registers itself against --
@@ -34,10 +35,12 @@ fun FieldScaffold(
     content: @Composable BoxScope.(HazeState) -> Unit,
 ) {
     val spec = LocalThemeSpec.current
-    val haze = rememberKhataHazeState()
+    val haze = remember { HazeState() }
 
     Box(modifier.background(spec.ground)) {
-        FieldBackdrop(Modifier.fillMaxSize().khataFieldSource(haze))
+        // Put the source on the mesh field, never on a scrolling list: blur cost
+        // scales with how often the backdrop changes.
+        FieldBackdrop(Modifier.fillMaxSize().hazeSource(haze))
         content(haze)
     }
 }

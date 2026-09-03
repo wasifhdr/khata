@@ -46,7 +46,6 @@ data class RuleEditorUiState(
      */
     val senderNamesAccount: Boolean = true,
     val progress: IngestProgress? = null,
-    val savedRuleId: Long? = null,
     val reparseSummary: String? = null,
     val error: String? = null,
 ) {
@@ -225,7 +224,6 @@ class RuleEditorViewModel @AssistedInject constructor(
                         it.copy(
                             isSaving = false,
                             progress = null,
-                            savedRuleId = 1,
                             reparseSummary = "${summary.recorded} recorded · ${summary.unmatched} still unread",
                         )
                     }

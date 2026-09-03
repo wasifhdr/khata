@@ -1,8 +1,6 @@
 package com.wasif.khata.core.ui.theme
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MotionTest {
@@ -14,7 +12,6 @@ class MotionTest {
         assertEquals("quick should cut instantly", 0, motion.quick)
         assertEquals("standard should cut instantly", 0, motion.standard)
         assertEquals("emphasized should cut instantly", 0, motion.emphasized)
-        assertTrue(motion.isInstant)
     }
 
     @Test
@@ -24,7 +21,6 @@ class MotionTest {
         assertEquals(150, motion.quick)
         assertEquals(250, motion.standard)
         assertEquals(400, motion.emphasized)
-        assertFalse(motion.isInstant)
     }
 
     @Test
@@ -34,6 +30,5 @@ class MotionTest {
         // because the platform already scales what it hands the animator.
         assertEquals(250, Motion.forDurationScale(0.5f).standard)
         assertEquals(250, Motion.forDurationScale(10f).standard)
-        assertFalse(Motion.forDurationScale(0.5f).isInstant)
     }
 }

@@ -1,6 +1,7 @@
 package com.wasif.khata.core.data.repository
 
 import androidx.paging.Pager
+import androidx.paging.PagingSource
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
@@ -11,6 +12,7 @@ import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.dao.pagingSourceMatching
 import com.wasif.khata.core.data.entity.TransactionEntity
+import com.wasif.khata.core.data.entity.signedMinor
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
@@ -29,6 +31,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+// One page shape for every list in the app.
+private val PAGING = PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)
+
 class TransactionRepositoryImpl @Inject constructor(
     private val db: KhataDatabase,
     private val transactionDao: TransactionDao,
@@ -37,27 +42,23 @@ class TransactionRepositoryImpl @Inject constructor(
     private val clock: KhataClock,
 ) : TransactionRepository {
 
-    override fun pagedTransactions(): Flow<PagingData<Transaction>> =
-        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
-            transactionDao.pagingSource()
-        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
-
     override fun pagedTransactionsBetween(
         fromInclusive: Long,
         toExclusive: Long,
     ): Flow<PagingData<Transaction>> =
-        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
-            transactionDao.pagingSourceBetween(fromInclusive, toExclusive)
-        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+        paged { transactionDao.pagingSourceBetween(fromInclusive, toExclusive) }
 
-    override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
-        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
-            if (query.isBlank()) {
-                transactionDao.pagingSource()
-            } else {
-                transactionDao.pagingSourceMatching(query)
-            }
-        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+    override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> = paged {
+        if (query.isBlank()) {
+            transactionDao.pagingSource()
+        } else {
+            transactionDao.pagingSourceMatching(query)
+        }
+    }
+
+    private fun paged(source: () -> PagingSource<Int, TransactionEntity>): Flow<PagingData<Transaction>> =
+        Pager(PAGING, pagingSourceFactory = source).flow
+            .map { pagingData -> pagingData.map { it.toDomain() } }
 
     override fun observe(id: Long): Flow<Transaction?> =
         transactionDao.observeById(id).map { it?.toDomain() }
@@ -80,9 +81,7 @@ class TransactionRepositoryImpl @Inject constructor(
         ).map { Money(it) }
 
     override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> =
-        Pager(PagingConfig(pageSize = 50, prefetchDistance = 25, enablePlaceholders = false)) {
-            transactionDao.pagingSourceNeedsAttention()
-        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+        paged { transactionDao.pagingSourceNeedsAttention() }
 
     override fun observeNeedsAttentionCount(): Flow<Int> = transactionDao.observeNeedsAttentionCount()
 
@@ -233,11 +232,6 @@ class TransactionRepositoryImpl @Inject constructor(
         }
     }
 }
-
-private fun signedMinor(amountMinor: Long, direction: TransactionDirection): Long =
-    if (direction == TransactionDirection.DEBIT) -amountMinor else amountMinor
-
-private fun TransactionEntity.signedMinor(): Long = signedMinor(amountMinor, direction)
 
 private inline fun <T> runCatchingData(block: () -> T): Result<T> = try {
     Result.success(block())

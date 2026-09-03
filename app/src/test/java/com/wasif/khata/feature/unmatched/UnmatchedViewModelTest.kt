@@ -25,7 +25,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -274,20 +273,6 @@ class UnmatchedViewModelTest {
         assertEquals(RuleKind.IGNORE, written.kind)
         // Evaluated last, so at worst it silences something nothing else could read.
         assertEquals(rules.maxOf { it.priority }, written.priority)
-    }
-
-    @Test
-    fun `the notice clears once it has been read`() = runTest(dispatcher) {
-        insert("a", CODE.format("350404"), 3000, RawMessageStatus.UNMATCHED)
-        val vm = startedViewModel()
-        advanceUntilIdle()
-        vm.onNotATransaction(vm.state.value.messages.single().id)
-        advanceUntilIdle()
-
-        vm.onNoticeShown()
-        advanceUntilIdle()
-
-        assertNull(vm.state.value.notice)
     }
 
     @Test

@@ -42,13 +42,12 @@ class ModulesViewModelTest {
     }
 
     private val transactions = object : TransactionRepository {
-        override fun pagedTransactions(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactionsBetween(
             fromInclusive: Long,
             toExclusive: Long,
         ): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
-            pagedTransactions()
+            flowOf(PagingData.empty())
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)

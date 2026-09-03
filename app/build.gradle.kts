@@ -1,7 +1,6 @@
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
-  alias(libs.plugins.kotlin.serialization)
   alias(libs.plugins.ksp)
   alias(libs.plugins.hilt)
   alias(libs.plugins.room)
@@ -77,7 +76,6 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   implementation(libs.androidx.compose.ui)
-  implementation(libs.androidx.compose.ui.tooling.preview)
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.haze)
@@ -93,6 +91,7 @@ dependencies {
   androidTestImplementation(libs.androidx.test.core)
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
+  // Not referenced directly; ui-test-junit4 and the runner resolve through it.
   androidTestImplementation(libs.androidx.test.espresso.core)
 
   implementation(libs.androidx.navigation.compose)

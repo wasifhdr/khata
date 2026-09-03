@@ -50,3 +50,9 @@ data class TransactionEntity(
     val updatedAt: Long,
     val deletedAt: Long? = null,
 )
+
+/** What this row does to its account's balance. */
+fun signedMinor(amountMinor: Long, direction: TransactionDirection): Long =
+    if (direction == TransactionDirection.DEBIT) -amountMinor else amountMinor
+
+fun TransactionEntity.signedMinor(): Long = signedMinor(amountMinor, direction)

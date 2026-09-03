@@ -280,7 +280,7 @@ remove. `TaglineTextStyle` and `BengaliBodyStyle` are the two entry points.
 
 ### Scale
 
-`displayLarge` 50 · `displaySmall` 38 · `headlineMedium` 34 · `titleLarge` 21 · `bodyLarge` 14 ·
+`displayLarge` 50 · `displaySmall` 38 · `titleLarge` 21 · `bodyLarge` 14 ·
 `bodyMedium` 13 · `bodySmall` 11 · `labelLarge` 11/1.5 tracking · `labelSmall` 10/1.4 tracking
 
 Named styles: `WordmarkTextStyle` 54 · `PageHeadingStyle` 34 · `PageSublineStyle` 11 ·

@@ -41,7 +41,6 @@ fun CategoryEntity.toDomain() = Category(
     id = id,
     uuid = uuid,
     name = name,
-    icon = icon,
     colorToken = colorToken,
     parentId = parentId,
 )

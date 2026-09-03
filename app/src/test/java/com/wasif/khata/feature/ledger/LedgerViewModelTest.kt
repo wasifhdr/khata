@@ -73,7 +73,6 @@ class LedgerViewModelTest {
                     id = 11,
                     uuid = "seed-cat-groceries",
                     name = "Groceries",
-                    icon = "shopping_cart",
                     colorToken = "category_green",
                     parentId = null,
                 ),
@@ -108,18 +107,19 @@ class LedgerViewModelTest {
     )
 
     private fun repositoryReturning(vararg transactions: Transaction) = object : TransactionRepository {
-        override fun pagedTransactions(): Flow<PagingData<Transaction>> =
-            flowOf(PagingData.from(transactions.toList(), sourceLoadStates = endOfPagination))
+        private val page = flowOf(
+            PagingData.from(transactions.toList(), sourceLoadStates = endOfPagination),
+        )
         override fun pagedTransactionsBetween(
             fromInclusive: Long,
             toExclusive: Long,
         ): Flow<PagingData<Transaction>> {
             requestedWindow = fromInclusive to toExclusive
-            return pagedTransactions()
+            return page
         }
         override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> {
             requestedQuery = query
-            return pagedTransactions()
+            return page
         }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
@@ -144,7 +144,6 @@ class LedgerViewModelTest {
     // crash. This fake goes through an actual Pager/PagingSource instead, the
     // same object shape combine() re-wraps on every observeDayTotals() tick.
     private fun repositoryWithRealPaging(vararg transactions: Transaction) = object : TransactionRepository {
-        override fun pagedTransactions(): Flow<PagingData<Transaction>> = pagedTransactionsBetween(0, 0)
         override fun pagedTransactionsBetween(
             fromInclusive: Long,
             toExclusive: Long,
@@ -160,7 +159,7 @@ class LedgerViewModelTest {
         }
         override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> {
             requestedQuery = query
-            return pagedTransactions()
+            return pagedTransactionsBetween(0, 0)
         }
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)

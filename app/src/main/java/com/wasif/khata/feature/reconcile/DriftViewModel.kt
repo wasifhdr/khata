@@ -12,7 +12,6 @@ import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,11 +26,6 @@ data class DriftUiState(
 ) {
     /** Only meaningful once loaded: an empty list before that is "not yet", not "agreed". */
     val isReconciled: Boolean get() = drifts.isEmpty()
-}
-
-/** Narrow seam so the ViewModel can be tested without a database. */
-fun interface AdjustmentRecorder {
-    suspend fun record(accountId: Long, gap: Money, occurredAt: Long): Result<Long>
 }
 
 /**
@@ -54,8 +48,8 @@ fun adjustmentDraft(accountId: Long, gap: Money, occurredAt: Long) = Transaction
 
 @HiltViewModel
 class DriftViewModel @Inject constructor(
-    driftSource: DriftSource,
-    private val recorder: AdjustmentRecorder,
+    reconciliation: ReconciliationRepository,
+    private val transactions: TransactionRepository,
     private val clock: KhataClock,
 ) : ViewModel() {
 
@@ -64,7 +58,7 @@ class DriftViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            driftSource.observe().collect { drifts ->
+            reconciliation.observeDrift().collect { drifts ->
                 _state.update { it.copy(drifts = drifts, isLoaded = true) }
             }
         }
@@ -77,7 +71,9 @@ class DriftViewModel @Inject constructor(
         viewModelScope.launch {
             // Dated now rather than when the drift opened: backdating would silently
             // rewrite a past month's totals.
-            val result = recorder.record(drift.accountId, drift.gap, clock.now())
+            val result = transactions.recordUnexplained(
+                adjustmentDraft(drift.accountId, drift.gap, clock.now()),
+            )
             _state.update { current ->
                 result.fold(
                     onSuccess = { current.copy(recordingFor = null) },
@@ -91,11 +87,4 @@ class DriftViewModel @Inject constructor(
             }
         }
     }
-
-    fun onErrorDismissed() = _state.update { it.copy(error = null) }
-}
-
-/** Indirection so the ViewModel takes a flow rather than the repository itself. */
-fun interface DriftSource {
-    fun observe(): Flow<List<BalanceDrift>>
 }

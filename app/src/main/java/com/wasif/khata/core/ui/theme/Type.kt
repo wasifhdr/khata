@@ -22,12 +22,6 @@ val KhataTypography = Typography(
         fontSize = 38.sp,
         lineHeight = 40.sp,
     ),
-    headlineMedium = TextStyle(
-        fontFamily = KhataFonts.Display,
-        fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 39.sp,
-    ),
     titleLarge = TextStyle(
         fontFamily = KhataFonts.Display,
         fontWeight = FontWeight.Bold,

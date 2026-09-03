@@ -1,7 +1,5 @@
 package com.wasif.khata.feature.unmatched
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,25 +8,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.time.DHAKA
@@ -36,6 +26,7 @@ import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.BengaliBodyStyle
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import dev.chrisbanes.haze.hazeSource
@@ -202,37 +193,8 @@ private fun UnmatchedRow(
             Modifier.padding(top = spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            Box(
-                Modifier
-                    .height(spacing.minTouchTarget)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .clickable(enabled = enabled, onClick = onWriteRule)
-                    .padding(horizontal = spacing.md),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Write a rule",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            }
-
-            Box(
-                Modifier
-                    .height(spacing.minTouchTarget)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable(enabled = enabled, onClick = onNotATransaction)
-                    .padding(horizontal = spacing.md),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "Not a transaction",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
+            Pill("Write a rule", selected = true, enabled = enabled, onClick = onWriteRule)
+            Pill("Not a transaction", selected = false, enabled = enabled, onClick = onNotATransaction)
         }
     }
 }

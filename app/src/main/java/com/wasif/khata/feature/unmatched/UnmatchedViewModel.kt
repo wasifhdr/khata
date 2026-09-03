@@ -154,8 +154,4 @@ class UnmatchedViewModel @Inject constructor(
             _working.value = false
         }
     }
-
-    fun onNoticeShown() {
-        _notice.value = null
-    }
 }

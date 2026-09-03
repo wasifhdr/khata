@@ -25,7 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -36,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
@@ -45,7 +45,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.component.Pill
+import com.wasif.khata.core.ui.component.SectionLabel
 import dev.chrisbanes.haze.HazeState
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
@@ -93,30 +95,14 @@ fun TransactionEditorContent(
                 Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Box(
-                    Modifier.size(spacing.minTouchTarget).clip(CircleShape).clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Close",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                NavCircle(Icons.Filled.Close, "Close", onClick = onBack)
                 if (state.isEditing) {
-                    Box(
-                        Modifier
-                            .size(spacing.minTouchTarget)
-                            .clip(CircleShape)
-                            .clickable(onClick = actions::onDelete),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Delete,
-                            contentDescription = "Delete transaction",
-                            tint = MaterialTheme.colorScheme.error,
-                        )
-                    }
+                    NavCircle(
+                        icon = Icons.Filled.Delete,
+                        description = "Delete transaction",
+                        tint = MaterialTheme.colorScheme.error,
+                        onClick = actions::onDelete,
+                    )
                 }
             }
 
@@ -199,11 +185,12 @@ fun TransactionEditorContent(
                 ) {
                     TransactionDirection.entries.forEach { direction ->
                         val selected = state.direction == direction
-                        // One body, two surfaces. Only the *unselected* half is
-                        // glass: a translucent selected pill reads as less
-                        // committed than an opaque one, which inverts the thing
-                        // selection is meant to say.
-                        val body: @Composable () -> Unit = {
+                        GlassChoice(
+                            haze = haze,
+                            selected = selected,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.weight(1f).height(spacing.minTouchTarget),
+                        ) {
                             Box(
                                 Modifier
                                     .fillMaxSize()
@@ -221,26 +208,10 @@ fun TransactionEditorContent(
                                 )
                             }
                         }
-                        if (selected) {
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .height(spacing.minTouchTarget)
-                                    .clip(MaterialTheme.shapes.small)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                            ) { body() }
-                        } else {
-                            KhataGlass(
-                                hazeState = haze,
-                                modifier = Modifier.weight(1f).height(spacing.minTouchTarget),
-                                shape = MaterialTheme.shapes.small,
-                                content = body,
-                            )
-                        }
                     }
                 }
 
-                FieldLabel("Account")
+                SectionLabel(top = spacing.md, text = "Account")
                 FlowRow(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -259,7 +230,7 @@ fun TransactionEditorContent(
                     }
                 }
 
-                FieldLabel("Category")
+                SectionLabel(top = spacing.md, text = "Category")
                 FlowRow(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -280,7 +251,7 @@ fun TransactionEditorContent(
 
                 // Only shown when there is more than one sensible answer, which
                 // for a plain purchase there is not.
-                FieldLabel("What kind")
+                SectionLabel(top = spacing.md, text = "What kind")
                 FlowRow(
                     Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
@@ -295,7 +266,7 @@ fun TransactionEditorContent(
                 }
 
                 if (state.wantsCounterparty) {
-                    FieldLabel(state.counterpartyLabel)
+                    SectionLabel(state.counterpartyLabel, top = spacing.md)
                     OutlinedTextField(
                         value = state.counterpartyInput,
                         onValueChange = actions::onCounterpartyChange,
@@ -306,7 +277,7 @@ fun TransactionEditorContent(
                     )
                 }
 
-                FieldLabel("Merchant")
+                SectionLabel(top = spacing.md, text = "Merchant")
                 OutlinedTextField(
                     value = state.merchantInput,
                     onValueChange = actions::onMerchantChange,
@@ -315,7 +286,7 @@ fun TransactionEditorContent(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                 )
 
-                FieldLabel("Note")
+                SectionLabel(top = spacing.md, text = "Note")
                 OutlinedTextField(
                     value = state.noteInput,
                     onValueChange = actions::onNoteChange,
@@ -370,22 +341,6 @@ fun TransactionEditorContent(
 }
 
 @Composable
-private fun FieldLabel(text: String) {
-    val spacing = LocalSpacing.current
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
-            start = spacing.screenHorizontal,
-            end = spacing.screenHorizontal,
-            top = spacing.md,
-            bottom = spacing.sm,
-        ),
-    )
-}
-
-@Composable
 private fun EditorChip(
     haze: HazeState,
     label: String,
@@ -394,9 +349,7 @@ private fun EditorChip(
     onClick: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
-    // Same split as the direction pill: selected stays opaque so it keeps
-    // reading as a commitment, unselected becomes glass.
-    val body: @Composable () -> Unit = {
+    GlassChoice(haze = haze, selected = selected, shape = CircleShape) {
         Row(
             Modifier
                 .clickable(onClick = onClick)
@@ -417,13 +370,24 @@ private fun EditorChip(
             )
         }
     }
+}
+
+/**
+ * One body, two surfaces. Only the *unselected* half is glass: a translucent
+ * selected control reads as less committed than an opaque one, which inverts the
+ * thing selection is meant to say.
+ */
+@Composable
+private fun GlassChoice(
+    haze: HazeState,
+    selected: Boolean,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     if (selected) {
-        Box(
-            Modifier
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
-        ) { body() }
+        Box(modifier.clip(shape).background(MaterialTheme.colorScheme.secondaryContainer)) { content() }
     } else {
-        KhataGlass(hazeState = haze, shape = CircleShape, content = body)
+        KhataGlass(hazeState = haze, modifier = modifier, shape = shape, content = content)
     }
 }

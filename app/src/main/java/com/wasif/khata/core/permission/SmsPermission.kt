@@ -9,7 +9,6 @@ import androidx.core.content.ContextCompat
 import com.wasif.khata.core.prefs.PreferencesRepository
 import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -29,12 +28,6 @@ enum class SmsPermissionState {
 
     /** Android stops showing the dialog after two refusals; only then is settings the route. */
     val needsAppSettings: Boolean get() = this == PERMANENTLY_DENIED
-
-    /**
-     * Always false. Refusing SMS access is a legitimate way to use Khata — it degrades
-     * to a manual ledger rather than breaking. Nothing about permission may gate entry.
-     */
-    val blocksManualEntry: Boolean get() = false
 }
 
 interface SmsPermissionChecker {
@@ -77,12 +70,13 @@ class AndroidSmsPermissionChecker @Inject constructor(
     }
 }
 
-class SmsPermissionRepository(
+@Singleton
+class SmsPermissionRepository @Inject constructor(
     private val checker: SmsPermissionChecker,
-    private val hasRequested: Flow<Boolean>,
-    private val markRequested: suspend () -> Unit,
+    private val prefs: PreferencesRepository,
 ) {
-    fun observe(): Flow<SmsPermissionState> = hasRequested.map { requested ->
+    fun observe(): Flow<SmsPermissionState> = prefs.preferences.map { stored ->
+        val requested = stored.hasRequestedSmsPermission
         when {
             checker.isGranted() -> SmsPermissionState.GRANTED
             !requested -> SmsPermissionState.NOT_REQUESTED
@@ -91,7 +85,7 @@ class SmsPermissionRepository(
         }
     }
 
-    suspend fun onRequested() = markRequested()
+    suspend fun onRequested() = prefs.setSmsPermissionRequested()
 }
 
 @Module
@@ -99,19 +93,4 @@ class SmsPermissionRepository(
 abstract class SmsPermissionModule {
     @Binds
     abstract fun bindChecker(impl: AndroidSmsPermissionChecker): SmsPermissionChecker
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-object SmsPermissionRepositoryModule {
-    @Provides
-    @Singleton
-    fun provideSmsPermissionRepository(
-        checker: SmsPermissionChecker,
-        prefs: PreferencesRepository,
-    ): SmsPermissionRepository = SmsPermissionRepository(
-        checker = checker,
-        hasRequested = prefs.preferences.map { it.hasRequestedSmsPermission },
-        markRequested = { prefs.setSmsPermissionRequested() },
-    )
 }

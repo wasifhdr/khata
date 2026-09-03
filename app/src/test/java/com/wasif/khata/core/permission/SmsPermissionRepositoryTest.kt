@@ -1,6 +1,11 @@
 package com.wasif.khata.core.permission
 
+import com.wasif.khata.core.prefs.HomeView
+import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.prefs.PreferencesRepository
+import com.wasif.khata.core.ui.theme.ThemeSpec
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -18,11 +23,20 @@ class SmsPermissionRepositoryTest {
 
     private val requested = MutableStateFlow(false)
 
-    private fun repository(checker: FakeChecker) = SmsPermissionRepository(
-        checker = checker,
-        hasRequested = requested,
-        markRequested = { requested.value = true },
-    )
+    private val prefs = object : PreferencesRepository {
+        override val preferences = requested.map {
+            KhataPreferences.Default.copy(hasRequestedSmsPermission = it)
+        }
+        override suspend fun setTheme(spec: ThemeSpec) = Unit
+        override suspend fun resetTheme() = Unit
+        override suspend fun setHomeView(view: HomeView) = Unit
+        override suspend fun setMonthlyBudget(minor: Long?) = Unit
+        override suspend fun setSmsPermissionRequested() {
+            requested.value = true
+        }
+    }
+
+    private fun repository(checker: FakeChecker) = SmsPermissionRepository(checker, prefs)
 
     @Test
     fun `a never-requested permission reports NOT_REQUESTED, not DENIED`() = runTest {
@@ -68,19 +82,6 @@ class SmsPermissionRepositoryTest {
 
         checker.rationale = true
         assertEquals(false, repo.observe().first().needsAppSettings)
-    }
-
-    @Test
-    fun `every denied state still permits manual entry`() = runTest {
-        // Denied is a legitimate way to use Khata: it degrades to a manual ledger
-        // rather than breaking, so nothing here may gate the rest of the app.
-        val states = listOf(
-            SmsPermissionState.NOT_REQUESTED,
-            SmsPermissionState.DENIED,
-            SmsPermissionState.PERMANENTLY_DENIED,
-        )
-
-        assertEquals(emptyList<SmsPermissionState>(), states.filter { it.blocksManualEntry })
     }
 
     @Test

@@ -14,7 +14,19 @@ data class OwedRow(
     /** Positive when they owe you, negative when you owe them. */
     val netMinor: Long,
     val entries: Int,
-    val lastAt: Long,
+)
+
+/** One category and what went to it over a window. */
+data class CategoryTotalRow(
+    val categoryId: Long?,
+    val totalMinor: Long,
+    val entries: Int,
+)
+
+/** Net movement on one Dhaka day, for rebuilding a net-worth line. */
+data class DailyNetRow(
+    val dhakaDayIndex: Long,
+    val netMinor: Long,
 )
 
 /** One row per Dhaka day that has any spending. */
@@ -92,9 +104,6 @@ interface TransactionDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH'")
     fun observeNeedsAttentionCount(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH'")
-    suspend fun countNeedsAttention(): Int
-
     @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
     suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?
 
@@ -162,8 +171,7 @@ interface TransactionDao {
                SUM(CASE WHEN kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED') THEN amountMinor
                         WHEN kind IN ('LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED') THEN -amountMinor
                         ELSE 0 END) AS netMinor,
-               COUNT(*) AS entries,
-               MAX(occurredAt) AS lastAt
+               COUNT(*) AS entries
         FROM transactions
         WHERE deletedAt IS NULL
           AND counterparty IS NOT NULL AND TRIM(counterparty) != ''
@@ -186,6 +194,35 @@ interface TransactionDao {
         """,
     )
     fun observeUnnamedOwed(): Flow<List<TransactionEntity>>
+
+    // Same exclusions as the spending total, or the breakdown would not add up to
+    // the figure printed above it.
+    @Query(
+        """
+        SELECT categoryId, SUM(amountMinor) AS totalMinor, COUNT(*) AS entries
+        FROM transactions
+        WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND occurredAt >= :fromInclusive AND occurredAt < :toExclusive
+        GROUP BY categoryId
+        ORDER BY totalMinor DESC
+        """,
+    )
+    fun observeSpendByCategory(fromInclusive: Long, toExclusive: Long): Flow<List<CategoryTotalRow>>
+
+    // Everything, including transfers between your own accounts: they net to zero
+    // across the pair, and dropping one side would invent a cliff.
+    @Query(
+        """
+        SELECT ((occurredAt + 21600000) / 86400000) AS dhakaDayIndex,
+               SUM(CASE WHEN direction = 'CREDIT' THEN amountMinor ELSE -amountMinor END) AS netMinor
+        FROM transactions
+        WHERE deletedAt IS NULL AND occurredAt >= :fromInclusive
+        GROUP BY dhakaDayIndex
+        ORDER BY dhakaDayIndex
+        """,
+    )
+    fun observeDailyNet(fromInclusive: Long): Flow<List<DailyNetRow>>
 
     @Query("SELECT * FROM transactions WHERE deletedAt IS NULL ORDER BY occurredAt DESC, id DESC LIMIT 1")
     fun observeMostRecent(): Flow<TransactionEntity?>

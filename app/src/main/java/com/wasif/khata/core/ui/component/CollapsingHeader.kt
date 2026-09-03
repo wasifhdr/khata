@@ -2,7 +2,6 @@ package com.wasif.khata.core.ui.component
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -16,10 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,8 +24,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -82,6 +79,11 @@ fun BoxScope.CollapsingTopBar(
     hazeState: HazeState,
     onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    // The wallet is a root when it is the home view, where the glyph opens the hub
+    // rather than going back -- back from a root exits the app, and the settings
+    // gear lives only on the hub.
+    navIcon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
+    navDescription: String = "Back",
 ) {
     val spacing = LocalSpacing.current
 
@@ -101,21 +103,14 @@ fun BoxScope.CollapsingTopBar(
 
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)) {
             if (onBack != null) {
-                Box(
-                    Modifier
+                NavCircle(
+                    icon = navIcon,
+                    description = navDescription,
+                    onClick = onBack,
+                    modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(horizontal = spacing.sm, vertical = spacing.xs)
-                        .size(spacing.minTouchTarget)
-                        .clip(CircleShape)
-                        .clickable(onClick = onBack),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                        .padding(horizontal = spacing.sm, vertical = spacing.xs),
+                )
             }
 
             if (expandedAlpha > 0f) {

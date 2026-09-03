@@ -7,6 +7,8 @@ import com.wasif.khata.core.data.seed.DEFAULT_CATEGORIES
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
  * The theme tuner exposes four free axes -- 8 fields x 4 grounds x 4 accents x
@@ -15,6 +17,7 @@ import org.junit.Test
  * every foreground clears every field, all 512 combinations clear by
  * construction.
  */
+@RunWith(RobolectricTestRunner::class)
 class ContrastTest {
 
     // 4.5:1 is the AA floor for text. The previous direction demanded more, to
