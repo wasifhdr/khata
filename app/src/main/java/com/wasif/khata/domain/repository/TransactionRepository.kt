@@ -4,6 +4,7 @@ import androidx.paging.PagingData
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
+import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.domain.model.Transaction
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,12 @@ data class TransactionDraft(
      * otherwise.
      */
     val kind: TransactionKind = TransactionKind.NORMAL,
+    /**
+     * Defaulted for the same reason `kind` is: every existing call site is an
+     * ordinary hand-entered row and should not have to say so. The widget is the
+     * first caller that is something else.
+     */
+    val source: TransactionSource = TransactionSource.MANUAL,
 )
 
 interface TransactionRepository {

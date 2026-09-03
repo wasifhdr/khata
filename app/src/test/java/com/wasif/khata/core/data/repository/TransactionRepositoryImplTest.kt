@@ -346,6 +346,33 @@ class TransactionRepositoryImplTest {
         assertEquals(Confidence.MEDIUM, db.transactionDao().findById(id)!!.confidence)
     }
 
+
+    // --- Where a row came from --------------------------------------------
+
+    @Test
+    fun `a draft carrying a source records it`() = runTest {
+        val accountId = account()
+
+        repository.save(
+            draft(accountId, Money(5_000), TransactionDirection.DEBIT)
+                .copy(source = TransactionSource.WIDGET),
+        ).getOrThrow()
+
+        assertEquals(TransactionSource.WIDGET, db.transactionDao().allActive().single().source)
+    }
+
+    @Test
+    fun `editing a parsed row does not relabel it as hand-entered`() = runTest {
+        val accountId = account()
+        val id = parsedRow(accountId, merchant(), "t-source")
+
+        // The editor's own drafts carry the default, MANUAL. An edit must not
+        // rewrite where the row came from -- the ledger's confidence markers and
+        // the unmatched screen both read source.
+        repository.save(draftFor(id, accountId, categoryId = null)).getOrThrow()
+
+        assertEquals(TransactionSource.SMS, db.transactionDao().findById(id)!!.source)
+    }
 }
 
 /**
