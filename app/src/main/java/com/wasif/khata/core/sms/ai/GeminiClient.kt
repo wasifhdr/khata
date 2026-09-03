@@ -31,7 +31,7 @@ fun interface RuleSuggester {
 }
 
 private const val ENDPOINT =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"
 
 /**
  * Null on anything that is not a usable rule: no candidates, a refusal, malformed JSON,
@@ -61,17 +61,28 @@ fun parseSuggestion(json: String): DraftedRule? = runCatching {
         Regex(body)
     }.getOrElse { return null }
 
+    val direction = payload.optString("direction")
+        .takeIf { it.isNotBlank() }
+        ?.let { runCatching { TransactionDirection.valueOf(it) }.getOrNull() }
+
+    val kind = payload.optString("kind")
+        .takeIf { it.isNotBlank() }
+        ?.let { runCatching { RuleKind.valueOf(it) }.getOrNull() }
+        ?: RuleKind.NORMAL
+
+    // RuleEngine skips a rule whose direction is null -- `rule.direction ?: continue`
+    // -- so a NORMAL rule without one matches nothing, ever, while the message stays
+    // unmatched and the app looks like it learned something. Same reason the invalid
+    // regex above is refused: silence that reads as success is the worst outcome.
+    // Only IGNORE rules extract nothing and so may have none.
+    if (kind != RuleKind.IGNORE && direction == null) return null
+
     DraftedRule(
         name = payload.optString("name").ifBlank { "AI rule" },
         senderPattern = sender,
         bodyPattern = body,
-        direction = payload.optString("direction")
-            .takeIf { it.isNotBlank() }
-            ?.let { runCatching { TransactionDirection.valueOf(it) }.getOrNull() },
-        kind = payload.optString("kind")
-            .takeIf { it.isNotBlank() }
-            ?.let { runCatching { RuleKind.valueOf(it) }.getOrNull() }
-            ?: RuleKind.NORMAL,
+        direction = direction,
+        kind = kind,
     )
 }.getOrNull()
 
@@ -96,7 +107,15 @@ class GeminiClient @Inject constructor(
 
             try {
                 connection.outputStream.use { it.write(requestBody(sender, body).toByteArray()) }
-                if (connection.responseCode !in 200..299) return@withContext null
+                val code = connection.responseCode
+                if (code !in 200..299) {
+                    // Worth a line. A refusal, a bad key and a blocked socket all end
+                    // up as "no rule", which is indistinguishable from the model
+                    // declining -- and that is exactly how a missing INTERNET
+                    // permission hid here for as long as it did.
+                    android.util.Log.w("KhataGemini", "generateContent -> " + code)
+                    return@withContext null
+                }
                 parseSuggestion(connection.inputStream.bufferedReader().readText())
             } catch (e: IOException) {
                 // Null rather than a throw: the worker turns this into a retry with
@@ -131,10 +150,29 @@ class GeminiClient @Inject constructor(
                     .put("name", JSONObject().put("type", "STRING"))
                     .put("senderPattern", JSONObject().put("type", "STRING"))
                     .put("bodyPattern", JSONObject().put("type", "STRING"))
-                    .put("direction", JSONObject().put("type", "STRING"))
-                    .put("kind", JSONObject().put("type", "STRING")),
+                    .put(
+                        "direction",
+                        JSONObject()
+                            .put("type", "STRING")
+                            .put("enum", JSONArray(listOf("DEBIT", "CREDIT"))),
+                    )
+                    .put(
+                        "kind",
+                        JSONObject()
+                            .put("type", "STRING")
+                            // Left open, the model answers this with a description --
+                            // "Cash Out" -- which falls back to NORMAL by luck rather
+                            // than by design. These are the only values RuleKind has.
+                            .put(
+                                "enum",
+                                JSONArray(RuleKind.entries.map { it.name }),
+                            ),
+                    ),
             )
-            .put("required", JSONArray(listOf("name", "senderPattern", "bodyPattern")))
+            .put(
+                "required",
+                JSONArray(listOf("name", "senderPattern", "bodyPattern", "direction")),
+            )
 
         return JSONObject()
             .put(

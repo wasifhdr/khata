@@ -54,4 +54,33 @@ class GeminiResponseTest {
         // which reads as the AI having done nothing.
         assertNull(parseSuggestion(envelope(payload)))
     }
+
+    @Test
+    fun `a normal rule with no direction is rejected`() {
+        // RuleEngine skips a rule whose direction is null -- `rule.direction ?: continue`
+        // -- so this one would match nothing, ever, while the message stayed unmatched
+        // and the app looked like it had learned something. Gemini really did return
+        // this: a well-formed Cash Out pattern with the direction field omitted.
+        val payload = """
+            {"name":"bKash_CashOut","senderPattern":"bKash",
+             "bodyPattern":"Cash Out Tk (?<amount>[0-9.]+) agent (?<merchant>.+?) ref",
+             "kind":"NORMAL"}
+        """.trimIndent()
+
+        assertNull(parseSuggestion(envelope(payload)))
+    }
+
+    @Test
+    fun `an ignore rule may have no direction`() {
+        // The one kind that legitimately extracts nothing, and so needs none.
+        val payload = """
+            {"name":"promo","senderPattern":"bKash",
+             "bodyPattern":"Get 10% cashback","kind":"IGNORE"}
+        """.trimIndent()
+
+        val drafted = parseSuggestion(envelope(payload))!!
+
+        assertEquals(RuleKind.IGNORE, drafted.kind)
+        assertNull(drafted.direction)
+    }
 }
