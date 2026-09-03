@@ -163,7 +163,7 @@ blocked on Drive being reachable.
 | Not connected | Upload skipped, no error. Settings says "Not connected" |
 | Grant revoked or expired | Worker records it, stops. Settings says "Reconnect to Drive" |
 | Offline | WorkManager's network constraint defers the run |
-| 401 | The token went stale mid-run. Mint once more, then give up |
+| 401 | The token went stale mid-run. No special case: the run fails, and WorkManager's retry mints a fresh one, which is the same thing with less code |
 | 403, 5xx | `Result.retry()` — quota and outages are temporary |
 | Folder gone | Recreate it and upload into the new one |
 | Upload fails | Local backup is untouched and already written. Nothing is pruned |
@@ -234,8 +234,13 @@ unit-tested, the parsing beside it is pure and is, and consumers depend on narro
   malformed or empty responses.
 - **`toDelete(names, keep)`** — pruning keeps seven and names the eighth, without a
   network to prove it.
-- **The worker with a fake uploader:** uploads after a successful backup, skips when
-  no account is stored, retries on failure, and never prunes after a failed upload.
+- **The worker against a fake uploader and a real backup:** uploads the file it just
+  wrote, treats "not connected" as success rather than an endless retry, and keeps
+  the local copy when the upload fails.
+- **Pruning cannot run after a failed upload**, because it sits below the success
+  check inside the client rather than in the worker. Structural, so the test that
+  would assert it would only be testing the order of two lines; the walkthrough
+  covers it against real Drive instead.
 - **Not unit-tested:** the consent screen, the live Drive calls, and the download.
   Verified on the device, as the backup walkthrough was — which is where the salt bug
   was caught, and it would not have been caught anywhere else.
