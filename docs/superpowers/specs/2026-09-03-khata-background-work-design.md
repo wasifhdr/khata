@@ -89,12 +89,28 @@ button — the failure the spec called out.
 `KhataPreferences` gains `hasBackfilled`, set when a backfill completes. When SMS
 permission is first held and the flag is false, one backfill is enqueued.
 
-**Where that check lives:** an application-scope collector in `KhataApplication`,
-beside the seeder and the widget's theme push. It is the established shape for "the
-app noticing something and reacting once", and it is the only place that sees both
-preferences and permission without belonging to a screen — putting it in
-`SettingsViewModel` would mean a first launch that never opens Settings never
-backfills, which is the whole case being solved.
+**Where that check lives** (revised during implementation): `MainViewModel`, triggered
+by `MainActivity` passing in the permission result.
+
+The first draft put an application-scope collector in `KhataApplication`, beside the
+seeder and the widget's theme push. **That was wrong, and the test suite proved it:**
+`SmsPermissionRepository.observe()` calls `ContextCompat.checkSelfPermission`, which
+needs a real `ActivityThread`. An application-scope collector runs it on
+`Dispatchers.IO` — a plain thread with no such environment — where it throws. Under
+Robolectric the uncaught exception surfaced in whichever unrelated test called
+`runTest` next, so the failing test moved between runs.
+
+`MainActivity` is the correct home because the permission check must happen on the
+main thread. The original objection — that a screen is the wrong trigger — was really
+an objection to *Settings*: a first launch that never opens Settings would never
+backfill. `MainActivity` opens on every launch, so it is no weaker a trigger than the
+Application was.
+
+The mechanism is `fun interface StartBackfill`, bound to `IngestionScheduler.backfill()`.
+`MainViewModel` has no business holding a WorkManager-shaped dependency, and the
+indirection turns §8's "verified by hand" into three real unit tests: it fires once
+when permission is held and the flag is clear, does nothing on later launches, and
+leaves the flag clear when permission is absent so granting it later still works.
 
 **The flag is the guard, not an empty ledger.** "No transactions yet" is also the
 honest state of a user whose inbox holds no bank messages, and testing for it would

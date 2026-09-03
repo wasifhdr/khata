@@ -59,6 +59,7 @@ class SettingsViewModelTest {
         override suspend fun setHomeView(view: HomeView) = Unit
         override suspend fun setMonthlyBudget(minor: Long?) = Unit
         override suspend fun setSmsPermissionRequested() = Unit
+        override suspend fun setBackfilled() = Unit
     }
 
     private lateinit var db: KhataDatabase

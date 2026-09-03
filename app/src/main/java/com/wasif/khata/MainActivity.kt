@@ -44,6 +44,10 @@ class MainActivity : ComponentActivity() {
         window.isNavigationBarContrastEnforced = false
         super.onCreate(savedInstanceState)
         permissionChecker.activity = this
+        // Checked here, on the main thread: ContextCompat's permission check needs a
+        // real ActivityThread. MainActivity opens on every launch, so this is no less
+        // reliable a trigger than the Application would have been.
+        viewModel.onPermissionKnown(permissionChecker.isGranted())
 
         setContent {
             when (val state = viewModel.state.collectAsStateWithLifecycle().value) {

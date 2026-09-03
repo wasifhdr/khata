@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -104,5 +106,14 @@ class PreferencesRepositoryTest {
 
         repo.setMonthlyBudget(null)
         assertNull(repo.preferences.first().monthlyBudgetMinor)
+    }
+
+    @Test
+    fun `the backfill flag defaults to false and survives being set`() = runTest {
+        assertFalse(repo.preferences.first().hasBackfilled)
+
+        repo.setBackfilled()
+
+        assertTrue(repo.preferences.first().hasBackfilled)
     }
 }

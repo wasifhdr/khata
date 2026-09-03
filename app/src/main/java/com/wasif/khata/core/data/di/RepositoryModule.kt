@@ -5,6 +5,8 @@ import com.wasif.khata.core.data.repository.ReferenceDataRepositoryImpl
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
+import com.wasif.khata.core.sms.IngestionScheduler
+import com.wasif.khata.core.sms.StartBackfill
 import com.wasif.khata.feature.widget.RecentCategoryIds
 import dagger.Binds
 import dagger.Module
@@ -31,5 +33,8 @@ abstract class RepositoryModule {
         @Provides
         fun provideRecentCategoryIds(dao: TransactionDao) =
             RecentCategoryIds { accountId, limit -> dao.observeRecentCategoryIds(accountId, limit) }
+
+        @Provides
+        fun provideStartBackfill(scheduler: IngestionScheduler) = StartBackfill { scheduler.backfill() }
     }
 }

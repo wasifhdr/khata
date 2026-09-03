@@ -72,6 +72,7 @@ class ModulesViewModelTest {
         override suspend fun setHomeView(view: HomeView) = Unit
         override suspend fun setMonthlyBudget(minor: Long?) = Unit
         override suspend fun setSmsPermissionRequested() = Unit
+        override suspend fun setBackfilled() = Unit
     }
 
     @Before

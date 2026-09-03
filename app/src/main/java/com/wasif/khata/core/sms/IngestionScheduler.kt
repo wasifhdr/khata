@@ -12,6 +12,15 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+/**
+ * Starting the first backfill, as a function type. MainViewModel needs to trigger one
+ * but has no business holding a WorkManager-shaped dependency -- and a test of the
+ * first-launch rule should not have to stand up WorkManager to watch it be called.
+ */
+fun interface StartBackfill {
+    operator fun invoke()
+}
+
 /** What a whole-inbox pass is doing, and what the last one came to. */
 data class PassState(
     val running: IngestProgress? = null,

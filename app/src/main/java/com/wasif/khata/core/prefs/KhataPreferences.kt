@@ -16,6 +16,12 @@ data class KhataPreferences(
      * them apart on its own.
      */
     val hasRequestedSmsPermission: Boolean = false,
+    /**
+     * Guards the one automatic backfill. Not "is the ledger empty" -- that is also
+     * the honest state of a user whose inbox holds no bank messages, and testing for
+     * it would rescan the whole inbox on every launch, forever.
+     */
+    val hasBackfilled: Boolean = false,
 ) {
     companion object {
         val Default = KhataPreferences(
@@ -23,6 +29,7 @@ data class KhataPreferences(
             homeView = HomeView.Modules,
             monthlyBudgetMinor = null,
             hasRequestedSmsPermission = false,
+            hasBackfilled = false,
         )
     }
 }
