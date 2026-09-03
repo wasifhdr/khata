@@ -1,6 +1,8 @@
 package com.wasif.khata
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.feature.widget.CashWidgetProvider
@@ -14,13 +16,18 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @HiltAndroidApp
-class KhataApplication : Application() {
+class KhataApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var seeder: DatabaseSeeder
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
 
     @Inject lateinit var preferences: PreferencesRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     override fun onCreate() {
         super.onCreate()

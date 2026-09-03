@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       Both are Google-restricted and cannot ship on the Play Store for expense
@@ -66,6 +67,25 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/cash_widget_info" />
         </receiver>
+
+        <!--
+          WorkManager also initialises itself through androidx.startup. Left in
+          place it wins the race, initialises with the default factory, and every
+          HiltWorker then fails to construct at run time with nothing wrong at
+          compile time. Only the WorkManagerInitializer meta-data is removed;
+          tools:node="remove" on the provider itself would silently take every
+          other startup initializer with it.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 
