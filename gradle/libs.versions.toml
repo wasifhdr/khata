@@ -16,6 +16,7 @@ junit = "4.13.2"
 kotlin = "2.3.20"
 room = "2.8.4"
 paging = "3.5.1"
+playServicesAuth = "22.0.0"
 hilt = "2.60.1"
 androidxHilt = "1.4.0"
 work = "2.11.2"
@@ -63,6 +64,7 @@ androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", vers
 androidx-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navCompose" }
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 

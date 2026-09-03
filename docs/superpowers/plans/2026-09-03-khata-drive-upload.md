@@ -222,16 +222,18 @@ Replace the existing `buildTypes { }` block with:
 ./gradlew :app:assembleDebug
 ```
 
-Then print the signer, using the JDK already on this machine:
+Then print the signer with `apksigner`. **Not `keytool -printcert -jarfile`** — that
+reads only v1 JAR signatures, and at `minSdk 33` AGP signs with v2/v3 alone, so
+keytool answers "Not a signed jar file" on a perfectly good APK:
 
 ```bash
-"C:\Users\Wasif\.gradle\jdks\eclipse_adoptium-17-amd64-windows.2\bin\keytool.exe" -printcert -jarfile app/build/outputs/apk/debug/app-debug.apk
+& "C:\Users\Wasif\AppData\Local\Android\Sdk\build-tools\36.0.0\apksigner.bat" verify --print-certs "app\build\outputs\apk\debug\app-debug.apk"
 ```
 
-Expected: a `SHA1:` line reading exactly
+Expected, lowercase and without colons:
 
 ```
-6C:8E:26:F4:50:9C:46:C8:B2:C7:15:7A:C0:6C:79:E4:3F:B0:7D:54
+Signer #1 certificate SHA-1 digest: 6c8e26f4509c46c8b2c7157ac06c79e43fb07d54
 ```
 
 If it prints a different fingerprint, the build fell back to the debug keystore — `keystore.properties` is missing, misspelled, or has a Windows-style path with backslashes.

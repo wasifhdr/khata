@@ -1,3 +1,14 @@
+import java.util.Properties
+
+// Drive authorises by package name plus signing certificate, so both build types
+// must be signed by the key registered in the Cloud Console. Absent on a machine
+// without the keystore, in which case the build still works and only Drive does
+// not -- better than a build that cannot run at all.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
@@ -31,10 +42,25 @@ android {
         getByName("debug").assets.srcDir("$projectDir/schemas")
     }
 
+    signingConfigs {
+        create("khata") {
+            if (keystoreProperties.isNotEmpty()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            if (keystoreProperties.isNotEmpty()) signingConfig = signingConfigs.getByName("khata")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystoreProperties.isNotEmpty()) signingConfig = signingConfigs.getByName("khata")
         }
     }
     compileOptions {
@@ -80,6 +106,10 @@ dependencies {
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.haze)
   implementation(libs.androidx.datastore.preferences)
+  // The account and an hour-long Drive token. Deliberately NOT
+  // google-api-services-drive: Drive itself is four HttpURLConnection calls,
+  // and the client library would be the largest thing in this app.
+  implementation(libs.play.services.auth)
   implementation(libs.androidx.core.splashscreen)
   debugImplementation(libs.androidx.compose.ui.tooling)
   androidTestImplementation(libs.androidx.compose.ui.test.junit4)

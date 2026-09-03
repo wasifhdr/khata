@@ -15,3 +15,7 @@ captures/
 
 # Worktrees created for parallel sessions
 .claude/worktrees/
+
+# Signing. *.keystore above does not match a .jks.
+keystore.properties
+*.jks
