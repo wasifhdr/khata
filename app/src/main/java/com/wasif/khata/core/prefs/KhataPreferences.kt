@@ -32,6 +32,14 @@ data class KhataPreferences(
      * switch that could disagree with whether a key exists is a switch that will.
      */
     val geminiKey: String? = null,
+    /**
+     * The PBKDF2 output, Base64 -- not the passphrase. A nightly backup needs a key
+     * without prompting, and storing the phrase would hand a compromised device the
+     * thing that unlocks every backup sitting elsewhere.
+     *
+     * Null means no backups are taken. There is no separate toggle.
+     */
+    val backupKey: String? = null,
 ) {
     companion object {
         val Default = KhataPreferences(
@@ -41,6 +49,7 @@ data class KhataPreferences(
             hasRequestedSmsPermission = false,
             hasBackfilled = false,
             geminiKey = null,
+            backupKey = null,
         )
     }
 }

@@ -2,6 +2,7 @@ package com.wasif.khata.feature.settings
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.wasif.khata.core.backup.BackupRepository
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.core.data.seed.DatabaseSeeder
@@ -61,6 +62,7 @@ class SettingsViewModelTest {
         override suspend fun setSmsPermissionRequested() = Unit
         override suspend fun setBackfilled() = Unit
         override suspend fun setGeminiKey(key: String?) = Unit
+        override suspend fun setBackupPassphrase(passphrase: String?) = Unit
     }
 
     private lateinit var db: KhataDatabase
@@ -120,6 +122,7 @@ class SettingsViewModelTest {
         repository = repo,
         smsPermission = SmsPermissionRepository(checker, repo),
         scheduler = IngestionScheduler(ApplicationProvider.getApplicationContext()),
+        backups = BackupRepository(ApplicationProvider.getApplicationContext(), db, clock),
         rawMessageDao = db.rawMessageDao(),
         accountDao = db.accountDao(),
         transactions = TransactionRepositoryImpl(

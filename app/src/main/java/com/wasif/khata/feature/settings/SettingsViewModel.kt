@@ -12,7 +12,12 @@ import com.wasif.khata.core.permission.SmsPermissionRepository
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
+import android.util.Base64
+import com.wasif.khata.core.backup.BackupFile
+import com.wasif.khata.core.backup.BackupRepository
+import com.wasif.khata.core.backup.BackupResult
 import com.wasif.khata.core.prefs.PreferencesRepository
+import java.io.File
 import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.IngestionScheduler
@@ -49,6 +54,7 @@ class SettingsViewModel @Inject constructor(
     private val repository: PreferencesRepository,
     private val smsPermission: SmsPermissionRepository,
     private val scheduler: IngestionScheduler,
+    private val backups: BackupRepository,
     rawMessageDao: RawMessageDao,
     private val accountDao: AccountDao,
     private val transactions: com.wasif.khata.domain.repository.TransactionRepository,
@@ -143,6 +149,42 @@ class SettingsViewModel @Inject constructor(
     fun onHomeViewSelected(view: HomeView) = viewModelScope.launch { repository.setHomeView(view) }
 
     fun onGeminiKeyChanged(key: String?) = viewModelScope.launch { repository.setGeminiKey(key) }
+
+    fun onBackupPassphraseChanged(passphrase: String?) =
+        viewModelScope.launch { repository.setBackupPassphrase(passphrase) }
+
+    fun onBackUpNow() = viewModelScope.launch {
+        val key = repository.preferences.first().backupKey ?: return@launch
+        _lastAction.value = if (backups.backUp(Base64.decode(key, Base64.NO_WRAP)) != null) {
+            "Backed up"
+        } else {
+            "Could not back up"
+        }
+    }
+
+    /** The newest backup, or null when there is none to share. */
+    fun latestBackup(): File? = backups.latest()
+
+    fun onRestore(bytes: ByteArray, passphrase: String, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val salt = BackupFile.saltOf(bytes)
+            if (salt == null) {
+                onResult("That is not a Khata backup file.")
+                return@launch
+            }
+            val result = backups.restore(bytes, BackupFile.deriveKey(passphrase, salt))
+            onResult(
+                when (result) {
+                    is BackupResult.Restored ->
+                        "Restored. Khata will close so it can reopen the restored data."
+                    BackupResult.NotABackup -> "That is not a Khata backup file."
+                    BackupResult.TooNew -> "That backup was made by a newer version of Khata."
+                    BackupResult.WrongPassphrase ->
+                        "Wrong passphrase, or the file has been altered."
+                },
+            )
+        }
+    }
 
     // Reads the store rather than state.value. `state` is WhileSubscribed, so
     // with no collector it never leaves its initial value -- and a save made

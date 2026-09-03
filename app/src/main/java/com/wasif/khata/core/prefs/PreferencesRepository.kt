@@ -12,4 +12,5 @@ interface PreferencesRepository {
     suspend fun setSmsPermissionRequested()
     suspend fun setBackfilled()
     suspend fun setGeminiKey(key: String?)
+    suspend fun setBackupPassphrase(passphrase: String?)
 }

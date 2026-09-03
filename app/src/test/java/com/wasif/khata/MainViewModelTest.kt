@@ -46,6 +46,7 @@ class MainViewModelTest {
         override suspend fun setSmsPermissionRequested() = Unit
         override suspend fun setBackfilled() { backfilledFlag = true }
         override suspend fun setGeminiKey(key: String?) = Unit
+        override suspend fun setBackupPassphrase(passphrase: String?) = Unit
     }
 
     @Before

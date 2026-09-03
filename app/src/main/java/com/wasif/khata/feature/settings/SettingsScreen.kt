@@ -28,8 +28,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.content.FileProvider
+import android.app.Activity
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,6 +96,7 @@ fun SettingsScreen(
         onOpenReconcile = onOpenReconcile,
         onOpenCategories = onOpenCategories,
         onGeminiKeyChanged = viewModel::onGeminiKeyChanged,
+        viewModel = viewModel,
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onFieldSelected = viewModel::onFieldSelected,
         onGroundSelected = viewModel::onGroundSelected,
@@ -111,6 +119,7 @@ fun SettingsContent(
     onOpenReconcile: () -> Unit,
     onOpenCategories: () -> Unit,
     onGeminiKeyChanged: (String?) -> Unit,
+    viewModel: SettingsViewModel,
     onHomeViewSelected: (HomeView) -> Unit,
     onFieldSelected: (FieldPalette) -> Unit,
     onGroundSelected: (Color) -> Unit,
@@ -140,6 +149,8 @@ fun SettingsContent(
 
                 SectionLabel("AI fallback")
                 GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
+
+                BackupSection(prefs = prefs, viewModel = viewModel)
 
                 SectionLabel("Categories")
                 ActionRow(
@@ -547,4 +558,135 @@ private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = spacing.screenHorizontal),
     )
+}
+
+@Composable
+private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel) {
+    val spacing = LocalSpacing.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var passphrase by rememberSaveable { mutableStateOf("") }
+    var pending by remember { mutableStateOf<ByteArray?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var restorePassphrase by rememberSaveable { mutableStateOf("") }
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        pending = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+    }
+
+    SectionLabel("Backup")
+
+    OutlinedTextField(
+        value = passphrase,
+        onValueChange = {
+            passphrase = it
+            viewModel.onBackupPassphraseChanged(it.ifBlank { null })
+        },
+        label = { Text("Backup passphrase") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            Text(
+                if (prefs.backupKey == null) {
+                    "Not set. No backups are being taken."
+                } else {
+                    // Said here, in these words, because there is no recovery path and
+                    // there cannot be one -- that is what makes the file safe to put
+                    // anywhere.
+                    "Set. If you lose this passphrase, every backup becomes unreadable. " +
+                        "There is no way to recover them."
+                },
+            )
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+    )
+
+    ActionRow(
+        title = "Back up now",
+        subtitle = "Writes an encrypted copy. Seven are kept.",
+        enabled = prefs.backupKey != null,
+        onClick = viewModel::onBackUpNow,
+    )
+
+    ActionRow(
+        title = "Share the latest backup",
+        subtitle = "Send it to Drive, email, or a cable. The file is encrypted.",
+        enabled = prefs.backupKey != null,
+        onClick = {
+            val file = viewModel.latestBackup() ?: return@ActionRow
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.backups",
+                file,
+            )
+            context.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    },
+                    "Share backup",
+                ),
+            )
+        },
+    )
+
+    ActionRow(
+        title = "Restore from a file",
+        subtitle = "Replaces everything in Khata with the contents of a backup.",
+        onClick = { picker.launch(arrayOf("*/*")) },
+    )
+
+    pending?.let { bytes ->
+        AlertDialog(
+            onDismissRequest = { pending = null },
+            title = { Text("Restore this backup?") },
+            text = {
+                Column {
+                    Text("Everything currently in Khata is replaced. Enter the passphrase the backup was made with.")
+                    OutlinedTextField(
+                        value = restorePassphrase,
+                        onValueChange = { restorePassphrase = it },
+                        label = { Text("Passphrase") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onRestore(bytes, restorePassphrase) { result ->
+                            message = result
+                            pending = null
+                            restorePassphrase = ""
+                        }
+                    },
+                ) { Text("Restore") }
+            },
+            dismissButton = { TextButton(onClick = { pending = null }) { Text("Cancel") } },
+        )
+    }
+
+    message?.let { text ->
+        AlertDialog(
+            onDismissRequest = { message = null },
+            title = { Text("Restore") },
+            text = { Text(text) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        message = null
+                        // Room is holding a handle to a file that was replaced
+                        // underneath it. Only a fresh process is safe.
+                        if (text.startsWith("Restored")) {
+                            scope.launch { (context as? Activity)?.finishAffinity() }
+                        }
+                    },
+                ) { Text("OK") }
+            },
+        )
+    }
 }

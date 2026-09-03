@@ -1,5 +1,6 @@
 package com.wasif.khata.core.prefs
 
+import android.util.Base64
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -7,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.wasif.khata.core.backup.BackupFile
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.ThemeSpec
@@ -33,6 +35,8 @@ class PreferencesRepositoryImpl @Inject constructor(
         val SmsRequested = intPreferencesKey("sms_permission_requested")
         val Backfilled = intPreferencesKey("has_backfilled")
         val GeminiKey = stringPreferencesKey("gemini_key")
+        val BackupKey = stringPreferencesKey("backup_key")
+        val BackupSalt = stringPreferencesKey("backup_salt")
     }
 
     override val preferences: Flow<KhataPreferences> = store.data
@@ -63,6 +67,7 @@ class PreferencesRepositoryImpl @Inject constructor(
                 hasRequestedSmsPermission = p[Keys.SmsRequested] == 1,
                 hasBackfilled = p[Keys.Backfilled] == 1,
                 geminiKey = p[Keys.GeminiKey],
+                backupKey = p[Keys.BackupKey],
             )
         }
 
@@ -97,6 +102,31 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override suspend fun setBackfilled() {
         store.edit { it[Keys.Backfilled] = 1 }
+    }
+
+    /**
+     * Derives and stores the key, never the passphrase.
+     *
+     * The salt is kept so the same passphrase derives the same key every night. A
+     * restore on another phone does not use it -- it derives from the salt in the
+     * backup file's own header, which is why the file travels.
+     */
+    override suspend fun setBackupPassphrase(passphrase: String?) {
+        store.edit { p ->
+            if (passphrase.isNullOrBlank()) {
+                p.remove(Keys.BackupKey)
+                p.remove(Keys.BackupSalt)
+            } else {
+                val salt = p[Keys.BackupSalt]?.let { Base64.decode(it, Base64.NO_WRAP) }
+                    ?: BackupFile.newSalt().also {
+                        p[Keys.BackupSalt] = Base64.encodeToString(it, Base64.NO_WRAP)
+                    }
+                p[Keys.BackupKey] = Base64.encodeToString(
+                    BackupFile.deriveKey(passphrase, salt),
+                    Base64.NO_WRAP,
+                )
+            }
+        }
     }
 
     override suspend fun setGeminiKey(key: String?) {

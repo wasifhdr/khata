@@ -3,6 +3,7 @@ package com.wasif.khata
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.wasif.khata.core.backup.BackupScheduler
 import com.wasif.khata.core.data.SnapshotScheduler
 import com.wasif.khata.core.data.repository.BudgetCarryOver
 import com.wasif.khata.core.data.seed.DatabaseSeeder
@@ -27,6 +28,8 @@ class KhataApplication : Application(), Configuration.Provider {
     @Inject lateinit var preferences: PreferencesRepository
 
     @Inject lateinit var snapshots: SnapshotScheduler
+
+    @Inject lateinit var backups: BackupScheduler
 
     @Inject lateinit var budgetCarryOver: BudgetCarryOver
 
@@ -57,5 +60,6 @@ class KhataApplication : Application(), Configuration.Provider {
         // first-launch SMS backfill this is safe to do from the Application. The first
         // run doubles as the backfill over existing history.
         snapshots.scheduleNightly()
+        backups.scheduleNightly()
     }
 }
