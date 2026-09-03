@@ -19,3 +19,4 @@ captures/
 # Signing. *.keystore above does not match a .jks.
 keystore.properties
 *.jks
+.kotlin/
