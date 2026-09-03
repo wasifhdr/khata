@@ -68,6 +68,7 @@ class PreferencesRepositoryImpl @Inject constructor(
                 hasBackfilled = p[Keys.Backfilled] == 1,
                 geminiKey = p[Keys.GeminiKey],
                 backupKey = p[Keys.BackupKey],
+                backupSalt = p[Keys.BackupSalt],
             )
         }
 

@@ -30,8 +30,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.AlertDialog
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.content.FileProvider
 import android.app.Activity
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -75,6 +73,7 @@ import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import com.wasif.khata.core.ui.theme.isLightColor
 import dev.chrisbanes.haze.hazeSource
+import kotlin.system.exitProcess
 
 @Composable
 fun SettingsScreen(
@@ -564,10 +563,10 @@ private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
 private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel) {
     val spacing = LocalSpacing.current
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var passphrase by rememberSaveable { mutableStateOf("") }
     var pending by remember { mutableStateOf<ByteArray?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    var choosing by remember { mutableStateOf(false) }
     var restorePassphrase by rememberSaveable { mutableStateOf("") }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -634,10 +633,49 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
     )
 
     ActionRow(
-        title = "Restore from a file",
-        subtitle = "Replaces everything in Khata with the contents of a backup.",
-        onClick = { picker.launch(arrayOf("*/*")) },
+        title = "Restore a backup",
+        subtitle = "Replaces everything in Khata. Pick one of this phone's backups, or a file.",
+        onClick = { choosing = true },
     )
+
+    if (choosing) {
+        val local = viewModel.localBackups()
+        AlertDialog(
+            onDismissRequest = { choosing = false },
+            title = { Text("Restore which backup?") },
+            text = {
+                Column {
+                    if (local.isEmpty()) {
+                        Text("This phone has no backups yet.")
+                    } else {
+                        local.forEach { file ->
+                            Text(
+                                text = backupLabel(file),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        pending = file.readBytes()
+                                        choosing = false
+                                    }
+                                    .padding(vertical = spacing.sm),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        choosing = false
+                        picker.launch(arrayOf("*/*"))
+                    },
+                ) { Text("Choose a file") }
+            },
+            dismissButton = { TextButton(onClick = { choosing = false }) { Text("Cancel") } },
+        )
+    }
 
     pending?.let { bytes ->
         AlertDialog(
@@ -681,12 +719,28 @@ private fun BackupSection(prefs: KhataPreferences, viewModel: SettingsViewModel)
                         message = null
                         // Room is holding a handle to a file that was replaced
                         // underneath it. Only a fresh process is safe.
+                        //
+                        // finishAffinity alone is not that: it ends the activities
+                        // and leaves the process cached, so the next launch reuses
+                        // it -- same pid, same closed-then-reopened Room. Verified
+                        // on the device. exitProcess is what actually makes the
+                        // next launch read the restored file from scratch.
                         if (text.startsWith("Restored")) {
-                            scope.launch { (context as? Activity)?.finishAffinity() }
+                            (context as? Activity)?.finishAffinity()
+                            exitProcess(0)
                         }
                     },
                 ) { Text("OK") }
             },
         )
     }
+}
+
+/** "3 Sep 2026, 19:56" from the millis in the filename. */
+private fun backupLabel(file: java.io.File): String {
+    val millis = file.name.removePrefix("khata-").removeSuffix(".kbk").toLongOrNull()
+        ?: return file.name
+    return java.time.Instant.ofEpochMilli(millis)
+        .atZone(com.wasif.khata.core.time.DHAKA)
+        .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", java.util.Locale.ENGLISH))
 }

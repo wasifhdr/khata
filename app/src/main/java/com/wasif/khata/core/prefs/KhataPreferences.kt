@@ -40,6 +40,8 @@ data class KhataPreferences(
      * Null means no backups are taken. There is no separate toggle.
      */
     val backupKey: String? = null,
+    /** The salt [backupKey] was derived from; it goes into every backup's header. */
+    val backupSalt: String? = null,
 ) {
     companion object {
         val Default = KhataPreferences(
@@ -50,6 +52,7 @@ data class KhataPreferences(
             hasBackfilled = false,
             geminiKey = null,
             backupKey = null,
+            backupSalt = null,
         )
     }
 }

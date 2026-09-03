@@ -154,8 +154,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { repository.setBackupPassphrase(passphrase) }
 
     fun onBackUpNow() = viewModelScope.launch {
-        val key = repository.preferences.first().backupKey ?: return@launch
-        _lastAction.value = if (backups.backUp(Base64.decode(key, Base64.NO_WRAP)) != null) {
+        val prefs = repository.preferences.first()
+        val key = prefs.backupKey ?: return@launch
+        val salt = prefs.backupSalt ?: return@launch
+        _lastAction.value = if (
+            backups.backUp(
+                Base64.decode(key, Base64.NO_WRAP),
+                Base64.decode(salt, Base64.NO_WRAP),
+            ) != null
+        ) {
             "Backed up"
         } else {
             "Could not back up"
@@ -164,6 +171,15 @@ class SettingsViewModel @Inject constructor(
 
     /** The newest backup, or null when there is none to share. */
     fun latestBackup(): File? = backups.latest()
+
+    /**
+     * The app's own backups, newest first. They live in app-private storage, which the
+     * system file picker cannot browse -- so without this list, restoring last night's
+     * backup would mean exporting it out and picking it back in, which defeats keeping
+     * seven of them.
+     */
+    fun localBackups(): List<File> =
+        backups.backupDir().listFiles()?.sortedByDescending { it.name } ?: emptyList()
 
     fun onRestore(bytes: ByteArray, passphrase: String, onResult: (String) -> Unit) {
         viewModelScope.launch {

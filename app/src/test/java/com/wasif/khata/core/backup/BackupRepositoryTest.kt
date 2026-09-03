@@ -32,7 +32,8 @@ class BackupRepositoryTest {
     private var nowMillis = 1_000L
     private val clock = object : KhataClock { override fun now(): Long = nowMillis }
 
-    private val key = BackupFile.deriveKey("a passphrase", ByteArray(16))
+    private val saltForKey = ByteArray(16)
+    private val key = BackupFile.deriveKey("a passphrase", saltForKey)
 
     @Before
     fun setUp() {
@@ -79,7 +80,7 @@ class BackupRepositoryTest {
         // time the row is gone.
         db.accountDao().upsert(account("acc-late"))
 
-        val file = repository.backUp(key)!!
+        val file = repository.backUp(key, saltForKey)!!
         val restored = BackupFile.read(file.readBytes(), key, SCHEMA_VERSION)
 
         // SQLite stores text inline, so the uuid is findable in the raw page bytes.
@@ -93,7 +94,7 @@ class BackupRepositoryTest {
     fun `seven are kept and the older ones pruned`() = runTest {
         repeat(9) {
             nowMillis += 1_000
-            repository.backUp(key)
+            repository.backUp(key, saltForKey)
         }
 
         assertEquals(7, repository.backupDir().listFiles()!!.size)
@@ -102,7 +103,7 @@ class BackupRepositoryTest {
     @Test
     fun `a database backed up and restored still holds its rows`() = runTest {
         db.accountDao().upsert(account("acc-survivor"))
-        val file = repository.backUp(key)!!
+        val file = repository.backUp(key, saltForKey)!!
 
         // Everything gone, as on a replacement phone.
         db.clearAllTables()
@@ -132,7 +133,7 @@ class BackupRepositoryTest {
     @Test
     fun `restoring keeps the database it replaced`() = runTest {
         db.accountDao().upsert(account("acc-before"))
-        val file = repository.backUp(key)!!
+        val file = repository.backUp(key, saltForKey)!!
 
         repository.restore(file.readBytes(), key)
 
@@ -143,7 +144,7 @@ class BackupRepositoryTest {
     @Test
     fun `a wrong passphrase changes nothing on disk`() = runTest {
         db.accountDao().upsert(account("acc-untouched"))
-        val file = repository.backUp(key)!!
+        val file = repository.backUp(key, saltForKey)!!
         val wrong = BackupFile.deriveKey("wrong", ByteArray(16))
 
         val result = repository.restore(file.readBytes(), wrong)
@@ -152,5 +153,21 @@ class BackupRepositoryTest {
         // The refusal happens before anything is written, so the live database is
         // still open and still correct.
         assertTrue(db.accountDao().getAll().any { it.uuid == "acc-untouched" })
+    }
+
+    @Test
+    fun `a backup can be restored from the passphrase alone`() = runTest {
+        // The real path, and the one the other tests missed: they carried a key object
+        // from write to read, so the header's salt was never used. Here the key is
+        // re-derived from the file, exactly as a restore on another phone must.
+        val salt = BackupFile.newSalt()
+        val writeKey = BackupFile.deriveKey("the phrase", salt)
+        db.accountDao().upsert(account("acc-passphrase"))
+
+        val file = repository.backUp(writeKey, salt)!!
+
+        val bytes = file.readBytes()
+        val readKey = BackupFile.deriveKey("the phrase", BackupFile.saltOf(bytes)!!)
+        assertTrue(repository.restore(bytes, readKey) is BackupResult.Restored)
     }
 }

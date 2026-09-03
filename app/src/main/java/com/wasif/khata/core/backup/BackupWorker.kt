@@ -30,9 +30,16 @@ class BackupWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         // No passphrase is the off switch, and it is not an error.
-        val key = preferences.preferences.first().backupKey ?: return Result.success()
+        val prefs = preferences.preferences.first()
+        val key = prefs.backupKey ?: return Result.success()
+        val salt = prefs.backupSalt ?: return Result.success()
 
-        return runCatching { repository.backUp(Base64.decode(key, Base64.NO_WRAP)) }
+        return runCatching {
+            repository.backUp(
+                Base64.decode(key, Base64.NO_WRAP),
+                Base64.decode(salt, Base64.NO_WRAP),
+            )
+        }
             .fold(
                 onSuccess = { Result.success() },
                 // Retry: tonight's copy is worth having, and a failed write leaves the

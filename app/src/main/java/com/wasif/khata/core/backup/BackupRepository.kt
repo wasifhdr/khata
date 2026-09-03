@@ -34,7 +34,13 @@ class BackupRepository @Inject constructor(
     /** Newest by name, which sorts by the millis in it. */
     fun latest(): File? = backupDir().listFiles()?.maxByOrNull { it.name }
 
-    suspend fun backUp(key: ByteArray): File? = withContext(Dispatchers.IO) {
+    /**
+     * [salt] must be the salt [key] was derived from: it goes in the header, and a
+     * restore derives its key from it. Writing a fresh salt here while the key came
+     * from another makes every backup unopenable by passphrase -- which is the only
+     * way a backup is ever opened on a replacement phone.
+     */
+    suspend fun backUp(key: ByteArray, salt: ByteArray): File? = withContext(Dispatchers.IO) {
         // Room runs in WAL mode, so the newest transactions live in khata.db-wal until
         // this folds them in. Without it the backup silently omits exactly the rows most
         // likely to matter, and nothing notices until a restore.
@@ -50,7 +56,7 @@ class BackupRepository @Inject constructor(
         if (!source.exists()) return@withContext null
 
         val file = File(backupDir(), "khata-${clock.now()}.kbk")
-        file.writeBytes(BackupFile.write(source.readBytes(), key, SCHEMA_VERSION))
+        file.writeBytes(BackupFile.write(source.readBytes(), key, SCHEMA_VERSION, salt))
 
         backupDir().listFiles()
             ?.sortedBy { it.name }
