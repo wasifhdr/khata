@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">Khata</string>
+
+    <!-- Not shown: the widget's targets are glyphs only. These are what a screen
+         reader announces, which is the one reader that cannot see a minus sign. -->
+    <string name="widget_spent">Cash spent</string>
+    <string name="widget_received">Cash received</string>
+    <string name="widget_minus">−</string>
+    <string name="widget_plus">+</string>
+    <string name="widget_description">Record cash in or out</string>
 </resources>

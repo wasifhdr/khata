@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  No colour attributes anywhere. Every fill, glyph and the separator are pushed at
+  runtime by CashWidgetProvider, because the surface follows the tuner across 512
+  combinations and a literal here would be correct in exactly one of them.
+
+  The glyphs carry the meaning on their own; the colours reinforce. The words
+  survive only as contentDescription, for a screen reader that cannot see either.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_surface"
+    android:orientation="horizontal">
+
+    <TextView
+        android:id="@+id/spent"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:contentDescription="@string/widget_spent"
+        android:gravity="center"
+        android:text="@string/widget_minus"
+        android:textSize="30sp" />
+
+    <!--
+      FrameLayout, not View: RemoteViews inflates only a whitelisted set of classes
+      and a bare View is not among them. It fails at inflation with "Class not
+      allowed to be inflated", which the launcher shows as "Can't load widget".
+    -->
+    <FrameLayout
+        android:id="@+id/separator"
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <TextView
+        android:id="@+id/received"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:contentDescription="@string/widget_received"
+        android:gravity="center"
+        android:text="@string/widget_plus"
+        android:textSize="30sp" />
+</LinearLayout>

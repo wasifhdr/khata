@@ -65,6 +65,7 @@ class TransactionDaoTest {
         amountMinor: Long = 10_000,
         direction: TransactionDirection = TransactionDirection.DEBIT,
         merchantRaw: String? = "SHWAPNO",
+        categoryId: Long? = null,
     ) =
         TransactionEntity(
             uuid = uuid,
@@ -74,7 +75,7 @@ class TransactionDaoTest {
             occurredAt = occurredAt,
             merchantRaw = merchantRaw,
             merchantId = null,
-            categoryId = null,
+            categoryId = categoryId,
             note = null,
             source = TransactionSource.MANUAL,
             confidence = Confidence.HIGH,
@@ -300,5 +301,36 @@ class TransactionDaoTest {
         val page = pager.refresh() as PagingSource.LoadResult.Page
 
         assertEquals(emptyList<String>(), page.data.map { it.uuid })
+    }
+
+    @Test
+    fun `recent categories come back most recently used first`() = runTest {
+        val bkash = insertAccount()
+        val cash = db.accountDao().upsert(
+            AccountEntity(
+                uuid = "acc-cash",
+                name = "Cash",
+                type = AccountType.CASH,
+                openingBalanceMinor = 0,
+                currentBalanceMinor = 0,
+                reportedBalanceMinor = null,
+                reportedBalanceAt = null,
+                includeInNetWorth = true,
+                smsIdentifiers = "",
+                createdAt = 1000,
+                updatedAt = 1000,
+            )
+        )
+        val older = Instant.parse("2026-08-01T10:00:00Z").toEpochMilli()
+        val newer = Instant.parse("2026-09-01T10:00:00Z").toEpochMilli()
+
+        db.transactionDao().upsert(transaction(cash, older, "t-old", categoryId = 7L))
+        db.transactionDao().upsert(transaction(cash, newer, "t-new", categoryId = 9L))
+        // Same category, wrong account: the cash sheet orders by cash habits.
+        db.transactionDao().upsert(transaction(bkash, newer, "t-other", categoryId = 3L))
+
+        val recent = db.transactionDao().observeRecentCategoryIds(cash, limit = 10).first()
+
+        assertEquals(listOf(9L, 7L), recent)
     }
 }

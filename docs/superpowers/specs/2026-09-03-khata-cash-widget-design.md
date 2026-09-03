@@ -43,11 +43,26 @@ implementation amends it to RemoteViews carrying this reason. Glance earns its p
 the day the face grows live data — a cash balance, recent-spend shortcuts — and not
 before.
 
-**The face itself:** a 2×1 cell, two equal targets split down the middle, each a
-glyph over a word — `−` **Spent** and `+` **Received**. The words are not decoration.
-`DESIGN.md` §1 forbids colour as the sole signal, and a bare `+` on a home screen
-reads as "add something" rather than "money in". Sizing is `targetCellWidth`/`Height`
-plus `minWidth`/`minHeight` in dp, since a launcher may honour either.
+**The face itself** (revised 2026-09-03, after seeing it on a launcher): a 2×1 cell,
+two equal targets split by a hairline rule — a red `−` and a green `+`, and nothing
+else. No labels.
+
+The words were in the first draft to satisfy `DESIGN.md` §1.3, colour never being the
+only signal. They are not needed: **`−` and `+` are shapes, and the shape is what
+carries the meaning here.** Colour reinforces it. The words survive as
+`contentDescription`, for the one reader that cannot see a minus sign.
+
+Red and green are **new colours**, and they are deliberately not the ledger's
+convention — that one gives credits the accent and leaves debits paper, which is
+tuned for finding a credit while scrolling a list. A pair of controls being offered
+is a different question from a row being read. They live in `core/ui/theme` as
+`moneyOut`/`moneyIn`, **fixed rather than tuned**, exactly as category colours are:
+they encode which way money moves, not taste. An accent-derived "in" would turn
+marigold the moment the tuner did. Both clear 7:1 on every shipped ground.
+
+**Sizing:** `targetCellWidth`/`Height` of 2×1, with `minWidth` at 110dp. The first
+draft set 180dp and the launcher rounded the widget up to three columns regardless of
+`targetCellWidth` — `minWidth` is the binding constraint, not the target.
 
 ---
 
@@ -79,9 +94,14 @@ directly; `SmsReceiver` already proves the pattern on a `BroadcastReceiver`.
 **The layout XML therefore carries no colour at all** — not even a placeholder. Every
 fill, tint and text colour arrives from the provider. `DESIGN.md` §1.1 bans colour
 literals outside `core/ui/theme` and enforces it with a test; a layout literal would
-be correct in one of the tuner's 512 combinations. The pairings the face uses —
-accent and paper on petrol — are ones the existing contrast suite already covers, so
-the widget inherits §1.2 rather than needing its own proof.
+be correct in one of the tuner's 512 combinations. The surface follows the tuner; the
+two glyph colours do not, for the reason given in §2.
+
+**One implementation constraint worth recording:** RemoteViews inflates only a
+whitelisted set of view classes, and a bare `<View>` is not among them — it fails with
+"Class not allowed to be inflated", which a launcher surfaces as the useless message
+"Can't load widget". The hairline separator is a `FrameLayout` for that reason and no
+other.
 
 **What cannot cross into the widget is blur and the mesh** — no `RenderEffect`, no
 AGSL grain. The face gets the tuner's ground, petrol and accent as flat fills and no

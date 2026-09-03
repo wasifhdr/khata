@@ -115,7 +115,7 @@ class TransactionRepositoryImpl @Inject constructor(
                     categoryId = draft.categoryId,
                     note = draft.note,
                     counterparty = draft.counterparty,
-                    source = existing?.source ?: TransactionSource.MANUAL,
+                    source = existing?.source ?: draft.source,
                     // Choosing a category by hand IS the confirmation. Without this
                     // a parsed row stays MEDIUM after you have categorised it, and
                     // the needs-attention list can never be emptied.

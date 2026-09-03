@@ -8,10 +8,17 @@ android
 
 ## Stack
 
-Kotlin · Jetpack Compose · Material 3 · Room · Hilt · Paging 3 · WorkManager · Glance ·
+Kotlin · Jetpack Compose · Material 3 · Room · Hilt · Paging 3 · WorkManager · RemoteViews ·
 Coil · kotlinx.serialization · Haze. `minSdk 33`, `compileSdk` / `targetSdk` 37.
 Confirmed with the user while writing
 `docs/superpowers/specs/2026-08-26-khata-wallet-design.md`; not delegated.
+
+The home-screen widget is `RemoteViews`, not Glance (2026-09-03). Its face carries no
+live data, so Glance would add a dependency and a second theming dialect to re-render
+nothing — and it would not have supplied `KhataTheme` either, having its own
+`ColorProviders`. The widget still follows the runtime tuner: `composeScheme` is a
+plain function the provider calls directly. Rationale in
+`docs/superpowers/specs/2026-09-03-khata-cash-widget-design.md` §2.
 
 The floor was raised from 30 to 33 for the glass design system: API 31 adds
 `RenderEffect`, without which `Modifier.blur` is a silent no-op, and 33 adds AGSL

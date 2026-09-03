@@ -210,6 +210,21 @@ interface TransactionDao {
     )
     fun observeSpendByCategory(fromInclusive: Long, toExclusive: Long): Flow<List<CategoryTotalRow>>
 
+    // ponytail: recency only. The spec asks for "recent and frequent"; for a
+    // handful of repeated cash categories both orderings converge, and this is one
+    // MAX() instead of a weighting nobody can tune. Add COUNT(*) as a tiebreaker if
+    // the order ever reads wrong.
+    @Query(
+        """
+        SELECT categoryId FROM transactions
+        WHERE deletedAt IS NULL AND accountId = :accountId AND categoryId IS NOT NULL
+        GROUP BY categoryId
+        ORDER BY MAX(occurredAt) DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeRecentCategoryIds(accountId: Long, limit: Int): Flow<List<Long>>
+
     // Everything, including transfers between your own accounts: they net to zero
     // across the pair, and dropping one side would invent a cliff.
     @Query(

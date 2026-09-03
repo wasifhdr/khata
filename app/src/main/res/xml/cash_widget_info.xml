@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two cells, one row. minWidth stays under the 2-cell threshold: set higher, a
+  launcher rounds the widget up to 3 columns regardless of targetCellWidth.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:initialLayout="@layout/widget_cash"
+    android:resizeMode="horizontal"
+    android:widgetCategory="home_screen" />
