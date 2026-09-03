@@ -10,6 +10,13 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
+    <!--
+      Absent until now, which silently disabled the AI fallback: a blocked socket
+      raises an IOException, GeminiClient catches it and answers null, and that is
+      indistinguishable from the model declining to draft a rule.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".KhataApplication"
         android:allowBackup="true"
