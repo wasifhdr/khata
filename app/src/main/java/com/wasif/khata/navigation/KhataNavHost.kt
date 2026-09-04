@@ -29,6 +29,7 @@ import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
+import com.wasif.khata.feature.search.SearchScreen
 import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
 import com.wasif.khata.feature.wallet.WalletScreen
@@ -44,6 +45,14 @@ object KhataRoutes {
     const val Insights = "insights"
     const val Categories = "categories"
     const val RuleEditor = "rules/new/{rawMessageId}"
+    const val Restaurants = "restaurants"
+    const val Restaurant = "restaurants/{restaurantId}"
+    const val VisitNew = "restaurants/visit/new"
+    const val VisitEdit = "restaurants/visit/{visitId}"
+    const val Wishlist = "wishlist"
+    const val Search = "search"
+    const val ArgRestaurantId = "restaurantId"
+    const val ArgVisitId = "visitId"
     const val EditorNew = "editor/new"
     const val EditorEdit = "editor/edit/{transactionId}"
     const val ArgTransactionId = "transactionId"
@@ -52,6 +61,10 @@ object KhataRoutes {
     fun editorEdit(id: Long): String = "editor/edit/$id"
 
     fun ruleEditor(rawMessageId: Long): String = "rules/new/$rawMessageId"
+
+    fun restaurant(id: Long): String = "restaurants/$id"
+
+    fun visitEdit(id: Long): String = "restaurants/visit/$id"
 }
 
 @Composable
@@ -104,6 +117,7 @@ fun KhataNavHost(homeView: HomeView) {
                     }
                 },
                 onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
+                onOpenSearch = { navController.navigate(KhataRoutes.Search) },
             )
         }
 
@@ -129,6 +143,14 @@ fun KhataNavHost(homeView: HomeView) {
                 onBack = { navController.popBackStack() },
                 onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+            )
+        }
+
+        composable(KhataRoutes.Search) {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+                onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
             )
         }
 

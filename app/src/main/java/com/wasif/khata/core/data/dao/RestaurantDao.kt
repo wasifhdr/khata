@@ -91,6 +91,18 @@ interface RestaurantDao {
     fun observeSummary(id: Long): Flow<RestaurantSummary?>
 
     /**
+     * Search results. Most recently visited first, and a restaurant never visited
+     * last -- FTS4 has no relevance ranking and none is invented here.
+     */
+    @Query(
+        SUMMARY_COLUMNS + """
+        WHERE r.id IN (:ids) AND r.deletedAt IS NULL
+        ORDER BY lastVisitedAt DESC, r.name COLLATE NOCASE
+        """,
+    )
+    suspend fun summariesByIds(ids: List<Long>): List<RestaurantSummary>
+
+    /**
      * Autocomplete. A LIKE prefix against a short list, ordered by most recently
      * visited -- not FTS, which would return fuzzier results in a field where the
      * user is trying to hit one specific row.

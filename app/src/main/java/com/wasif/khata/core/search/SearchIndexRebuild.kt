@@ -32,7 +32,11 @@ class SearchIndexRebuild @Inject constructor(
     }
 
     companion object {
-        /** Bump when the text an IndexSource produces changes shape. */
-        const val VERSION = 1
+        /**
+         * Bump when the text an IndexSource produces changes shape, or when a new
+         * source arrives with rows already in the database behind it -- version 2
+         * is PlaceIndexSource, whose table the spine had already been filling.
+         */
+        const val VERSION = 2
     }
 }

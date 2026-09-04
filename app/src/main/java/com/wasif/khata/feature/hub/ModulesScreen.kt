@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,12 +47,14 @@ import dev.chrisbanes.haze.HazeState
 fun ModulesScreen(
     onOpenWallet: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
     ModulesContent(
         state = viewModel.state.collectAsStateWithLifecycle().value,
         onOpenWallet = onOpenWallet,
         onOpenSettings = onOpenSettings,
+        onOpenSearch = onOpenSearch,
     )
 }
 
@@ -60,6 +63,7 @@ fun ModulesContent(
     state: ModulesUiState,
     onOpenWallet: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -74,6 +78,16 @@ fun ModulesContent(
                 Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
                 horizontalArrangement = Arrangement.End,
             ) {
+                // Search sits beside settings rather than on the field: it reaches
+                // every module at once, so it belongs to the hub rather than to any
+                // one of the tiles below.
+                NavCircle(
+                    icon = Icons.Filled.Search,
+                    description = "Search",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconSize = 22.dp,
+                    onClick = onOpenSearch,
+                )
                 NavCircle(
                     icon = Icons.Filled.Settings,
                     description = "Settings",

@@ -14,6 +14,8 @@ import com.wasif.khata.core.drive.DriveMedia
 import com.wasif.khata.core.drive.DriveUploader
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.search.IndexSource
+import com.wasif.khata.core.search.PlaceIndexSource
+import com.wasif.khata.core.search.RestaurantIndexSource
 import com.wasif.khata.core.search.TransactionIndexSource
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
@@ -62,6 +64,14 @@ abstract class RepositoryModule {
     @Binds
     @IntoSet
     abstract fun bindTransactionIndexSource(impl: TransactionIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindRestaurantIndexSource(impl: RestaurantIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindPlaceIndexSource(impl: PlaceIndexSource): IndexSource
 
     companion object {
         @Provides
