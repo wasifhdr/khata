@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.wasif.khata.core.drive.DriveUploader
+import com.wasif.khata.core.drive.MediaSync
 import com.wasif.khata.core.drive.UploadOutcome
 import com.wasif.khata.core.prefs.PreferencesRepository
 import dagger.assisted.Assisted
@@ -31,6 +32,7 @@ class BackupWorker @AssistedInject constructor(
     private val repository: BackupRepository,
     private val preferences: PreferencesRepository,
     private val uploader: DriveUploader,
+    private val mediaSync: MediaSync,
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -51,7 +53,14 @@ class BackupWorker @AssistedInject constructor(
         // The local copy is already on disk and stays there whatever happens next. A
         // retry re-runs a backup that already succeeded, which is cheap; the
         // alternative is a night with no offsite copy.
-        return when (uploader.upload(file)) {
+        val outcome = uploader.upload(file)
+
+        // After the archive, and never instead of it. A photo that fails to upload is
+        // not worth retrying the database backup for -- it is already safe on disk,
+        // and the next run picks it up because the name is still missing from Drive.
+        if (outcome == UploadOutcome.UPLOADED) runCatching { mediaSync.push() }
+
+        return when (outcome) {
             UploadOutcome.UPLOADED, UploadOutcome.SKIPPED -> Result.success()
             UploadOutcome.FAILED -> Result.retry()
         }

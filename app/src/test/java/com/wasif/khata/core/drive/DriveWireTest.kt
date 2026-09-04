@@ -88,6 +88,19 @@ class DriveWireTest {
         assertEquals(emptyList<DriveFile>(), toDelete(files, keep = 7))
     }
 
+    @Test
+    fun `pruning never touches a media blob`() {
+        // Blobs are named by hash, so they sort before "khata-..." and would all fall
+        // outside the newest seven. Without the archive filter one nightly backup
+        // would delete the entire photo library.
+        val archives = (1..9).map { DriveFile("id-$it", "khata-100$it.kbk") }
+        val blobs = listOf("a1b2c3", "f0e1d2").map { DriveFile("blob-$it", "$it.kbm") }
+
+        val doomed = toDelete(blobs + archives, keep = 7)
+
+        assertEquals(listOf("khata-1001.kbk", "khata-1002.kbk"), doomed.map { it.name })
+    }
+
     private fun ByteArray.indexOfSub(needle: ByteArray): Int =
         (0..size - needle.size).first { i ->
             needle.indices.all { this[i + it] == needle[it] }

@@ -46,9 +46,16 @@ fun parseFileList(json: String): List<DriveFile> = runCatching {
 fun parseFileId(json: String): String? =
     runCatching { JSONObject(json).optString("id").ifBlank { null } }.getOrNull()
 
+/** Archives rotate; media blobs do not. The folder holds both. */
+const val ARCHIVE_SUFFIX = ".kbk"
+
 /**
  * Sorted by name and dropping the newest [keep], which matches BackupRepository's
  * local prune exactly. The two must agree, or Drive drifts from the phone.
+ *
+ * Archives only. Media blobs share the folder and sort before the archives by name,
+ * so without this filter every blob would fall outside the newest seven and the
+ * nightly rotation would delete the entire photo library.
  */
 fun toDelete(files: List<DriveFile>, keep: Int): List<DriveFile> =
-    files.sortedBy { it.name }.dropLast(keep)
+    files.filter { it.name.endsWith(ARCHIVE_SUFFIX) }.sortedBy { it.name }.dropLast(keep)

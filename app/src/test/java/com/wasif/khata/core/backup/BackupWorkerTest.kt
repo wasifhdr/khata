@@ -8,8 +8,11 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.drive.DriveMedia
 import com.wasif.khata.core.drive.DriveUploader
+import com.wasif.khata.core.drive.MediaSync
 import com.wasif.khata.core.drive.UploadOutcome
+import com.wasif.khata.core.media.MediaStore
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.prefs.PreferencesRepository
@@ -112,6 +115,16 @@ class BackupWorkerTest {
                         repository,
                         FakePreferences(key, salt),
                         uploader,
+                        MediaSync(
+                            drive = object : DriveMedia {
+                                override suspend fun blobNames() = emptyList<String>()
+                                override suspend fun putBlob(name: String, bytes: ByteArray) = true
+                                override suspend fun getBlob(name: String): ByteArray? = null
+                            },
+                            store = MediaStore(appContext, db.mediaDao(), clock),
+                            dao = db.mediaDao(),
+                            preferences = FakePreferences(key, salt),
+                        ),
                     )
                 })
                 .build()

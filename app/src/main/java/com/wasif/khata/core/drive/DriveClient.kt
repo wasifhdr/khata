@@ -36,6 +36,16 @@ interface DriveBackups {
     suspend fun download(id: String): ByteArray?
 }
 
+/**
+ * Media's view of Drive: blobs by name. Named separately from DriveBackups because
+ * the rotation does not apply -- a blob goes up once and stays.
+ */
+interface DriveMedia {
+    suspend fun blobNames(): List<String>
+    suspend fun putBlob(name: String, bytes: ByteArray): Boolean
+    suspend fun getBlob(name: String): ByteArray?
+}
+
 private const val FILES = "https://www.googleapis.com/drive/v3/files"
 private const val UPLOAD = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
 private const val FOLDER_MIME = "application/vnd.google-apps.folder"
@@ -49,7 +59,7 @@ class DriveClient @Inject constructor(
     private val auth: DriveAuth,
     private val preferences: PreferencesRepository,
     private val clock: KhataClock,
-) : DriveUploader, DriveBackups {
+) : DriveUploader, DriveBackups, DriveMedia {
 
     override suspend fun upload(file: File): UploadOutcome = withContext(Dispatchers.IO) {
         val token = when (val result = auth.token()) {
@@ -91,11 +101,49 @@ class DriveClient @Inject constructor(
     override suspend fun list(): List<DriveFile> = withContext(Dispatchers.IO) {
         val token = (auth.token() as? TokenResult.Token)?.value ?: return@withContext emptyList()
         val folder = folderId(token) ?: return@withContext emptyList()
-        listFiles(token, folder).sortedByDescending { it.name }
+        listFiles(token, folder)
+            .filter { it.name.endsWith(ARCHIVE_SUFFIX) }
+            .sortedByDescending { it.name }
     }
 
     override suspend fun download(id: String): ByteArray? = withContext(Dispatchers.IO) {
         val token = (auth.token() as? TokenResult.Token)?.value ?: return@withContext null
+        get(url = "$FILES/$id?alt=media", token = token)
+    }
+
+    override suspend fun blobNames(): List<String> = withContext(Dispatchers.IO) {
+        val token = (auth.token() as? TokenResult.Token)?.value ?: return@withContext emptyList()
+        val folder = folderId(token) ?: return@withContext emptyList()
+        listFiles(token, folder).map { it.name }.filterNot { it.endsWith(ARCHIVE_SUFFIX) }
+    }
+
+    override suspend fun putBlob(name: String, bytes: ByteArray): Boolean =
+        withContext(Dispatchers.IO) {
+            val token = (auth.token() as? TokenResult.Token)?.value ?: return@withContext false
+            val folder = folderId(token) ?: return@withContext false
+
+            val metadata = JSONObject()
+                .put("name", name)
+                .put("parents", JSONArray().put(folder))
+                .toString()
+            val boundary = "khata-blob-${clock.now()}"
+            val created = post(
+                url = UPLOAD,
+                token = token,
+                contentType = "multipart/related; boundary=$boundary",
+                body = multipartBody(metadata, bytes, boundary),
+            ) ?: return@withContext false
+
+            // No pruning here, deliberately: the KEEP rotation is for archives. A
+            // blob is written once and referenced by rows that outlive seven nights.
+            parseFileId(created) != null
+        }
+
+    override suspend fun getBlob(name: String): ByteArray? = withContext(Dispatchers.IO) {
+        val token = (auth.token() as? TokenResult.Token)?.value ?: return@withContext null
+        val folder = folderId(token) ?: return@withContext null
+        val id = listFiles(token, folder).firstOrNull { it.name == name }?.id
+            ?: return@withContext null
         get(url = "$FILES/$id?alt=media", token = token)
     }
 

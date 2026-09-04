@@ -9,6 +9,7 @@ import com.wasif.khata.core.data.repository.BudgetRepository
 import com.wasif.khata.core.data.repository.MonthLimits
 import com.wasif.khata.core.drive.DriveBackups
 import com.wasif.khata.core.drive.DriveClient
+import com.wasif.khata.core.drive.DriveMedia
 import com.wasif.khata.core.drive.DriveUploader
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.search.IndexSource
@@ -49,6 +50,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindDriveBackups(impl: DriveClient): DriveBackups
+
+    @Binds
+    @Singleton
+    abstract fun bindDriveMedia(impl: DriveClient): DriveMedia
 
     @Binds
     @IntoSet
