@@ -186,6 +186,9 @@ private class FakeTransactionRepository(
     override suspend fun recordUnexplained(draft: TransactionDraft): Result<Long> = TODO()
     override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = TODO()
     override suspend fun delete(id: Long): Result<Unit> = TODO()
+    override suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long) =
+        Result.success(Unit)
+    override suspend fun dismissTransferReview(transactionId: Long) = Result.success(Unit)
     override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = TODO()
     override fun observeMostRecent(): Flow<Transaction?> = TODO()
     override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = TODO()

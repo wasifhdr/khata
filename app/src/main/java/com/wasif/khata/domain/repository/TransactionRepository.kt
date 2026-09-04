@@ -61,6 +61,15 @@ interface TransactionRepository {
     suspend fun resetToZero(accountId: Long, at: Long): Result<Long?>
     suspend fun delete(id: Long): Result<Unit>
 
+    /**
+     * Records that a movement went to another of the owner's accounts: writes the
+     * other side, pairs the two, and takes both out of spending.
+     */
+    suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long): Result<Unit>
+
+    /** Records that it did not: the row stays ordinary spending, and stops asking. */
+    suspend fun dismissTransferReview(transactionId: Long): Result<Unit>
+
     /** Debits only, over a half-open window. Boundaries are the caller's to compute in Dhaka. */
     fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money>
 

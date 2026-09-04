@@ -49,6 +49,9 @@ class ModulesViewModelTest {
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
         override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = Result.success(null)
         override suspend fun delete(id: Long) = Result.success(Unit)
+        override suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long) =
+            Result.success(Unit)
+        override suspend fun dismissTransferReview(transactionId: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> {
             requestedSpendWindow = fromInclusive to toExclusive
             return spend

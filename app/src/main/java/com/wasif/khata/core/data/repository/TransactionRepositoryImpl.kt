@@ -224,6 +224,73 @@ class TransactionRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun settleAsOwnTransfer(
+        transactionId: Long,
+        otherAccountId: Long,
+    ): Result<Unit> = runCatchingData {
+        db.withTransaction {
+            val original = transactionDao.findById(transactionId) ?: throw DataError.NotFound
+            // Already settled -- by the other door, or by a partner arriving late.
+            // Writing a second mirror would credit the account twice.
+            if (original.transferGroupId != null) return@withTransaction
+
+            val now = clock.now()
+            // The mirror is the same movement seen from the other side: same amount,
+            // same moment, opposite direction.
+            val mirrorDirection = when (original.direction) {
+                TransactionDirection.DEBIT -> TransactionDirection.CREDIT
+                TransactionDirection.CREDIT -> TransactionDirection.DEBIT
+            }
+            val mirrorId = transactionDao.upsert(
+                TransactionEntity(
+                    uuid = UUID.randomUUID().toString(),
+                    accountId = otherAccountId,
+                    amountMinor = original.amountMinor,
+                    direction = mirrorDirection,
+                    occurredAt = original.occurredAt,
+                    merchantRaw = original.merchantRaw,
+                    merchantId = null,
+                    categoryId = null,
+                    note = null,
+                    counterparty = null,
+                    // MANUAL, because no message said this: the owner did.
+                    source = TransactionSource.MANUAL,
+                    confidence = Confidence.HIGH,
+                    kind = TransactionKind.TRANSFER,
+                    rawMessageId = null,
+                    transferGroupId = null,
+                    feeMinor = null,
+                    referenceNumber = null,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+
+            // The other account gains what this one lost. Without this the money
+            // leaves net worth, which is worse than counting it as spending.
+            accountDao.adjustBalance(
+                otherAccountId,
+                signedMinor(original.amountMinor, mirrorDirection),
+                now,
+            )
+
+            // Marks both TRANSFER, joins them, and clears the review flag in one go.
+            transactionDao.markAsTransfer(
+                listOf(original.id, mirrorId),
+                UUID.randomUUID().toString(),
+                now,
+            )
+
+            searchIndex.reindex("transaction", original.id)
+            searchIndex.reindex("transaction", mirrorId)
+        }
+    }
+
+    override suspend fun dismissTransferReview(transactionId: Long): Result<Unit> =
+        runCatchingData {
+            transactionDao.setReviewPending(transactionId, pending = false, updatedAt = clock.now())
+        }
+
     override suspend fun delete(id: Long): Result<Unit> = runCatchingData {
         db.withTransaction {
             val existing = transactionDao.findById(id) ?: throw DataError.NotFound
