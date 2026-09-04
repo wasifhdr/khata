@@ -104,7 +104,7 @@ class Migration6To7Test {
         }
 
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_6_7)
+            .addMigrations(MIGRATION_6_7, MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
 
