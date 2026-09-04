@@ -118,10 +118,16 @@ empty result list. The manual fields are already on screen beneath the search bo
 nothing to recover from and nothing to explain — the user simply types, exactly as they would
 have with no key at all.
 
-**The poster** is downloaded on pick, downscaled and stored by the spine's existing media path
-(§4 of the spine spec: 2048px / q85, content-addressed, write-once). It rides to Drive with
-every other photo. That is mildly wasteful for an image that could be refetched, and it is not
-worth a second backup path to avoid.
+**The poster** is downloaded on pick and stored through the spine's existing media path —
+content-addressed, write-once, one file per hash (`MediaStore.importBytes`). It rides to Drive
+with every other photo. That is mildly wasteful for an image that could be refetched, and it is
+not worth a second backup path to avoid.
+
+It is **not** downscaled, unlike a gallery photo: a `w500` poster is already far under the
+2048px edge, so re-encoding it would cost quality to save nothing. The bytes are stored exactly
+as they arrived, which is also why reading their dimensions with `BitmapFactory` is safe here
+where the gallery path deliberately avoids it — nothing is re-encoded, so there is no EXIF
+orientation to lose.
 
 **The refresh** (W6) happens in the title screen's view model on open: if `tmdbId` is present,
 `tmdbRatingAt` is over seven days old, and a search call succeeds, `tmdbRating` and
