@@ -28,9 +28,21 @@ class SearchQueryTest {
     }
 
     @Test
+    fun `a hyphen is a separator, never FTS's NOT operator`() {
+        // A merchant reference like LTD-6-RM7123 is ordinary text to the person
+        // typing it. To FTS4 a leading - is NOT, so leaving it in means "ltd, but
+        // not 6 and not rm7123" -- which answered with 163 of 1154 rows on a real
+        // ledger. unicode61 splits on - when indexing, so the query must too.
+        assertEquals("LTD 6 RM7123*", ftsQuery("LTD-6-RM7123"))
+        // And a leading one is a malformed MATCH expression, i.e. a SQL exception.
+        assertEquals("shop*", ftsQuery("-shop"))
+    }
+
+    @Test
     fun `an empty or punctuation-only query searches for nothing`() {
         assertNull(ftsQuery(""))
         assertNull(ftsQuery("   "))
         assertNull(ftsQuery("\"*^"))
+        assertNull(ftsQuery("---"))
     }
 }

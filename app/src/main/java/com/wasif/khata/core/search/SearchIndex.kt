@@ -5,8 +5,16 @@ import com.wasif.khata.core.data.entity.SearchFtsEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** FTS operators, and the quote that turns a typo into a SQL error. */
-private val OPERATORS = Regex("""["'*^():]|\b(AND|OR|NOT|NEAR)\b""")
+/**
+ * FTS operators, and the quote that turns a typo into a SQL error.
+ *
+ * The hyphen is in here because FTS4 reads a leading `-` as NOT. Without it, searching
+ * a reference like `LTD-6-RM7123` means "ltd, but not 6 and not rm7123" and answers
+ * with most of the ledger, while a query starting with one is a malformed-MATCH
+ * exception. unicode61 already splits on `-` when indexing, so replacing it with a
+ * space is exactly what makes a query tokenize the way the text did.
+ */
+private val OPERATORS = Regex("""["'*^():-]|\b(AND|OR|NOT|NEAR)\b""")
 
 /**
  * Null when there is nothing to search for. Callers treat that as "no query" rather
