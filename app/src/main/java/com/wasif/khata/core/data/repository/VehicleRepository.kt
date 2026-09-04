@@ -2,9 +2,13 @@ package com.wasif.khata.core.data.repository
 
 import com.wasif.khata.core.data.dao.CostTotals
 import com.wasif.khata.core.data.dao.ItemSpend
+import com.wasif.khata.core.data.dao.MediaDao
+import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.ServiceSummary
 import com.wasif.khata.core.data.dao.VehicleDao
 import com.wasif.khata.core.data.dao.YearSpend
+import com.wasif.khata.core.data.entity.MediaEntity
+import com.wasif.khata.core.data.entity.PlaceEntity
 import com.wasif.khata.core.data.entity.ServiceEntity
 import com.wasif.khata.core.data.entity.ServiceItemEntity
 import com.wasif.khata.core.data.entity.VehicleEntity
@@ -60,6 +64,8 @@ fun otherMinor(summary: ServiceSummary): Long? {
 @Singleton
 class VehicleRepository @Inject constructor(
     private val dao: VehicleDao,
+    private val places: PlaceDao,
+    private val mediaDao: MediaDao,
     private val searchIndex: SearchIndex,
     private val clock: KhataClock,
 ) {
@@ -83,6 +89,8 @@ class VehicleRepository @Inject constructor(
 
     fun observeVehicle(): Flow<VehicleEntity?> = dao.observeVehicle()
 
+    suspend fun observeVehicleOnce(): VehicleEntity? = dao.firstVehicle()
+
     suspend fun saveVehicle(vehicle: VehicleEntity) {
         dao.upsert(vehicle.copy(updatedAt = clock.now()))
     }
@@ -104,6 +112,35 @@ class VehicleRepository @Inject constructor(
     suspend fun items(serviceId: Long): List<ServiceItemEntity> = dao.itemsFor(serviceId)
 
     suspend fun summariesByIds(ids: List<Long>): List<ServiceSummary> = dao.summariesByIds(ids)
+
+    suspend fun photosFor(entityId: Long): List<MediaEntity> =
+        mediaDao.mediaFor(ENTITY_VEHICLE_SERVICE, entityId)
+
+    suspend fun workshopSuggestions(prefix: String): List<PlaceEntity> =
+        if (prefix.isBlank()) emptyList() else places.namesLike(prefix.trim())
+
+    suspend fun place(id: Long): PlaceEntity? = places.findById(id)
+
+    /**
+     * The same findOrCreate shape as tags and restaurants: being made to register a
+     * workshop before recording a repair is the chore that gets a module abandoned.
+     * NOCASE, so "Navana" and "navana" do not become two workshops.
+     */
+    suspend fun findOrCreateWorkshop(name: String): Long {
+        val trimmed = name.trim()
+        places.findByName(trimmed)?.let { return it.id }
+        val now = clock.now()
+        val id = places.upsert(
+            PlaceEntity(
+                uuid = UUID.randomUUID().toString(),
+                name = trimmed,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        searchIndex.reindex("place", id)
+        return id
+    }
 
     /**
      * The service and its items in one call, because they are one thing the user

@@ -36,7 +36,13 @@ class VehicleRepositoryTest {
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
         dao = db.vehicleDao()
-        repository = VehicleRepository(dao = dao, searchIndex = searchIndex(db), clock = clock)
+        repository = VehicleRepository(
+            dao = dao,
+            places = db.placeDao(),
+            mediaDao = db.mediaDao(),
+            searchIndex = searchIndex(db),
+            clock = clock,
+        )
     }
 
     @After

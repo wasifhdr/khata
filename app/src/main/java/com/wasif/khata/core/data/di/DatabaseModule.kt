@@ -13,6 +13,7 @@ import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.RestaurantDao
+import com.wasif.khata.core.data.dao.VehicleDao
 import com.wasif.khata.core.data.dao.SearchDao
 import com.wasif.khata.core.data.dao.TagDao
 import com.wasif.khata.core.data.dao.TransactionDao
@@ -61,6 +62,8 @@ object DatabaseModule {
     @Provides fun provideTagDao(db: KhataDatabase): TagDao = db.tagDao()
     @Provides fun provideSearchDao(db: KhataDatabase): SearchDao = db.searchDao()
     @Provides fun provideRestaurantDao(db: KhataDatabase): RestaurantDao = db.restaurantDao()
+
+    @Provides fun provideVehicleDao(db: KhataDatabase): VehicleDao = db.vehicleDao()
 }
 
 @Module

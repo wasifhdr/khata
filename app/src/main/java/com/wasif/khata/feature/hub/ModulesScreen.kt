@@ -57,6 +57,7 @@ fun ModulesScreen(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenRestaurants: () -> Unit,
+    onOpenVehicle: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
@@ -84,6 +85,7 @@ fun ModulesScreen(
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
         onOpenRestaurants = onOpenRestaurants,
+        onOpenVehicle = onOpenVehicle,
     )
 }
 
@@ -94,6 +96,7 @@ fun ModulesContent(
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenRestaurants: () -> Unit,
+    onOpenVehicle: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -170,7 +173,19 @@ fun ModulesContent(
                     )
                     DormantTile(haze = haze, name = "Watchlist", modifier = Modifier.weight(1f))
                 }
-                DormantRow(haze = haze, left = "Notes", right = "Car service")
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    ModuleTile(
+                        haze = haze,
+                        name = "Car service",
+                        subline = "History and what it costs",
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenVehicle,
+                    )
+                    DormantTile(haze = haze, name = "Notes", modifier = Modifier.weight(1f))
+                }
             }
         }
     }
@@ -271,19 +286,6 @@ private fun BudgetRing(fraction: Float) {
             style = MaterialTheme.typography.labelLarge,
             color = value,
         )
-    }
-}
-
-@Composable
-private fun DormantRow(haze: HazeState, left: String, right: String) {
-    val spacing = LocalSpacing.current
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-    ) {
-        listOf(left, right).forEach { name ->
-            DormantTile(haze = haze, name = name, modifier = Modifier.weight(1f))
-        }
     }
 }
 
