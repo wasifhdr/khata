@@ -59,7 +59,6 @@ class LedgerViewModelTest {
     private val spend = MutableStateFlow(Money.ZERO)
     private var requestedWindow: Pair<Long, Long>? = null
     private var requestedQuery: String? = null
-    private var requestedNeedsAttention = false
 
     private val clock = object : KhataClock {
         override fun now(): Long = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
@@ -131,11 +130,6 @@ class LedgerViewModelTest {
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
-        override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> {
-            requestedNeedsAttention = true
-            return flowOf(PagingData.from(emptyList(), sourceLoadStates = endOfPagination))
-        }
-        override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
         override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
@@ -171,8 +165,6 @@ class LedgerViewModelTest {
         override suspend fun delete(id: Long) = Result.success(Unit)
         override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = spend
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = dayTotals
-        override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
-        override fun observeNeedsAttentionCount(): Flow<Int> = flowOf(0)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
         override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> =
             flowOf(Money.ZERO)
@@ -438,47 +430,4 @@ class LedgerViewModelTest {
             }
         }
 
-    @Test
-    fun `the needs-attention filter spans all time, not the viewed month`() = runTest(dispatcher) {
-        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
-        viewModel.items.asSnapshot()
-        requestedWindow = null
-
-        viewModel.onNeedsAttentionToggled()
-        viewModel.items.asSnapshot()
-
-        // The point is to find every uncertain row, not the uncertain rows in
-        // one month -- a row you never checked is not less uncertain in July.
-        assertEquals(true, requestedNeedsAttention)
-        assertEquals(null, requestedWindow)
-    }
-
-    @Test
-    fun `a search outranks an active needs-attention filter`() = runTest(dispatcher) {
-        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
-        viewModel.onNeedsAttentionToggled()
-        viewModel.items.asSnapshot()
-        requestedNeedsAttention = false
-
-        viewModel.onQueryChange("pathao")
-        viewModel.items.asSnapshot()
-
-        // Typing a name is a specific question; it should not be silently
-        // narrowed to the rows that happen to be unchecked.
-        assertEquals("pathao", requestedQuery)
-        assertEquals(false, requestedNeedsAttention)
-    }
-
-    @Test
-    fun `toggling the filter off returns to the windowed month`() = runTest(dispatcher) {
-        val viewModel = LedgerViewModel(repositoryReturning(), referenceData, clock)
-        viewModel.onNeedsAttentionToggled()
-        viewModel.items.asSnapshot()
-        requestedWindow = null
-
-        viewModel.onNeedsAttentionToggled()
-        viewModel.items.asSnapshot()
-
-        assertEquals(true, requestedWindow != null)
-    }
 }

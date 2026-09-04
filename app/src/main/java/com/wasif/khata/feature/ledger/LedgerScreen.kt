@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,7 +65,6 @@ import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.component.NavCircle
-import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.AmountTextStyle
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
@@ -87,9 +87,6 @@ fun LedgerScreen(
         canGoForward = viewModel.canGoForward.collectAsStateWithLifecycle().value,
         query = viewModel.query.collectAsStateWithLifecycle().value,
         onQueryChange = viewModel::onQueryChange,
-        needsAttentionOnly = viewModel.needsAttentionOnly.collectAsStateWithLifecycle().value,
-        needsAttentionCount = viewModel.needsAttentionCount.collectAsStateWithLifecycle().value,
-        onNeedsAttentionToggled = viewModel::onNeedsAttentionToggled,
         onPreviousMonth = viewModel::onPreviousMonth,
         onNextMonth = viewModel::onNextMonth,
         onBack = onBack,
@@ -106,9 +103,6 @@ fun LedgerContent(
     canGoForward: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
-    needsAttentionOnly: Boolean,
-    needsAttentionCount: Int,
-    onNeedsAttentionToggled: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onBack: () -> Unit,
@@ -123,8 +117,8 @@ fun LedgerContent(
     // The ledger's header is a set of controls rather than a title, so it keeps
     // them and takes only the treatment: it floats over the list, turns to glass
     // as the rows pass beneath it, and gives up its air the same way. Its height
-    // is measured rather than fixed, because the month strip and the filter come
-    // and go.
+    // is measured rather than fixed, because the month strip comes and goes with
+    // search.
     var headerPx by remember { mutableIntStateOf(0) }
     val headerHeight = with(LocalDensity.current) { headerPx.toDp() }
 
@@ -212,29 +206,7 @@ fun LedgerContent(
                 )
             }
 
-            // Offered only when there is something to review. A filter that always
-            // reads "0 to check" trains you to stop looking at it, and then it is
-            // still there on the day it says 4.
-            if (needsAttentionCount > 0 || needsAttentionOnly) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = spacing.screenHorizontal)
-                        .padding(bottom = spacing.sm),
-                ) {
-                    Pill(
-                        // The count is in the label, not a coloured dot: the number
-                        // is the whole reason to tap it.
-                        text = if (needsAttentionOnly) {
-                            "Showing $needsAttentionCount to check"
-                        } else {
-                            "$needsAttentionCount to check"
-                        },
-                        selected = needsAttentionOnly,
-                        onClick = onNeedsAttentionToggled,
-                    )
-                }
-            }
+            Spacer(Modifier.height(spacing.sm))
 
           }
           }

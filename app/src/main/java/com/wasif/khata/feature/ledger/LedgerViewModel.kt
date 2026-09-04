@@ -103,38 +103,22 @@ class LedgerViewModel @Inject constructor(
         _query.value = value
     }
 
-    private val _needsAttentionOnly = MutableStateFlow(false)
-    val needsAttentionOnly: StateFlow<Boolean> = _needsAttentionOnly.asStateFlow()
-
-    /** Drives the filter's own badge, so it can say how much it would show. */
-    val needsAttentionCount: StateFlow<Int> = repository.observeNeedsAttentionCount()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
-
-    fun onNeedsAttentionToggled() {
-        _needsAttentionOnly.value = !_needsAttentionOnly.value
-    }
-
     @OptIn(ExperimentalCoroutinesApi::class)
     val items: Flow<PagingData<LedgerItem>> =
-        combine(_viewedMonth, _query, _needsAttentionOnly) { month, q, attention ->
-            Triple(month, q, attention)
+        combine(_viewedMonth, _query) { month, q ->
+            month to q
         }
         // Search spans all time: hunting for one past transaction is a distinct
         // job from reviewing a month, and confining it to the viewed month would
         // make the common case -- "I know I bought it, I forget when" -- fail.
         // flatMapLatest cancels the previous stream rather than stacking one page
         // load per keystroke.
-        .flatMapLatest { (month, q, attention) ->
-            when {
-                // Needs-attention spans all time for the same reason search does: the
-                // point is to find every uncertain row, not the uncertain rows in one
-                // month. It outranks the month window but not an active search.
-                q.isNotBlank() -> repository.pagedTransactions(q)
-                attention -> repository.pagedNeedsAttention()
-                else -> {
-                    val (from, to) = month.dhakaWindow()
-                    repository.pagedTransactionsBetween(from, to)
-                }
+        .flatMapLatest { (month, q) ->
+            if (q.isNotBlank()) {
+                repository.pagedTransactions(q)
+            } else {
+                val (from, to) = month.dhakaWindow()
+                repository.pagedTransactionsBetween(from, to)
             }
         }
         // cachedIn goes BEFORE the combine, not after. observeDayTotals() is a

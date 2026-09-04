@@ -71,9 +71,7 @@ interface TransactionRepository {
 
     /** Spending per Dhaka calendar day, for ledger day headers. */
     /** Anything the pipeline was not certain about — MEDIUM as well as LOW. */
-    fun pagedNeedsAttention(): Flow<PagingData<Transaction>>
 
-    fun observeNeedsAttentionCount(): Flow<Int>
 
     fun observeDayTotals(): Flow<Map<LocalDate, Money>>
 }

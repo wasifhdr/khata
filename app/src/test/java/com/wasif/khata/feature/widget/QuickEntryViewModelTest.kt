@@ -189,8 +189,6 @@ private class FakeTransactionRepository(
     override fun observeSpentBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = TODO()
     override fun observeMostRecent(): Flow<Transaction?> = TODO()
     override fun observeReceivedBetween(fromInclusive: Long, toExclusive: Long): Flow<Money> = TODO()
-    override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> = TODO()
-    override fun observeNeedsAttentionCount(): Flow<Int> = TODO()
     override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = TODO()
 }
 

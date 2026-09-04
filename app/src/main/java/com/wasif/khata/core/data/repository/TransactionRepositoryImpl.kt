@@ -81,10 +81,7 @@ class TransactionRepositoryImpl @Inject constructor(
             toExclusive = toExclusive,
         ).map { Money(it) }
 
-    override fun pagedNeedsAttention(): Flow<PagingData<Transaction>> =
-        paged { transactionDao.pagingSourceNeedsAttention() }
 
-    override fun observeNeedsAttentionCount(): Flow<Int> = transactionDao.observeNeedsAttentionCount()
 
     override fun observeDayTotals(): Flow<Map<LocalDate, Money>> =
         transactionDao.observeDayTotals().map { rows ->
