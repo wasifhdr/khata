@@ -134,6 +134,13 @@ interface RestaurantDao {
     @Upsert
     suspend fun upsertDishes(dishes: List<VisitDishEntity>)
 
+    /**
+     * The editor holds the whole list, so saving it is a replace. Soft-deleted rather
+     * than removed, for the same reason every other row in this database is.
+     */
+    @Query("UPDATE visit_dishes SET deletedAt = :now, updatedAt = :now WHERE visitId = :visitId AND deletedAt IS NULL")
+    suspend fun clearDishes(visitId: Long, now: Long)
+
     @Query(
         "SELECT * FROM visit_dishes WHERE visitId = :visitId AND deletedAt IS NULL " +
             "ORDER BY sortOrder, id",
