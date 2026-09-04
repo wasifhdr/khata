@@ -17,6 +17,7 @@ import com.wasif.khata.core.search.IndexSource
 import com.wasif.khata.core.search.PlaceIndexSource
 import com.wasif.khata.core.search.RestaurantIndexSource
 import com.wasif.khata.core.search.TransactionIndexSource
+import com.wasif.khata.core.search.TitleIndexSource
 import com.wasif.khata.core.search.VehicleServiceIndexSource
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
@@ -78,6 +79,10 @@ abstract class RepositoryModule {
     @Binds
     @IntoSet
     abstract fun bindVehicleServiceIndexSource(impl: VehicleServiceIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindTitleIndexSource(impl: TitleIndexSource): IndexSource
 
     companion object {
         @Provides
