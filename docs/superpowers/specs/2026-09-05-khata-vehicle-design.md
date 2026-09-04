@@ -83,8 +83,11 @@ it as zero.
 **`servicedAt`** is UTC epoch millis, displayed and bucketed in `Asia/Dhaka` — the house rule,
 unchanged.
 
-**The single vehicle** is seeded by the migration: one row named "Car", so no screen ever has to
-handle an empty parent and the first service has somewhere to attach. The user renames it inline.
+**The single vehicle** is created lazily by the repository — `findOrCreateVehicle()` returns the
+first live row or inserts one named "Car" — so no screen ever has to handle an empty parent. Not
+seeded by the migration: a fresh install creates its schema from the entities and runs no
+migration at all, so seeding there would need the same row written in two places and would
+eventually be written in only one.
 
 ### The derived pieces
 
@@ -179,7 +182,7 @@ Bengali script must render in workshop names, item names, and notes, as everywhe
 Matching the existing suite: DAO, repository, and Compose tests in `app/src/test` under
 Robolectric.
 
-- **`Migration11To12Test`** — tables, indices, and the seeded vehicle row.
+- **`Migration11To12Test`** — tables and indices.
 - **Cost per km** — two services with readings give a figure; one service gives `null`; two
   services at the same odometer give `null` rather than dividing by zero.
 - **Yearly totals** bucket in `Asia/Dhaka`, proven by a service timestamped inside the hours
