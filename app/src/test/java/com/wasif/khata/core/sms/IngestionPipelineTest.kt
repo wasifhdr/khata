@@ -9,6 +9,7 @@ import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -64,7 +65,11 @@ class IngestionPipelineTest {
             accountDao = db.accountDao(),
             merchantDao = db.merchantDao(),
             engine = RuleEngine(),
-            pairing = TransferPairing(db.transactionDao(), clock),
+            pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            ),
             clock = clock,
         )
     }

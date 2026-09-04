@@ -13,6 +13,7 @@ import com.wasif.khata.core.sms.IngestionPipeline
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.RuleEngine
 import com.wasif.khata.core.sms.TransferPairing
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
@@ -70,7 +71,11 @@ class RuleEditorViewModelTest {
             accountDao = db.accountDao(),
             merchantDao = db.merchantDao(),
             engine = RuleEngine(),
-            pairing = TransferPairing(db.transactionDao(), clock),
+            pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            ),
             clock = clock,
         )
         rawId = db.rawMessageDao().insertIgnoringDuplicate(

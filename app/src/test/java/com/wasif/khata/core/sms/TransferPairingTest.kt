@@ -9,6 +9,7 @@ import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import java.time.Instant
 import java.util.UUID
@@ -43,7 +44,11 @@ class TransferPairingTest {
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
         DatabaseSeeder(db.accountDao(), db.categoryDao(), db.parsingRuleDao(), clock).seedIfEmpty()
-        pairing = TransferPairing(db.transactionDao(), clock)
+        pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            )
     }
 
     @After
