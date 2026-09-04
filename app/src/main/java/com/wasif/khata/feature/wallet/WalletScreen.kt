@@ -30,6 +30,11 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.wasif.khata.feature.settle.SettleTransferSheet
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,8 +65,13 @@ fun WalletScreen(
     onOpenLedger: () -> Unit,
     onOpenOwed: () -> Unit,
     onOpenInsights: () -> Unit,
+    /** Set when the notification's "Own transfer" brought us here. */
+    initialSettleId: Long? = null,
     viewModel: WalletViewModel = hiltViewModel(),
 ) {
+    // Survives rotation, so a half-answered question is not lost to turning the phone.
+    var settling by rememberSaveable { mutableStateOf(initialSettleId) }
+
     WalletContent(
         state = viewModel.state.collectAsStateWithLifecycle().value,
         onBack = onBack,
@@ -69,7 +79,12 @@ fun WalletScreen(
         onOpenLedger = onOpenLedger,
         onOpenOwed = onOpenOwed,
         onOpenInsights = onOpenInsights,
+        onSettleTransfer = { settling = it },
     )
+
+    settling?.let { id ->
+        SettleTransferSheet(transactionId = id, onDismiss = { settling = null })
+    }
 }
 
 @Composable
@@ -80,6 +95,9 @@ fun WalletContent(
     onOpenLedger: () -> Unit,
     onOpenOwed: () -> Unit,
     onOpenInsights: () -> Unit,
+    // Defaulted so the screen tests, which are about the figures rather than this,
+    // keep constructing WalletContent unchanged.
+    onSettleTransfer: (Long) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     val scroll = rememberScrollState()
@@ -109,6 +127,43 @@ fun WalletContent(
                     NetWorthChart(points = state.netWorthTrend, haze = haze)
                 }
                 MonthPair(state = state, haze = haze)
+
+                // Above ACCOUNTS because it is a question, and the balances below it
+                // are wrong until it is answered. Absent entirely when nothing is
+                // waiting -- a heading reading "0 to settle" is furniture.
+                if (state.pendingReviews.isNotEmpty()) {
+                    Text(
+                        text = "TO SETTLE",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.screenHorizontal)
+                            .padding(top = spacing.md, bottom = spacing.sm),
+                    )
+                    state.pendingReviews.forEach { transaction ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onSettleTransfer(transaction.id) }
+                                .padding(horizontal = spacing.screenHorizontal)
+                                .padding(vertical = spacing.sm),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = transaction.merchantRaw ?: "Transfer",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            MoneyText(
+                                money = transaction.amount,
+                                direction = transaction.direction,
+                            )
+                        }
+                    }
+                }
+
                 AccountList(state = state)
 
                 if (state.categories.isNotEmpty()) {

@@ -33,6 +33,9 @@ class ModulesViewModelTest {
     private val spend = MutableStateFlow(Money.ZERO)
     private var requestedSpendWindow: Pair<Long, Long>? = null
 
+    // Nothing waiting, in every test here: the dot has its own coverage.
+    private val pendingReviews = PendingReviewCount { flowOf(0) }
+
     private val clock = object : KhataClock {
         override fun now(): Long = Instant.parse("2026-08-28T09:41:00Z").toEpochMilli()
     }
@@ -76,7 +79,7 @@ class ModulesViewModelTest {
     fun `month spend comes from the Dhaka month window`() = runTest(dispatcher) {
         spend.value = Money(47_382_50)
 
-        val vm = ModulesViewModel(transactions, monthLimits, clock)
+        val vm = ModulesViewModel(transactions, monthLimits, pendingReviews, clock)
 
         vm.state.test {
             // stateIn emits its initialValue before the upstream combine has run
@@ -107,7 +110,7 @@ class ModulesViewModelTest {
         // user never entered. Absent is the honest state.
         spend.value = Money(47_382_50)
 
-        ModulesViewModel(transactions, monthLimits, clock).state.test {
+        ModulesViewModel(transactions, monthLimits, pendingReviews, clock).state.test {
             advanceUntilIdle()
             assertNull(expectMostRecentItem().budgetFraction)
             cancelAndIgnoreRemainingEvents()
@@ -119,7 +122,7 @@ class ModulesViewModelTest {
         spend.value = Money(75_000_00)
         limits.value = mapOf(1L to 30_000_00L, 2L to 20_000_00L)
 
-        ModulesViewModel(transactions, monthLimits, clock).state.test {
+        ModulesViewModel(transactions, monthLimits, pendingReviews, clock).state.test {
             // Overspending is real and must show as a full ring, never as 150%
             // of a circle.
             advanceUntilIdle()
@@ -133,7 +136,7 @@ class ModulesViewModelTest {
         spend.value = Money(1_000_00)
         limits.value = mapOf(1L to 0L)
 
-        ModulesViewModel(transactions, monthLimits, clock).state.test {
+        ModulesViewModel(transactions, monthLimits, pendingReviews, clock).state.test {
             advanceUntilIdle()
             assertEquals(1f, expectMostRecentItem().budgetFraction)
             cancelAndIgnoreRemainingEvents()

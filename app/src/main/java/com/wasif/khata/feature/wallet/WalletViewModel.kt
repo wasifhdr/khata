@@ -15,6 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import com.wasif.khata.core.data.repository.toDomain
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
@@ -63,7 +64,14 @@ class WalletViewModel @Inject constructor(
             },
             netWorthTrend = daily.map { it.totalMinor },
         )
-    }.stateIn(
+    }
+        // Combined onto the end rather than folded into the five above: the pending
+        // list is independent of every figure on this screen, and threading a sixth
+        // source through that nest would obscure all of them.
+        .combine(transactionDao.observePendingReviews()) { state, pending ->
+            state.copy(pendingReviews = pending.map { it.toDomain() })
+        }
+        .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         initialValue = WalletUiState(),

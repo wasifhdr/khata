@@ -23,6 +23,7 @@ import com.wasif.khata.core.sms.ScheduleTransferReview
 import com.wasif.khata.core.sms.StartBackfill
 import com.wasif.khata.core.sms.TransferReviewScheduler
 import com.wasif.khata.feature.editor.OriginalMessage
+import com.wasif.khata.feature.hub.PendingReviewCount
 import com.wasif.khata.feature.widget.RecentCategoryIds
 import dagger.Binds
 import dagger.Module
@@ -90,6 +91,10 @@ abstract class RepositoryModule {
 
         @Provides
         fun provideRuleSuggester(client: GeminiClient): RuleSuggester = client
+
+        @Provides
+        fun providePendingReviewCount(dao: TransactionDao) =
+            PendingReviewCount { dao.observePendingReviewCount() }
 
         @Provides
         fun provideMonthLimits(budgets: BudgetRepository) =

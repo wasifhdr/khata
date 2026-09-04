@@ -14,10 +14,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
+/**
+ * How many rows are waiting to be settled as transfers, as a function type -- the
+ * shape MonthLimits and RecentCategoryIds already use, so the hub's test needs one
+ * lambda rather than a whole TransactionDao.
+ */
+fun interface PendingReviewCount {
+    operator fun invoke(): kotlinx.coroutines.flow.Flow<Int>
+}
+
 @HiltViewModel
 class ModulesViewModel @Inject constructor(
     transactions: TransactionRepository,
     limits: MonthLimits,
+    pendingReviews: PendingReviewCount,
     clock: KhataClock,
 ) : ViewModel() {
 
@@ -27,13 +37,15 @@ class ModulesViewModel @Inject constructor(
         transactions.observeSpentBetween(now.dhakaMonthStart(), now.dhakaNextMonthStart()),
         transactions.observeMostRecent(),
         limits(now.dhakaMonthStart()),
-    ) { spend, last, limits ->
+        pendingReviews(),
+    ) { spend, last, limits, pending ->
         // The sum of what every category is allowed, which is the only total there
         // is now -- the single global budget it replaced could disagree with the
         // categories underneath it about the same month.
         val total = if (limits.isEmpty()) null else limits.values.sum()
         ModulesUiState(
             monthSpend = spend,
+            hasPendingReview = pending > 0,
             budgetFraction = when {
                 // Absent, not zero: no limits set means no ring, as before.
                 total == null -> null

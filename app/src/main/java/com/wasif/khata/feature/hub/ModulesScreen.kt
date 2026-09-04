@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,13 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.content.pm.PackageManager
+import android.Manifest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,8 +56,27 @@ fun ModulesScreen(
     onOpenSettings: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
+    val state = viewModel.state.collectAsStateWithLifecycle().value
+
+    // Asked here rather than at launch: this fires the first time something is
+    // actually waiting, which is the first moment the permission buys anything.
+    // Denied, the dot below and the TO SETTLE list in Wallet carry the whole feature.
+    val context = LocalContext.current
+    val notifications = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+    LaunchedEffect(state.hasPendingReview) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (state.hasPendingReview && !granted) {
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     ModulesContent(
-        state = viewModel.state.collectAsStateWithLifecycle().value,
+        state = state,
         onOpenWallet = onOpenWallet,
         onOpenSettings = onOpenSettings,
     )
@@ -131,6 +158,18 @@ private fun WalletCard(state: ModulesUiState, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(spacing.md),
     ) {
+        if (state.hasPendingReview) {
+            // A dot, not a count: the number is not the point, and a badge reading "1"
+            // on a card whose other number is money invites reading it as money.
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(spacing.sm)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiary),
+            )
+        }
+
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(

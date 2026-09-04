@@ -7,6 +7,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
@@ -55,8 +56,14 @@ object KhataRoutes {
 }
 
 @Composable
-fun KhataNavHost(homeView: HomeView) {
+fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
     val navController = rememberNavController()
+
+    // The notification's "Own transfer" opens the app with a transaction on it. Wallet
+    // is where that question is answered, and it may not be the start destination.
+    LaunchedEffect(settleTransactionId) {
+        if (settleTransactionId != null) navController.navigate(KhataRoutes.Wallet)
+    }
 
     // The preference IS the back-stack root, which is why it has to be resolved
     // before this composes: back from the root exits the app, and that cannot
@@ -121,6 +128,7 @@ fun KhataNavHost(homeView: HomeView) {
                 onOpenLedger = { navController.navigate(KhataRoutes.Ledger) },
                 onOpenOwed = { navController.navigate(KhataRoutes.Owed) },
                 onOpenInsights = { navController.navigate(KhataRoutes.Insights) },
+                initialSettleId = settleTransactionId,
             )
         }
 
