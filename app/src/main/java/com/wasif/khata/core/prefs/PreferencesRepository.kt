@@ -12,6 +12,7 @@ interface PreferencesRepository {
     suspend fun setSmsPermissionRequested()
     suspend fun setBackfilled()
     suspend fun setGeminiKey(key: String?)
+    suspend fun setTmdbKey(key: String?)
     suspend fun setBackupPassphrase(passphrase: String?)
     suspend fun setDriveConnected(connected: Boolean)
     suspend fun setDriveFolderId(id: String?)

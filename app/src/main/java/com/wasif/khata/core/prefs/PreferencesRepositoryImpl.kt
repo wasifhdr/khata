@@ -36,6 +36,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val SmsRequested = intPreferencesKey("sms_permission_requested")
         val Backfilled = intPreferencesKey("has_backfilled")
         val GeminiKey = stringPreferencesKey("gemini_key")
+        val TmdbKey = stringPreferencesKey("tmdb_key")
         val BackupKey = stringPreferencesKey("backup_key")
         val BackupSalt = stringPreferencesKey("backup_salt")
         val DriveConnected = intPreferencesKey("drive_connected")
@@ -73,6 +74,7 @@ class PreferencesRepositoryImpl @Inject constructor(
                 hasRequestedSmsPermission = p[Keys.SmsRequested] == 1,
                 hasBackfilled = p[Keys.Backfilled] == 1,
                 geminiKey = p[Keys.GeminiKey],
+                tmdbKey = p[Keys.TmdbKey],
                 backupKey = p[Keys.BackupKey],
                 backupSalt = p[Keys.BackupSalt],
                 driveConnected = p[Keys.DriveConnected] == 1,
@@ -182,6 +184,12 @@ class PreferencesRepositoryImpl @Inject constructor(
     override suspend fun setGeminiKey(key: String?) {
         store.edit { p ->
             if (key.isNullOrBlank()) p.clear(Keys.GeminiKey) else p[Keys.GeminiKey] = key
+        }
+    }
+
+    override suspend fun setTmdbKey(key: String?) {
+        store.edit { p ->
+            if (key.isNullOrBlank()) p.clear(Keys.TmdbKey) else p[Keys.TmdbKey] = key
         }
     }
 
