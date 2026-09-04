@@ -48,6 +48,7 @@ fun ModulesScreen(
     onOpenWallet: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenRestaurants: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
     ModulesContent(
@@ -55,6 +56,7 @@ fun ModulesScreen(
         onOpenWallet = onOpenWallet,
         onOpenSettings = onOpenSettings,
         onOpenSearch = onOpenSearch,
+        onOpenRestaurants = onOpenRestaurants,
     )
 }
 
@@ -64,6 +66,7 @@ fun ModulesContent(
     onOpenWallet: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenRestaurants: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -127,7 +130,19 @@ fun ModulesContent(
                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 WalletCard(state = state, onClick = onOpenWallet)
-                DormantRow(haze = haze, left = "Restaurants", right = "Watchlist")
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    ModuleTile(
+                        haze = haze,
+                        name = "Restaurants",
+                        subline = "Been, and want to try",
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenRestaurants,
+                    )
+                    DormantTile(haze = haze, name = "Watchlist", modifier = Modifier.weight(1f))
+                }
                 DormantRow(haze = haze, left = "Notes", right = "Car service")
             }
         }
@@ -228,28 +243,62 @@ private fun DormantRow(haze: HazeState, left: String, right: String) {
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         listOf(left, right).forEach { name ->
-            KhataGlass(
-                hazeState = haze,
-                modifier = Modifier.weight(1f).height(96.dp),
-            ) {
-                // Unbuilt modules read as unbuilt. Hiding them would make the
-                // hub a launcher with one tile; faking data would be worse.
-                Column(
-                    Modifier.fillMaxSize().padding(spacing.md),
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    Text(
-                        text = name.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Not built",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            DormantTile(haze = haze, name = name, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Unbuilt modules read as unbuilt. Hiding them would make the hub a launcher with
+ * one tile; faking data would be worse.
+ */
+@Composable
+private fun DormantTile(haze: HazeState, name: String, modifier: Modifier = Modifier) =
+    Tile(haze = haze, name = name, subline = "Not built", modifier = modifier, onClick = null)
+
+/** A live tile: the same glass, the same shape, and a destination behind it. */
+@Composable
+private fun ModuleTile(
+    haze: HazeState,
+    name: String,
+    subline: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) = Tile(haze = haze, name = name, subline = subline, modifier = modifier, onClick = onClick)
+
+@Composable
+private fun Tile(
+    haze: HazeState,
+    name: String,
+    subline: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)?,
+) {
+    val spacing = LocalSpacing.current
+    KhataGlass(hazeState = haze, modifier = modifier.height(96.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .padding(spacing.md),
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            Text(
+                text = name.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                // A live tile takes the paper tier and a dormant one stays quiet,
+                // which is the difference readable without reading the subline.
+                color = if (onClick != null) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                text = subline,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -29,6 +29,9 @@ import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
+import com.wasif.khata.feature.restaurants.RestaurantScreen
+import com.wasif.khata.feature.restaurants.RestaurantViewModel
+import com.wasif.khata.feature.restaurants.RestaurantsScreen
 import com.wasif.khata.feature.restaurants.VisitEditorScreen
 import com.wasif.khata.feature.restaurants.VisitEditorViewModel
 import com.wasif.khata.feature.search.SearchScreen
@@ -123,6 +126,7 @@ fun KhataNavHost(homeView: HomeView) {
                 },
                 onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
                 onOpenSearch = { navController.navigate(KhataRoutes.Search) },
+                onOpenRestaurants = { navController.navigate(KhataRoutes.Restaurants) },
             )
         }
 
@@ -148,6 +152,33 @@ fun KhataNavHost(homeView: HomeView) {
                 onBack = { navController.popBackStack() },
                 onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+            )
+        }
+
+        composable(KhataRoutes.Restaurants) {
+            RestaurantsScreen(
+                onBack = { navController.popBackStack() },
+                onLogVisit = { navController.navigate(KhataRoutes.visitNew()) },
+                onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
+                onAddToWishlist = { navController.navigate(KhataRoutes.Wishlist) },
+            )
+        }
+
+        composable(
+            route = KhataRoutes.Restaurant,
+            arguments = listOf(navArgument(KhataRoutes.ArgRestaurantId) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(KhataRoutes.ArgRestaurantId) ?: 0L
+            RestaurantScreen(
+                onBack = { navController.popBackStack() },
+                onLogVisit = { restaurantId ->
+                    navController.navigate(KhataRoutes.visitNew(restaurantId))
+                },
+                onOpenVisit = { visitId -> navController.navigate(KhataRoutes.visitEdit(visitId)) },
+                viewModel = hiltViewModel<RestaurantViewModel, RestaurantViewModel.Factory>(
+                    key = "restaurant-$id",
+                    creationCallback = { factory -> factory.create(id) },
+                ),
             )
         }
 

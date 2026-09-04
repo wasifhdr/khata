@@ -18,7 +18,12 @@ data class RestaurantSummary(
     val name: String,
     val placeId: Long?,
     val coverMediaId: Long?,
+    /** The cover's content hash, which is its file name. Joined here so a list of
+     *  twenty restaurants is one query rather than twenty-one. */
+    val coverSha: String?,
     val note: String?,
+    val placeName: String?,
+    val mapsUrl: String?,
     /** Null on the wishlist, which is what "not been" means. */
     val lastVisitedAt: Long?,
     val visitCount: Int,
@@ -27,7 +32,12 @@ data class RestaurantSummary(
 )
 
 private const val SUMMARY_COLUMNS = """
-    SELECT r.id, r.name, r.placeId, r.coverMediaId, r.note,
+    SELECT r.id, r.name, r.placeId, r.coverMediaId,
+      (SELECT m.sha256 FROM media m WHERE m.id = r.coverMediaId AND m.deletedAt IS NULL)
+        AS coverSha,
+      r.note,
+      (SELECT p.name FROM places p WHERE p.id = r.placeId) AS placeName,
+      (SELECT p.mapsUrl FROM places p WHERE p.id = r.placeId) AS mapsUrl,
       (SELECT MAX(v.visitedAt) FROM restaurant_visits v
        WHERE v.restaurantId = r.id AND v.deletedAt IS NULL) AS lastVisitedAt,
       (SELECT COUNT(*) FROM restaurant_visits v

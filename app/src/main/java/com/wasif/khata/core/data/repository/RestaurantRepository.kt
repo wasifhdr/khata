@@ -168,6 +168,8 @@ class RestaurantRepository @Inject constructor(
 
     suspend fun visit(id: Long): RestaurantVisitEntity? = dao.findVisit(id)
 
+    suspend fun visits(restaurantId: Long): List<RestaurantVisitEntity> = dao.visitsFor(restaurantId)
+
     suspend fun dishesFor(visitId: Long): List<VisitDishEntity> = dao.dishesFor(visitId)
 
     suspend fun companionsFor(visitId: Long): List<TagEntity> =
