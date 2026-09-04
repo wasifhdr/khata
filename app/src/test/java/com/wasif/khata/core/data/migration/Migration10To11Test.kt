@@ -97,7 +97,7 @@ class Migration10To11Test {
         // Room verifies the identity hash and every column on open. A migration whose
         // SQL drifted from the exported schema throws here rather than passing quietly.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_10_11)
+            .addMigrations(MIGRATION_10_11, MIGRATION_11_12)
             .build()
 
         val id = db.restaurantDao().upsert(

@@ -13,6 +13,7 @@ import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.SearchDao
+import com.wasif.khata.core.data.dao.VehicleDao
 import com.wasif.khata.core.data.dao.TagDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.entity.AccountEntity
@@ -29,9 +30,12 @@ import com.wasif.khata.core.data.entity.RawMessageEntity
 import com.wasif.khata.core.data.entity.RestaurantEntity
 import com.wasif.khata.core.data.entity.RestaurantVisitEntity
 import com.wasif.khata.core.data.entity.SearchFtsEntity
+import com.wasif.khata.core.data.entity.ServiceEntity
+import com.wasif.khata.core.data.entity.ServiceItemEntity
 import com.wasif.khata.core.data.entity.TagEntity
 import com.wasif.khata.core.data.entity.TagLinkEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
+import com.wasif.khata.core.data.entity.VehicleEntity
 import com.wasif.khata.core.data.entity.VisitDishEntity
 
 @Database(
@@ -54,8 +58,11 @@ import com.wasif.khata.core.data.entity.VisitDishEntity
         RestaurantEntity::class,
         RestaurantVisitEntity::class,
         VisitDishEntity::class,
+        VehicleEntity::class,
+        ServiceEntity::class,
+        ServiceItemEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {
@@ -72,4 +79,5 @@ abstract class KhataDatabase : RoomDatabase() {
     abstract fun tagDao(): TagDao
     abstract fun searchDao(): SearchDao
     abstract fun restaurantDao(): RestaurantDao
+    abstract fun vehicleDao(): VehicleDao
 }

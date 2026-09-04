@@ -7,30 +7,32 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
-import com.wasif.khata.core.model.Confidence
-
+import com.wasif.khata.core.data.entity.ServiceEntity
+import com.wasif.khata.core.data.entity.ServiceItemEntity
+import com.wasif.khata.core.data.entity.VehicleEntity
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-private const val TEST_DB = "migration-8-9-test.db"
+private const val TEST_DB = "migration-11-12-test.db"
 private const val SCHEMA_DIR = "schemas/com.wasif.khata.core.data.KhataDatabase"
 
 /**
- * Builds a real version-8 database from the exported schema and migrates it, rather
+ * Builds a real version-11 database from the exported schema and migrates it, rather
  * than using MigrationTestHelper, which cannot agree with Robolectric about database
  * paths. Validation is not lost: the test reopens the migrated file through Room
  * itself, so Room's own identity-hash and column checks run against the result.
  */
 @RunWith(RobolectricTestRunner::class)
-class Migration8To9Test {
+class Migration11To12Test {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -55,13 +57,13 @@ class Migration8To9Test {
         return JSONObject(file!!.readText()).getJSONObject("database")
     }
 
-    /** Recreates schema v8 exactly as Room would have, identity hash included. */
-    private fun createV8Database(): SupportSQLiteDatabase {
-        val database = schemaJson(8)
+    /** Recreates schema v11 exactly as Room would have, identity hash included. */
+    private fun createV11Database(): SupportSQLiteDatabase {
+        val database = schemaJson(11)
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(TEST_DB)
-                .callback(object : SupportSQLiteOpenHelper.Callback(8) {
+                .callback(object : SupportSQLiteOpenHelper.Callback(11) {
                     override fun onCreate(db: SupportSQLiteDatabase) = Unit
                     override fun onUpgrade(db: SupportSQLiteDatabase, old: Int, new: Int) = Unit
                 })
@@ -86,38 +88,54 @@ class Migration8To9Test {
             "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
             arrayOf(database.getString("identityHash")),
         )
-        db.version = 8
+        db.version = 11
         return db
     }
 
     @Test
-    fun `a merchant nobody filed stops claiming to need checking`() = runTest {
-        createV8Database().use { db ->
-            db.execSQL(
-                "INSERT INTO transactions (uuid, accountId, amountMinor, direction, kind, " +
-                    "occurredAt, merchantRaw, note, counterparty, source, confidence, " +
-                    "createdAt, updatedAt) VALUES " +
-                    "('t1', 1, 8560, 'DEBIT', 'NORMAL', 1000, 'FOODPANDA BD', NULL, " +
-                    "NULL, 'SMS', 'MEDIUM', 1000, 1000), " +
-                    "('t2', 1, 100, 'DEBIT', 'NORMAL', 1000, NULL, NULL, " +
-                    "NULL, 'SMS', 'MEDIUM', 1000, 1000), " +
-                    "('t3', 1, 200, 'DEBIT', 'NORMAL', 1000, 'CASH', NULL, " +
-                    "NULL, 'MANUAL', 'MEDIUM', 1000, 1000)",
-            )
-        }
+    fun `the three tables exist and Room agrees with the schema they were created from`() = runTest {
+        createV11Database().close()
 
+        // Room verifies the identity hash and every column on open. A migration whose
+        // SQL drifted from the exported schema throws here rather than passing quietly.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
-            .allowMainThreadQueries()
+            .addMigrations(MIGRATION_11_12)
             .build()
 
-        // Parsed fine, merchant simply unfiled: not a doubt.
-        assertEquals(Confidence.HIGH, db.transactionDao().findById(1)!!.confidence)
-        // Nothing on the row says what it was, so it stays worth a look.
-        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(2)!!.confidence)
-        // Only SMS rows were mislabelled by the old rule; a hand-entered row is left
-        // exactly as the person left it.
-        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(3)!!.confidence)
+        val dao = db.vehicleDao()
+        val vehicleId = dao.upsert(
+            VehicleEntity(uuid = "v-1", name = "Car", createdAt = 1, updatedAt = 1),
+        )
+        val serviceId = dao.upsertService(
+            ServiceEntity(
+                uuid = "s-1",
+                vehicleId = vehicleId,
+                servicedAt = 1,
+                odometerKm = 42_000,
+                costMinor = 500_00L,
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+        )
+        dao.upsertItem(
+            ServiceItemEntity(
+                uuid = "i-1",
+                serviceId = serviceId,
+                name = "Oil filter",
+                costMinor = 120_00L,
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+        )
+
+        assertEquals(listOf("Oil filter"), dao.itemsFor(serviceId).map { it.name })
+        assertEquals(42_000, dao.findService(serviceId)?.odometerKm)
+
+        // The migration seeds nothing: a fresh install runs no migration at all, so
+        // the vehicle row is the repository's job on both paths.
+        assertEquals("Car", dao.firstVehicle()?.name)
+        assertNull(dao.findService(serviceId)?.deletedAt)
+
         db.close()
     }
 }

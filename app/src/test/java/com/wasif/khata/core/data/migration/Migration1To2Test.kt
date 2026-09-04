@@ -204,7 +204,7 @@ class Migration1To2Test {
         // Room verifies the identity hash and every column on open. A migration that
         // produced a schema Room did not expect throws here rather than passing quietly.
         val room = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
             .build()
 
         val accounts = room.accountDao().getAll()
