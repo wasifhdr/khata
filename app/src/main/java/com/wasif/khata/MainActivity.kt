@@ -1,5 +1,6 @@
 package com.wasif.khata
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -53,11 +54,24 @@ class MainActivity : ComponentActivity() {
             when (val state = viewModel.state.collectAsStateWithLifecycle().value) {
                 MainUiState.Loading -> Unit
                 is MainUiState.Ready -> KhataTheme(spec = state.preferences.themeSpec) {
-                    KhataNavHost(homeView = state.preferences.homeView)
+                    KhataNavHost(
+                        homeView = state.preferences.homeView,
+                        sharedPlaceText = sharedPlaceText,
+                    )
                 }
             }
         }
     }
+
+    /**
+     * Null unless this launch was a share. Read once, in onCreate: MainActivity is
+     * launchMode standard, so a share starts a fresh instance rather than delivering
+     * a new intent to a running one.
+     */
+    private val sharedPlaceText: String?
+        get() = intent
+            ?.takeIf { it.action == Intent.ACTION_SEND && it.type == "text/plain" }
+            ?.getStringExtra(Intent.EXTRA_TEXT)
 
     override fun onDestroy() {
         permissionChecker.activity = null

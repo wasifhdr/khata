@@ -29,6 +29,7 @@ import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
+import com.wasif.khata.feature.restaurants.AddToWishlistScreen
 import com.wasif.khata.feature.restaurants.RestaurantScreen
 import com.wasif.khata.feature.restaurants.RestaurantViewModel
 import com.wasif.khata.feature.restaurants.RestaurantsScreen
@@ -76,7 +77,7 @@ object KhataRoutes {
 }
 
 @Composable
-fun KhataNavHost(homeView: HomeView) {
+fun KhataNavHost(homeView: HomeView, sharedPlaceText: String? = null) {
     val navController = rememberNavController()
 
     // The preference IS the back-stack root, which is why it has to be resolved
@@ -94,9 +95,13 @@ fun KhataNavHost(homeView: HomeView) {
     // comment's promise above -- both hold for the rest of the process.
     // Settings tells the user the new value takes effect next launch.
     val frozenHomeView = remember { homeView }
-    val start = when (frozenHomeView) {
-        HomeView.Modules -> KhataRoutes.Modules
-        HomeView.Wallet -> KhataRoutes.Wallet
+    // A share is what this launch is for, so it is the root rather than something
+    // pushed onto one: back from it leaves the app and returns the user to Maps,
+    // which is where they came from.
+    val start = when {
+        sharedPlaceText != null -> KhataRoutes.Wishlist
+        frozenHomeView == HomeView.Wallet -> KhataRoutes.Wallet
+        else -> KhataRoutes.Modules
     }
 
     val motion = LocalMotion.current
@@ -152,6 +157,19 @@ fun KhataNavHost(homeView: HomeView) {
                 onBack = { navController.popBackStack() },
                 onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+            )
+        }
+
+        composable(KhataRoutes.Wishlist) {
+            AddToWishlistScreen(
+                onBack = { if (!navController.popBackStack()) navController.navigate(KhataRoutes.Modules) },
+                onSaved = { id ->
+                    navController.navigate(KhataRoutes.restaurant(id)) {
+                        popUpTo(KhataRoutes.Wishlist) { inclusive = true }
+                    }
+                },
+                onLogVisitInstead = { navController.navigate(KhataRoutes.visitNew()) },
+                sharedText = sharedPlaceText,
             )
         }
 
