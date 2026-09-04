@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.backup.BackupRepository
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.search.searchIndex
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.permission.SmsPermissionChecker
@@ -134,7 +135,7 @@ class SettingsViewModelTest {
         rawMessageDao = db.rawMessageDao(),
         accountDao = db.accountDao(),
         transactions = TransactionRepositoryImpl(
-            db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock,
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
         ),
         clock = clock,
         driveAuth = DriveAuth(ApplicationProvider.getApplicationContext(), repo),

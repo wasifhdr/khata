@@ -3,6 +3,7 @@ package com.wasif.khata.feature.reconcile
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.search.searchIndex
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.repository.ReconciliationRepository
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
@@ -63,7 +64,9 @@ class DriftViewModelTest {
 
     private fun viewModel() = DriftViewModel(
         ReconciliationRepository(db.accountDao()),
-        TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock),
+        TransactionRepositoryImpl(
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
+        ),
         clock,
     )
 

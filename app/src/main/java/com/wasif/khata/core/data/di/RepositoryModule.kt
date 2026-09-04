@@ -11,6 +11,8 @@ import com.wasif.khata.core.drive.DriveBackups
 import com.wasif.khata.core.drive.DriveClient
 import com.wasif.khata.core.drive.DriveUploader
 import com.wasif.khata.core.prefs.PreferencesRepository
+import com.wasif.khata.core.search.IndexSource
+import com.wasif.khata.core.search.TransactionIndexSource
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
 import com.wasif.khata.core.sms.ai.GeminiClient
@@ -22,6 +24,7 @@ import dagger.Module
 import dagger.Provides
 import kotlinx.coroutines.flow.first
 import dagger.hilt.InstallIn
+import dagger.multibindings.IntoSet
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -46,6 +49,10 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindDriveBackups(impl: DriveClient): DriveBackups
+
+    @Binds
+    @IntoSet
+    abstract fun bindTransactionIndexSource(impl: TransactionIndexSource): IndexSource
 
     companion object {
         @Provides

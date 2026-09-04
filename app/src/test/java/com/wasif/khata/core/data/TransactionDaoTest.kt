@@ -5,13 +5,14 @@ import androidx.paging.PagingSource
 import androidx.paging.testing.TestPager
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.wasif.khata.core.data.dao.pagingSourceMatching
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionSource
+import com.wasif.khata.core.search.ftsQuery
+import com.wasif.khata.core.search.searchIndex
 import com.wasif.khata.core.time.dhakaMonthStart
 import com.wasif.khata.core.time.dhakaNextMonthStart
 import com.wasif.khata.core.time.toDhakaDayIndex
@@ -276,31 +277,21 @@ class TransactionDaoTest {
     fun `search matches merchant and note, case-insensitively`() = runTest {
         val accountId = insertAccount()
         val dao = db.transactionDao()
+        val index = searchIndex(db)
         val day = Instant.parse("2026-08-29T06:00:00Z").toEpochMilli()
 
-        dao.upsert(transaction(accountId, day, "m1", merchantRaw = "North End Coffee"))
-        dao.upsert(transaction(accountId, day, "m2", merchantRaw = "Chaldal"))
+        val m1 = dao.upsert(transaction(accountId, day, "m1", merchantRaw = "North End Coffee"))
+        val m2 = dao.upsert(transaction(accountId, day, "m2", merchantRaw = "Chaldal"))
+        index.reindex("transaction", m1)
+        index.reindex("transaction", m2)
 
-        val pager = TestPager(PagingConfig(pageSize = 10), dao.pagingSourceMatching("coffee"))
+        val pager = TestPager(
+            PagingConfig(pageSize = 10),
+            dao.pagingSourceMatchingFts(ftsQuery("coffee")!!),
+        )
         val page = pager.refresh() as PagingSource.LoadResult.Page
 
         assertEquals(listOf("m1"), page.data.map { it.uuid })
-    }
-
-    @Test
-    fun `search escapes wildcards so a literal percent finds nothing`() = runTest {
-        // Without escaping, a bare % matches every row -- which would turn a
-        // failed search into "here is your entire ledger".
-        val accountId = insertAccount()
-        val dao = db.transactionDao()
-        val day = Instant.parse("2026-08-29T06:00:00Z").toEpochMilli()
-
-        dao.upsert(transaction(accountId, day, "m1", merchantRaw = "Chaldal"))
-
-        val pager = TestPager(PagingConfig(pageSize = 10), dao.pagingSourceMatching("%"))
-        val page = pager.refresh() as PagingSource.LoadResult.Page
-
-        assertEquals(emptyList<String>(), page.data.map { it.uuid })
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.wasif.khata.core.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.search.searchIndex
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
@@ -44,7 +45,9 @@ class TransactionRepositoryImplTest {
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
-        repository = TransactionRepositoryImpl(db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock)
+        repository = TransactionRepositoryImpl(
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
+        )
     }
 
     @After
@@ -178,6 +181,7 @@ class TransactionRepositoryImplTest {
             db.transactionDao(),
             ThrowsOnSecondAdjustBalanceAccountDao(db.accountDao()),
             db.merchantDao(),
+            searchIndex(db),
             clock,
         )
 

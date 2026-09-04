@@ -59,24 +59,25 @@ interface TransactionDao {
     )
     fun pagingSourceBetween(fromInclusive: Long, toExclusive: Long): PagingSource<Int, TransactionEntity>
 
-    // ESCAPE '\' with the caller pre-escaping % and _ : an unescaped wildcard
-    // turns a search that should find nothing into one that returns the whole
-    // ledger, which is the worst possible answer to "find that one thing".
     @Query(
         """
-        SELECT * FROM transactions
-        WHERE deletedAt IS NULL
-          AND (merchantRaw LIKE :pattern ESCAPE '\' OR note LIKE :pattern ESCAPE '\')
-        ORDER BY occurredAt DESC, id DESC
+        SELECT t.* FROM transactions t
+        JOIN search_fts f ON f.entityType = 'transaction' AND f.entityId = t.id
+        WHERE f.text MATCH :query AND t.deletedAt IS NULL
+        ORDER BY t.occurredAt DESC, t.id DESC
         """,
     )
-    fun pagingSourceMatchingPattern(pattern: String): PagingSource<Int, TransactionEntity>
+    fun pagingSourceMatchingFts(query: String): PagingSource<Int, TransactionEntity>
 
     @Query("SELECT * FROM transactions WHERE id = :id AND deletedAt IS NULL")
     fun observeById(id: Long): Flow<TransactionEntity?>
 
     @Query("SELECT * FROM transactions WHERE id = :id AND deletedAt IS NULL")
     suspend fun findById(id: Long): TransactionEntity?
+
+    /** Every live row, for SearchIndex.reindexAll. */
+    @Query("SELECT id FROM transactions WHERE deletedAt IS NULL")
+    suspend fun allIdsForIndex(): List<Long>
 
     /**
      * Backfills the category the user just confirmed onto the merchant's other
@@ -304,13 +305,4 @@ interface TransactionDao {
         """,
     )
     fun observeDayTotals(): Flow<List<DayTotalRow>>
-}
-
-/** Escapes LIKE wildcards, then wraps in % so the term matches anywhere. */
-fun TransactionDao.pagingSourceMatching(query: String): PagingSource<Int, TransactionEntity> {
-    val escaped = query
-        .replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    return pagingSourceMatchingPattern("%$escaped%")
 }

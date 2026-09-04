@@ -3,6 +3,7 @@ package com.wasif.khata.core.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.search.searchIndex
 import com.wasif.khata.core.data.entity.AccountEntity
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
@@ -42,7 +43,7 @@ class OwedMoneyTest {
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
         repository = TransactionRepositoryImpl(
-            db, db.transactionDao(), db.accountDao(), db.merchantDao(), clock,
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
         )
         accountId = db.accountDao().upsert(
             AccountEntity(

@@ -33,4 +33,8 @@ interface MerchantDao {
             "WHERE id = :id AND deletedAt IS NULL"
     )
     suspend fun confirmCategory(id: Long, categoryId: Long, now: Long)
+
+    /** Alias text only: SearchIndex wants the strings, not the rows. */
+    @Query("SELECT rawText FROM merchant_aliases WHERE merchantId = :merchantId AND deletedAt IS NULL")
+    suspend fun aliasesFor(merchantId: Long): List<String>
 }

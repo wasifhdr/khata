@@ -10,7 +10,6 @@ import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
 import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.TransactionDao
-import com.wasif.khata.core.data.dao.pagingSourceMatching
 import com.wasif.khata.core.data.entity.TransactionEntity
 import com.wasif.khata.core.data.entity.signedMinor
 import com.wasif.khata.core.model.Confidence
@@ -18,6 +17,8 @@ import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
+import com.wasif.khata.core.search.SearchIndex
+import com.wasif.khata.core.search.ftsQuery
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.dhakaDayIndexToLocalDate
 import com.wasif.khata.domain.error.DataError
@@ -39,6 +40,7 @@ class TransactionRepositoryImpl @Inject constructor(
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val merchantDao: MerchantDao,
+    private val searchIndex: SearchIndex,
     private val clock: KhataClock,
 ) : TransactionRepository {
 
@@ -49,11 +51,10 @@ class TransactionRepositoryImpl @Inject constructor(
         paged { transactionDao.pagingSourceBetween(fromInclusive, toExclusive) }
 
     override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> = paged {
-        if (query.isBlank()) {
-            transactionDao.pagingSource()
-        } else {
-            transactionDao.pagingSourceMatching(query)
-        }
+        // ftsQuery is null when the box holds nothing searchable -- punctuation only,
+        // say. That is "no query", not "match nothing", so the whole ledger shows.
+        val match = ftsQuery(query)
+        if (match == null) transactionDao.pagingSource() else transactionDao.pagingSourceMatchingFts(match)
     }
 
     private fun paged(source: () -> PagingSource<Int, TransactionEntity>): Flow<PagingData<Transaction>> =
@@ -149,7 +150,11 @@ class TransactionRepositoryImpl @Inject constructor(
             }
 
             // @Upsert returns -1 when it updated rather than inserted.
-            if (rowId == -1L) existing!!.id else rowId
+            val id = if (rowId == -1L) existing!!.id else rowId
+            // Inside the same database transaction as the write, so a row and its
+            // index entry can never disagree about what the ledger contains.
+            searchIndex.reindex("transaction", id)
+            id
         }
     }
 
@@ -183,6 +188,7 @@ class TransactionRepositoryImpl @Inject constructor(
             // is already right. Adding this row is what makes the transactions add
             // up to it, so applying it twice would put the ledger back out.
             accountDao.clearUnexplained(draft.accountId, now)
+            searchIndex.reindex("transaction", rowId)
             rowId
         }
     }
@@ -219,6 +225,7 @@ class TransactionRepositoryImpl @Inject constructor(
                 )
             )
             accountDao.adjustBalance(accountId, -balance, now)
+            searchIndex.reindex("transaction", rowId)
             rowId
         }
     }
@@ -229,6 +236,7 @@ class TransactionRepositoryImpl @Inject constructor(
             val now = clock.now()
             accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
             transactionDao.softDelete(id, now)
+            searchIndex.remove("transaction", id)
         }
     }
 }
