@@ -136,7 +136,7 @@ Package `feature/watchlist`, package-per-feature (D2).
 
 | Screen | Content |
 |---|---|
-| **Watchlist** (hub tile) | **Up next** — poster, name, year, recommender. **Watched** — poster, name, your verdict, last watched, newest first. Primary action in the bottom third: **Add a title** |
+| **Watchlist** (hub tile) | **Up next** — poster, name, year, kind. **Watched** — the same, plus your verdict and when you last watched it. Primary action in the bottom third: **Add a title** |
 | **Add a title** | Search box → results with poster, title, year, kind, TMDB rating · manual fields beneath, always present · recommender tags · note · optionally log a watch immediately |
 | **Title** | Poster, year, kind, TMDB rating with the date it was taken, the user's verdict, the list of watches, note. **Log a watch** lives here |
 | **Log a watch** | Date, `StarRating`, note. A bottom sheet, not a screen — three fields do not earn a destination |
@@ -163,11 +163,20 @@ The global search screen gains a fifth group. Kind then recency, as everywhere.
 Inherited: `KhataTheme`, `core/ui/component`, `StarRating`, Coil, Haze.
 
 One thing needs design attention rather than reuse: **a poster is a tall image with its own
-colours, and the queue is a grid of them**. The restaurant module has already solved photographs
-behind glass; this is the same problem at a different aspect ratio, and the answer there is the
-answer here. If a title has no poster, the card shows the name set large — an absent poster is
-normal, not a broken image, and a placeholder graphic would be inventing an asset the product
-does not have.
+colours**. The restaurant module has already solved photographs behind glass; this is the same
+problem at a different aspect ratio, and the answer there is the answer here. If a title has no
+poster, the card shows the name's initials in the poster's 2:3 shape — an absent poster is normal,
+not a broken image, and a placeholder graphic would be inventing an asset the product does not
+have.
+
+**Two decisions taken while building, recorded here rather than left as drift:**
+
+- **Rows with poster thumbnails, not a poster grid.** Every other list in the app is a row, and a
+  grid would show fewer titles per screen while carrying less of each one. The poster is the
+  thumbnail at the row's leading edge.
+- **The recommender appears on the title screen, not in the list row.** Recommenders are spine
+  tags rather than summary columns, so putting them in a row would mean one tag query per visible
+  title — an N+1 against a list, to repeat what the title screen already says.
 
 Bengali script must render in titles and notes, as everywhere else.
 
