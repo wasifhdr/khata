@@ -3,6 +3,25 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Confidence used to mean "the merchant has a category", which put 1122 of
+        // 1154 rows on a list headed "to check" and made the one control that exists
+        // to catch a bad parse select 97% of the ledger. Nothing about those rows was
+        // ever suspect, so they stop claiming to be.
+        //
+        // A row with no merchant text stays flagged: it is the one thing still
+        // recoverable here, and it is the case where nothing on the row says what it
+        // was. Whether a date had to be guessed was never recorded, so it cannot be
+        // rebuilt for history -- only rows written from now on carry it.
+        db.execSQL(
+            "UPDATE transactions SET confidence = 'HIGH' " +
+                "WHERE confidence = 'MEDIUM' AND source = 'SMS' " +
+                "AND merchantRaw IS NOT NULL AND TRIM(merchantRaw) != ''",
+        )
+    }
+}
+
 val MIGRATION_7_8 = object : Migration(7, 8) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Statements copied verbatim from schemas/8.json. Room compares the result

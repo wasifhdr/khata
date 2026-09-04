@@ -171,7 +171,19 @@ class IngestionPipeline @Inject constructor(
                     note = null,
                     counterparty = null,
                     source = TransactionSource.SMS,
-                    confidence = if (merchant?.categoryId != null) Confidence.HIGH else Confidence.MEDIUM,
+                    // Not whether the merchant has a category: filing something is a
+                    // separate question from trusting it, and a merchant nobody has
+                    // filed yet still produced a rule-matched amount, direction and
+                    // account. What is worth a second look is a row whose date had to
+                    // be guessed -- it lands in whatever month the message happened to
+                    // arrive in, which is the one error that moves a monthly total --
+                    // or one with no merchant text at all, where nothing on the row
+                    // says what it was.
+                    confidence = if (parsed.occurredAt == null || parsed.merchant.isNullOrBlank()) {
+                        Confidence.MEDIUM
+                    } else {
+                        Confidence.HIGH
+                    },
                     rawMessageId = rawId,
                     transferGroupId = existing?.transferGroupId,
                     feeMinor = parsed.feeMinor,

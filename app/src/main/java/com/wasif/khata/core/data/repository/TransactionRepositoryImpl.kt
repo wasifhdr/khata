@@ -117,14 +117,11 @@ class TransactionRepositoryImpl @Inject constructor(
                     note = draft.note,
                     counterparty = draft.counterparty,
                     source = existing?.source ?: draft.source,
-                    // Choosing a category by hand IS the confirmation. Without this
-                    // a parsed row stays MEDIUM after you have categorised it, and
-                    // the needs-attention list can never be emptied.
-                    confidence = if (draft.categoryId != null) {
-                        Confidence.HIGH
-                    } else {
-                        existing?.confidence ?: Confidence.HIGH
-                    },
+                    // Saving by hand IS the review: the row was on screen, in an
+                    // editor, and the person looked at it. That is the affordance for
+                    // clearing a flag, and it does not require filing the thing under
+                    // a category to get it.
+                    confidence = Confidence.HIGH,
                     // An edit never reclassifies: a transfer stays a transfer when its
                     // note changes. Only a fresh row takes the draft's kind.
                     kind = existing?.kind ?: draft.kind,

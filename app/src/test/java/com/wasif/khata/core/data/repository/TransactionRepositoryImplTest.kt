@@ -297,8 +297,12 @@ class TransactionRepositoryImplTest {
         repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
 
         val settled = db.transactionDao().findById(sibling)!!
+        // The labour-saving half: file one, and the merchant's other rows are filed.
         assertEquals(11L, settled.categoryId)
-        assertEquals(Confidence.HIGH, settled.confidence)
+        // Its confidence is left alone. Filing a row says nothing about whether it
+        // parsed correctly, and conflating the two is what made "to check" mean
+        // "unfiled" and put nearly every row on the list.
+        assertEquals(Confidence.MEDIUM, settled.confidence)
     }
 
     @Test
@@ -335,6 +339,8 @@ class TransactionRepositoryImplTest {
         repository.save(draftFor(id, accountId, categoryId = 11)).getOrThrow()
 
         assertNull(db.transactionDao().findById(unrelated)!!.categoryId)
+        // Another merchant's row is untouched. Its confidence is whatever parsing made
+        // it and has nothing to do with anyone filing this one.
         assertEquals(Confidence.MEDIUM, db.transactionDao().findById(unrelated)!!.confidence)
     }
 
@@ -347,7 +353,9 @@ class TransactionRepositoryImplTest {
         repository.save(draftFor(id, accountId, categoryId = null)).getOrThrow()
 
         assertFalse(db.merchantDao().findById(merchantId)!!.isUserConfirmed)
-        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(id)!!.confidence)
+        // Saving by hand is the review, so the row is no longer flagged -- clearing a
+        // category is still the person having looked at it.
+        assertEquals(Confidence.HIGH, db.transactionDao().findById(id)!!.confidence)
     }
 
 

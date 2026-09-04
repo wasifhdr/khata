@@ -89,8 +89,12 @@ interface TransactionDao {
      * earlier confirmation, and is never overwritten from here.
      */
     @Query(
-        "UPDATE transactions SET categoryId = :categoryId, confidence = 'HIGH', updatedAt = :now " +
-            "WHERE merchantId = :merchantId AND categoryId IS NULL AND confidence = 'MEDIUM' " +
+        // Confidence is not touched and not tested for: filing a merchant says nothing
+        // about whether its rows parsed correctly. Testing for it here would also have
+        // quietly stopped this propagating at all once confidence stopped tracking
+        // categories, which is the labour-saving half of categorising anything.
+        "UPDATE transactions SET categoryId = :categoryId, updatedAt = :now " +
+            "WHERE merchantId = :merchantId AND categoryId IS NULL " +
             "AND source = 'SMS' AND deletedAt IS NULL"
     )
     suspend fun adoptMerchantCategory(merchantId: Long, categoryId: Long, now: Long): Int

@@ -22,6 +22,7 @@ import com.wasif.khata.core.data.migration.MIGRATION_4_5
 import com.wasif.khata.core.data.migration.MIGRATION_5_6
 import com.wasif.khata.core.data.migration.MIGRATION_6_7
 import com.wasif.khata.core.data.migration.MIGRATION_7_8
+import com.wasif.khata.core.data.migration.MIGRATION_8_9
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.SystemKhataClock
 import dagger.Binds
@@ -40,7 +41,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KhataDatabase =
         Room.databaseBuilder(context, KhataDatabase::class.java, "khata.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
             .build()
 
     @Provides fun provideAccountDao(db: KhataDatabase): AccountDao = db.accountDao()

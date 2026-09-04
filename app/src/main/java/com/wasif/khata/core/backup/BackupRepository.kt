@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Bumped with the Room version; a backup records which one wrote it. */
-const val SCHEMA_VERSION = 8
+const val SCHEMA_VERSION = 9
 
 /**
  * A single rolling file would mean a corruption written last night is the only copy.

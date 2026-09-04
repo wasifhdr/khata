@@ -154,11 +154,15 @@ class IngestionPipelineTest {
     }
 
     @Test
-    fun `a new merchant is created with MEDIUM confidence and no category`() = runTest {
+    fun `a new merchant is created with no category, and that is not a doubt`() = runTest {
         pipeline.ingest("bKash", BKASH_PAYMENT, receivedAt = 1000)
 
         val txn = transactions().single()
-        assertEquals(Confidence.MEDIUM, txn.confidence)
+        // Nobody has filed this merchant yet, and the row is still HIGH: the rule
+        // matched, the amount and direction came out of the message, and the account
+        // resolved. Tying these together is what put 97% of a real ledger on a list
+        // headed "to check".
+        assertEquals(Confidence.HIGH, txn.confidence)
         assertNull(txn.categoryId)
         assertNotNull(txn.merchantId)
         assertNotNull(db.merchantDao().findByAlias("FOODPANDA BANGLADESH LIMITED"))

@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.model.Confidence
 
 import java.io.File
 import kotlinx.coroutines.test.runTest
@@ -19,17 +20,17 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-private const val TEST_DB = "migration-7-8-test.db"
+private const val TEST_DB = "migration-8-9-test.db"
 private const val SCHEMA_DIR = "schemas/com.wasif.khata.core.data.KhataDatabase"
 
 /**
- * Builds a real version-7 database from the exported schema and migrates it, rather
+ * Builds a real version-8 database from the exported schema and migrates it, rather
  * than using MigrationTestHelper, which cannot agree with Robolectric about database
  * paths. Validation is not lost: the test reopens the migrated file through Room
  * itself, so Room's own identity-hash and column checks run against the result.
  */
 @RunWith(RobolectricTestRunner::class)
-class Migration7To8Test {
+class Migration8To9Test {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -54,13 +55,13 @@ class Migration7To8Test {
         return JSONObject(file!!.readText()).getJSONObject("database")
     }
 
-    /** Recreates schema v7 exactly as Room would have, identity hash included. */
-    private fun createV7Database(): SupportSQLiteDatabase {
-        val database = schemaJson(7)
+    /** Recreates schema v8 exactly as Room would have, identity hash included. */
+    private fun createV8Database(): SupportSQLiteDatabase {
+        val database = schemaJson(8)
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(TEST_DB)
-                .callback(object : SupportSQLiteOpenHelper.Callback(7) {
+                .callback(object : SupportSQLiteOpenHelper.Callback(8) {
                     override fun onCreate(db: SupportSQLiteDatabase) = Unit
                     override fun onUpgrade(db: SupportSQLiteDatabase, old: Int, new: Int) = Unit
                 })
@@ -85,31 +86,38 @@ class Migration7To8Test {
             "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
             arrayOf(database.getString("identityHash")),
         )
-        db.version = 7
+        db.version = 8
         return db
     }
 
     @Test
-    fun `the spine tables arrive, and existing transactions are already indexed`() = runTest {
-        createV7Database().use { db ->
+    fun `a merchant nobody filed stops claiming to need checking`() = runTest {
+        createV8Database().use { db ->
             db.execSQL(
                 "INSERT INTO transactions (uuid, accountId, amountMinor, direction, kind, " +
                     "occurredAt, merchantRaw, note, counterparty, source, confidence, " +
                     "createdAt, updatedAt) VALUES " +
-                    "('t1', 1, 8560, 'DEBIT', 'NORMAL', 1000, 'FOODPANDA BD', 'lunch', " +
-                    "NULL, 'SMS', 'HIGH', 1000, 1000)",
+                    "('t1', 1, 8560, 'DEBIT', 'NORMAL', 1000, 'FOODPANDA BD', NULL, " +
+                    "NULL, 'SMS', 'MEDIUM', 1000, 1000), " +
+                    "('t2', 1, 100, 'DEBIT', 'NORMAL', 1000, NULL, NULL, " +
+                    "NULL, 'SMS', 'MEDIUM', 1000, 1000), " +
+                    "('t3', 1, 200, 'DEBIT', 'NORMAL', 1000, 'CASH', NULL, " +
+                    "NULL, 'MANUAL', 'MEDIUM', 1000, 1000)",
             )
         }
 
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_8_9)
             .allowMainThreadQueries()
             .build()
 
-        // Opening through Room runs its identity-hash check, so a migration whose SQL
-        // disagrees with the entities fails here rather than on a user's phone.
-        assertEquals(listOf(1L), db.searchDao().idsMatching("transaction", "foodpanda"))
-        assertEquals(listOf(1L), db.searchDao().idsMatching("transaction", "lunch"))
+        // Parsed fine, merchant simply unfiled: not a doubt.
+        assertEquals(Confidence.HIGH, db.transactionDao().findById(1)!!.confidence)
+        // Nothing on the row says what it was, so it stays worth a look.
+        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(2)!!.confidence)
+        // Only SMS rows were mislabelled by the old rule; a hand-entered row is left
+        // exactly as the person left it.
+        assertEquals(Confidence.MEDIUM, db.transactionDao().findById(3)!!.confidence)
         db.close()
     }
 }
