@@ -9,12 +9,14 @@ import com.wasif.khata.core.model.RawMessageStatus
 import com.wasif.khata.core.model.RuleKind
 import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.IngestionScheduler
+import com.wasif.khata.core.sms.TeachState
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.deriveIgnorePattern
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.time.KhataClock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -68,6 +70,9 @@ class UnmatchedViewModel @Inject constructor(
     private val _working = MutableStateFlow(false)
 
     private val _progress = MutableStateFlow<IngestProgress?>(null)
+
+    /** One at a time: asking about a second message replaces the first's reporting. */
+    private var askJob: Job? = null
 
     val state: StateFlow<UnmatchedUiState> = combine(
         rawMessageDao.observeByStatus(RawMessageStatus.UNMATCHED),
@@ -181,7 +186,26 @@ class UnmatchedViewModel @Inject constructor(
      * This is that path, one message at a time, asked for rather than guessed.
      */
     fun onAskGemini(id: Long) {
-        _notice.value = "Asking Gemini to write a rule…"
         scheduler.teach(id)
+
+        // Collected until it settles, so the line reports an answer rather than
+        // sitting on "asking" whether it worked or not. The message leaving the list
+        // is the other half of the confirmation, and happens on its own.
+        askJob?.cancel()
+        askJob = viewModelScope.launch {
+            scheduler.observeTeach(id).collect { state ->
+                when (state) {
+                    TeachState.ASKING, null -> _notice.value = "Asking Gemini to write a rule…"
+                    TeachState.WROTE_A_RULE -> {
+                        _notice.value = "Gemini wrote a rule."
+                        return@collect
+                    }
+                    TeachState.GAVE_UP -> {
+                        _notice.value = "Gemini could not read that one. Write a rule by hand."
+                        return@collect
+                    }
+                }
+            }
+        }
     }
 }

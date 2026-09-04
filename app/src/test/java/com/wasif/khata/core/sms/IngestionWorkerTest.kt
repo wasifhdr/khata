@@ -77,8 +77,12 @@ class IngestionWorkerTest {
     fun tearDown() = db.close()
 
     private fun worker(vararg input: Pair<String, Any?>): IngestionWorker =
+        workerOnAttempt(0, *input)
+
+    private fun workerOnAttempt(attempt: Int, vararg input: Pair<String, Any?>): IngestionWorker =
         TestListenableWorkerBuilder<IngestionWorker>(context)
             .setInputData(workDataOf(*input))
+            .setRunAttemptCount(attempt)
             .setWorkerFactory(
                 object : WorkerFactory() {
                     override fun createWorker(
@@ -206,5 +210,30 @@ class IngestionWorkerTest {
 
         assertTrue(result is ListenableWorker.Result.Retry)
         assertTrue(db.parsingRuleDao().allIncludingDisabled().none { it.origin == "AI" })
+    }
+
+    @Test
+    fun `a suggester that keeps returning nothing is given up on`() = runTest {
+        // Every attempt is a Gemini request, so a message the model cannot read would
+        // otherwise cost a call every backoff interval for as long as the app is
+        // installed -- and the screen would sit on "asking" forever, with no terminal
+        // state to report.
+        pipeline.ingest("bKash", UNTAUGHT, 2_000L)
+        val rawId = db.rawMessageDao().allForReparse().single { it.body == UNTAUGHT }.id
+        suggester = RuleSuggester { _, _ -> null }
+
+        val secondAttempt = workerOnAttempt(
+            1,
+            KEY_MODE to IngestionMode.TEACH.name,
+            KEY_RAW_ID to rawId,
+        ).doWork()
+        val lastAttempt = workerOnAttempt(
+            2,
+            KEY_MODE to IngestionMode.TEACH.name,
+            KEY_RAW_ID to rawId,
+        ).doWork()
+
+        assertTrue(secondAttempt is ListenableWorker.Result.Retry)
+        assertTrue(lastAttempt is ListenableWorker.Result.Failure)
     }
 }

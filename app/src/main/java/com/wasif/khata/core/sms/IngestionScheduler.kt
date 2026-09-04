@@ -31,6 +31,9 @@ fun interface TeachRequest {
     suspend operator fun invoke(rawMessageId: Long)
 }
 
+/** Where one teach has got to. The screen that asked needs a terminal answer. */
+enum class TeachState { ASKING, WROTE_A_RULE, GAVE_UP }
+
 /** What a whole-inbox pass is doing, and what the last one came to. */
 data class PassState(
     val running: IngestProgress? = null,
@@ -72,7 +75,11 @@ class IngestionScheduler @Inject constructor(
      * is small and must not be dropped for colliding with a backfill.
      */
     fun teach(rawMessageId: Long) {
-        workManager.enqueue(
+        workManager.enqueueUniqueWork(
+            teachName(rawMessageId),
+            // REPLACE, so asking again after it gave up actually asks again rather
+            // than returning the old refusal.
+            ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<IngestionWorker>()
                 .setInputData(
                     workDataOf(
@@ -83,6 +90,22 @@ class IngestionScheduler @Inject constructor(
                 .build(),
         )
     }
+
+    /**
+     * Named per message rather than tracked by request id, so the screen can report a
+     * teach it did not start -- a rotation, or coming back to the list.
+     */
+    fun observeTeach(rawMessageId: Long): Flow<TeachState?> =
+        workManager.getWorkInfosForUniqueWorkFlow(teachName(rawMessageId)).map { infos ->
+            when (infos.lastOrNull()?.state) {
+                WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING -> TeachState.ASKING
+                WorkInfo.State.SUCCEEDED -> TeachState.WROTE_A_RULE
+                WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> TeachState.GAVE_UP
+                null, WorkInfo.State.BLOCKED -> null
+            }
+        }
+
+    private fun teachName(rawMessageId: Long) = "teach-" + rawMessageId
 
     /**
      * By unique name rather than by id, so a screen that did not start the pass can

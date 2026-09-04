@@ -12,6 +12,9 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.Flow
 
+/** Attempts a teach gets before the answer is taken as no. */
+private const val TEACH_ATTEMPTS = 3
+
 @HiltWorker
 class IngestionWorker @AssistedInject constructor(
     @Assisted context: Context,
@@ -23,6 +26,18 @@ class IngestionWorker @AssistedInject constructor(
     private val suggester: RuleSuggester,
     private val drafter: RuleDrafter,
 ) : CoroutineWorker(context, params) {
+
+    /**
+     * A retry while there are attempts left, a failure once there are not.
+     *
+     * Every attempt is a Gemini request, so a message the model cannot read would
+     * otherwise cost a call every backoff interval for as long as the app is
+     * installed. Three is enough to ride out a 503 or a dropped connection; past that
+     * the answer is not going to change, and the screen needs a terminal state to
+     * report rather than "asking" forever.
+     */
+    private fun giveUp(): Result =
+        if (runAttemptCount + 1 < TEACH_ATTEMPTS) Result.retry() else Result.failure()
 
     override suspend fun doWork(): Result = runCatching {
         when (inputData.getString(KEY_MODE)?.let(IngestionMode::valueOf)) {
@@ -37,9 +52,9 @@ class IngestionWorker @AssistedInject constructor(
                 val drafted = suggester(raw.sender, raw.body)
                     // Retry rather than fail: a rate limit, a dropped connection or a
                     // reply that did not parse should come back, and the message stays
-                    // unmatched until it does.
-                    ?: return Result.retry()
-                if (!drafter.store(drafted, raw.sender, raw.body)) return Result.retry()
+                    // unmatched until it does. But not forever -- see giveUp.
+                    ?: return giveUp()
+                if (!drafter.store(drafted, raw.sender, raw.body)) return giveUp()
                 runPass(reparse.run())
             }
             IngestionMode.MESSAGE -> {
