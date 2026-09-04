@@ -14,6 +14,7 @@ import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.VehicleDao
+import com.wasif.khata.core.data.dao.WatchlistDao
 import com.wasif.khata.core.data.dao.SearchDao
 import com.wasif.khata.core.data.dao.TagDao
 import com.wasif.khata.core.data.dao.TransactionDao
@@ -28,6 +29,7 @@ import com.wasif.khata.core.data.migration.MIGRATION_8_9
 import com.wasif.khata.core.data.migration.MIGRATION_9_10
 import com.wasif.khata.core.data.migration.MIGRATION_10_11
 import com.wasif.khata.core.data.migration.MIGRATION_11_12
+import com.wasif.khata.core.data.migration.MIGRATION_12_13
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.SystemKhataClock
 import dagger.Binds
@@ -46,7 +48,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): KhataDatabase =
         Room.databaseBuilder(context, KhataDatabase::class.java, "khata.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .build()
 
     @Provides fun provideAccountDao(db: KhataDatabase): AccountDao = db.accountDao()
@@ -64,6 +66,8 @@ object DatabaseModule {
     @Provides fun provideRestaurantDao(db: KhataDatabase): RestaurantDao = db.restaurantDao()
 
     @Provides fun provideVehicleDao(db: KhataDatabase): VehicleDao = db.vehicleDao()
+
+    @Provides fun provideWatchlistDao(db: KhataDatabase): WatchlistDao = db.watchlistDao()
 }
 
 @Module

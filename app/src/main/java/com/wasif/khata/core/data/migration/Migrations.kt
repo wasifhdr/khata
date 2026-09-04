@@ -3,6 +3,40 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Statements copied verbatim from schemas/13.json, as every migration since
+        // 7 -> 8 has been.
+        //
+        // Two tables: the recommender is a tag_link and the poster is a media id, so
+        // neither needs a column here. The unique index on tmdbId is what stops the
+        // same TMDB entry becoming two rows -- SQLite treats NULLs as distinct, so
+        // hand-typed titles are unaffected by it.
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `titles` (`id` INTEGER PRIMARY KEY AUTOINCREMENT " +
+                "NOT NULL, `uuid` TEXT NOT NULL, `name` TEXT NOT NULL, `year` INTEGER, " +
+                "`kind` TEXT NOT NULL, `tmdbId` INTEGER, `tmdbRating` REAL, " +
+                "`tmdbRatingAt` INTEGER, `posterMediaId` INTEGER, `note` TEXT, " +
+                "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                "`deletedAt` INTEGER)",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_titles_uuid` ON `titles` (`uuid`)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_titles_tmdbId` ON `titles` (`tmdbId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_titles_name` ON `titles` (`name`)")
+
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `watches` (`id` INTEGER PRIMARY KEY AUTOINCREMENT " +
+                "NOT NULL, `uuid` TEXT NOT NULL, `titleId` INTEGER NOT NULL, " +
+                "`watchedAt` INTEGER NOT NULL, `rating` INTEGER, `note` TEXT, " +
+                "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                "`deletedAt` INTEGER)",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_watches_uuid` ON `watches` (`uuid`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_watches_titleId` ON `watches` (`titleId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_watches_watchedAt` ON `watches` (`watchedAt`)")
+    }
+}
+
 val MIGRATION_11_12 = object : Migration(11, 12) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Statements copied verbatim from schemas/12.json, as every migration since
