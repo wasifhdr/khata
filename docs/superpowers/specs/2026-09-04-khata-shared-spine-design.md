@@ -33,8 +33,8 @@ merchant. That was considered and declined by the user: the wallet's job is mone
 attaching a gallery picker to it would be building a feature to justify a table.
 
 The consequence is that this spec is almost entirely data and logic. The only user-visible
-changes it makes on its own are that ledger search gets better (§7) and Settings gains
-export/import (§8). The screens that make places, media, and tags touchable live in the
+changes it makes on its own are that ledger search gets better (§7) and photos start
+reaching Drive alongside the nightly archive (§8). The screens that make places, media, and tags touchable live in the
 restaurant spec, deliberately.
 
 ---
@@ -51,8 +51,9 @@ Settled during design. Not open for re-litigation during implementation.
 | S4 | `unicode61` tokenizer, never `simple` | `simple` is ASCII-only. Bengali merchant names and notes would silently never match, and Bengali rendering is a hard product requirement |
 | S5 | Media is content-addressed (`<sha256>.jpg`) and write-once | Deduplication is free, an absolute path cannot survive a restore onto another phone, and immutability is what makes §8 hold |
 | S6 | Media rows are tombstoned; media **files** are never deleted | Principle 3, and it makes the live store a guaranteed superset of what any retained backup references |
-| S7 | Media backup is in scope, via a full **export**, not by fattening the nightly backup | `KEEP = 7` rotation × a whole photo library is gigabytes to protect bytes that never change |
-| S8 | Photos are downscaled to 2048px / q85, as `2026-08-26` D10 specified | ~400 KB vs ~4 MB, indistinguishable on a phone, and the difference between a shareable export and an impossible one |
+| S7 | Media backup is in scope, via **Drive, one encrypted blob at a time** — not inside the nightly archive, and not by export | `KEEP = 7` rotation × a whole photo library is gigabytes to protect bytes that never change. Content addressing makes "already uploaded?" a filename check, so each photo goes up once, ever |
+| S10 | Each blob is wrapped in the existing `BackupFile` envelope, under the same passphrase-derived key | Anything leaving the phone stays opaque (`2026-09-03-khata-backup-design.md` §6), and reusing the envelope means no second crypto path — it already carries its own salt, including the fix that made backups restorable from the passphrase alone |
+| S8 | Photos are downscaled to 2048px / q85, as `2026-08-26` D10 specified | ~400 KB vs ~4 MB, indistinguishable on a phone, and the difference between a photo library that fits in Drive and one that does not |
 | S9 | Three specced satellite columns are dropped (§3) | Nothing can write them. Each is a one-line migration if that changes |
 
 ---
@@ -315,70 +316,69 @@ is the right order and pretending otherwise is not worth the machinery.
 
 ## 8. Backup, including media
 
-### The problem with the obvious answer
+### What does not change
 
-The obvious answer is to zip the database and the photos together and bump the format version.
-`BackupRepository` keeps `KEEP = 7` rolling backups, and the comment beside it reads "a few
-hundred kilobytes each." Fold photos into that archive and seven nightly copies of the entire
-photo library sit on the phone — gigabytes, to protect bytes that by S5 can never change.
+The nightly archive stays exactly what it is today: the database, encrypted, written to
+`files/backups/khata-<millis>.kbk` and uploaded to Drive verbatim. Format v1. `KEEP = 7`.
+`BackupRepository.backUp` and `restore` keep their `ByteArray` signatures and their
+one-shot crypto.
 
-### What makes the small answer correct
+That is worth stating plainly because the obvious design does change it — fold photos into
+the archive, bump the format, and rewrite both ends to stream. Every one of those was
+considered and is unnecessary once media travels separately, and each carried real risk:
+streaming would have introduced `CipherInputStream`, which swallows `AEADBadTagException`
+and reports a clean EOF, so a truncated archive would present as a successful restore.
+Not writing that code is better than writing it carefully.
 
-Because media files are content-addressed (S5) and never hard-deleted (S6), **the live media
-store is always a superset of what any retained backup references.** A nightly archive therefore
-does not need to carry photos: restoring last Tuesday's database re-points at files that never
-went anywhere.
+### Why media rides alongside rather than inside
 
-| Path | Entries | Size |
-|---|---|---|
-| Nightly local | `db` only | unchanged — kilobytes, `KEEP = 7` stays honest |
-| **Export / share** | `db` + every non-tombstoned media file | full |
-| Drive (later) | `db` nightly, each media blob uploaded **once** | incremental by construction |
+`KEEP = 7` means seven archives at all times. Photos inside one means the entire library
+re-encrypted and re-uploaded seven times over, every night, for bytes that by S5 can never
+change.
 
-Media leaves the device completely, today, through export — no Drive dependency and no new
-library. And when the Drive plan resumes, content addressing makes "have I uploaded this photo
-already?" a filename comparison, so the incremental media sync `2026-08-26` §14 wanted is a
-consequence of the design rather than machinery bolted onto it.
+Because media is content-addressed (S5) and never hard-deleted (S6), the question
+"has this photo been backed up?" is a filename comparison. Each blob goes up exactly once,
+ever, and no rotation touches it.
 
-### Format v2
+### The shape
 
-One format with variable contents: a zip inside the existing encrypted envelope, holding a `db`
-entry and zero or more `media/<sha256>.jpg` entries. The reader does not branch on which it
-received — it unpacks what is present and **merges** media into the store. Never wipes: an
-orphaned file costs disk, and a wipe costs photos.
+| | On the phone | In the `.kbk` | In Drive |
+|---|---|---|---|
+| Database | `databases/khata.db` | yes — this is what a `.kbk` is | the 7 archives, uploaded verbatim |
+| Photos | `files/media/<sha256>.jpg` | **no** | `<sha256>.kbm`, one per photo, once |
 
-`db` is deflated normally; media entries are written with
-`ZipOutputStream.setLevel(Deflater.NO_COMPRESSION)`. JPEG does not deflate, so the default level
-burns CPU across hundreds of megabytes for nothing. That is simpler than `ZipEntry.STORED`,
-which would require computing sizes and CRCs by hand.
+There is deliberately **no local backup of media**. The live files are already the local
+copy: S6 means a file is never deleted, so copying it beside itself protects against
+nothing.
 
-**v1 files must still restore.** Backups written by the current build exist on the phone, so the
-reader branches on the header's format version: v1 is raw database bytes, v2 is the zip. That is
-what the version field was put there for.
+### The blob format
 
-`SCHEMA_VERSION` goes 7 → 8.
+`BackupFile.write(photoBytes, key, SCHEMA_VERSION, salt)` — the same envelope the database
+archive uses, so there is no second crypto path to get wrong, and blobs inherit the header
+salt that makes a file openable from the passphrase alone on a phone that has never seen it.
 
-### Streaming, and one banned class
+The Drive filename is the sha256 of the **plaintext** photo, not of the ciphertext: a random
+IV per encryption means the ciphertext differs every time, and dedup depends on the name
+being stable. On the way back, re-hashing the decrypted bytes and comparing to the filename
+is an integrity check that costs nothing.
 
-`backUp` currently does `source.readBytes()` and `restore` takes `bytes: ByteArray` — the whole
-file in memory. Fine for a 2 MB database, fatal for a 300 MB export. Both become streams:
-`FileOutputStream` → plaintext header → `CipherOutputStream` → `ZipOutputStream`.
+### Restore gains a phase
 
-**`CipherInputStream` must not be used on the read side.** It swallows `AEADBadTagException` and
-reports a clean EOF, so a tampered or truncated archive would present as a successful restore —
-the worst possible outcome for this feature. The reader drives `cipher.update` / `doFinal`
-itself and maps `AEADBadTagException` onto the existing `BackupResult.WrongPassphrase`.
+Restoring the database is unchanged. What follows is new: the restored rows reference
+`<sha256>.jpg` files that a replacement phone does not have, so the referenced blobs are
+fetched from Drive and decrypted into `files/media/`.
 
-The current one-shot code is safe only because `doFinal(bytes)` cannot behave that way. The
-hazard is created by the move to streams, not inherited.
+This is the step that makes the whole thing hold, and it is why export was rejected rather
+than added alongside. An export only protects what the user remembered to export; this
+protects what the app already uploaded on its own.
 
-### Restore ordering
+Media sync is **skipped entirely when Drive is not connected** — the same shape as the
+nightly upload. A phone with no Drive keeps its photos locally and loses them with the
+phone, which is the honest consequence of not connecting it, reported rather than hidden.
 
-Everything unpacks into a staging directory first. The GCM tag is verified before
-`khata.db.replaced` is written or a single media file is touched — the same stage-then-swap
-instinct the existing restore already encodes, extended to cover media.
-
----
+`SCHEMA_VERSION` goes 7 → 8 here, and 8 → 9 when the restaurant migration lands. It is
+stamped into every archive and compared on restore, so leaving it behind would quietly
+disable the "refuse a backup newer than this app" guard for exactly one version.
 
 ## 9. Testing
 
@@ -390,8 +390,13 @@ Robolectric 4.16.1 already runs the migration, DAO, repository, and Compose suit
 - **Search** — query-builder hazards (quote injection, prefix matching, empty input); alias
   matching; multi-word; `counterparty`; and a Bengali-script case that fails under the `simple`
   tokenizer, so S4 cannot be silently regressed.
-- **Backup** — a v1 archive still restores; a v2 round-trip carrying real media files; and a
-  flipped-byte archive returning `WrongPassphrase` rather than a truncated success.
+- **Backup** — the archive format is untouched, so its existing suite must still pass
+  unchanged; that is the assertion. New: a media blob round-trips through the `BackupFile`
+  envelope, a flipped byte in a blob returns `WrongPassphrase` rather than a corrupt photo,
+  and a blob whose decrypted bytes do not re-hash to its filename is rejected.
+- **Media sync** — a blob already in Drive is not uploaded twice; restore fetches only the
+  hashes the database references; and Drive being unconnected skips sync without failing the
+  backup.
 - **Places** — the Maps-URL corpus, including a case where `@` and `!3d!4d` disagree.
 - **Media** — hashing, deduplication, path derivation, and which downscale branch is taken.
 
@@ -411,4 +416,5 @@ mid-implementation.
 - **The Google Places API.** Unchanged from `2026-08-26` §12 — it needs a billing account for a
   handful of lookups.
 - **FTS5 and relevance ranking.** See §7.
-- **Drive upload of media.** The design makes it cheap; the Drive plan owns the work.
+- **Exporting media as a shareable archive.** Drive covers durability (§8); a second mechanism for the same job is a second thing to keep correct.
+- **Reclaiming disk from tombstoned media.** S6 makes the store grow monotonically. Accepted knowingly: a photo is a few hundred kilobytes and the alternative is deciding, in code, that a picture is safe to destroy.

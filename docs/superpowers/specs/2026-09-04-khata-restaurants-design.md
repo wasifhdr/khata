@@ -43,7 +43,9 @@ ratings.
 ## 3. Data model
 
 Migration **8 → 9**, separate from the spine's 7 → 8 so each spec owns its own migration and its
-own test. House quartet on every table (`uuid`, `createdAt`, `updatedAt`, `deletedAt`).
+own test. `BackupRepository.SCHEMA_VERSION` goes to 9 with it: it is stamped into every archive
+and compared on restore, so leaving it at 8 would stamp a lie and quietly disable the "refuse a
+backup newer than this app" guard for one version. House quartet on every table (`uuid`, `createdAt`, `updatedAt`, `deletedAt`).
 
 ```sql
 restaurants       (id, uuid, name UNIQUE COLLATE NOCASE, placeId?,
