@@ -30,6 +30,19 @@ data class TmdbResult(
 fun posterUrl(posterPath: String): String = IMAGE_BASE + posterPath
 
 /**
+ * What the screens depend on, so their tests need neither a network nor a key -- the
+ * same reason the ingestion worker depends on RuleSuggester rather than GeminiClient.
+ */
+interface Tmdb {
+    suspend fun search(query: String): List<TmdbResult>
+
+    /** The rating alone, for the refresh on opening a title. */
+    suspend fun rating(tmdbId: Int, name: String): Double?
+
+    suspend fun poster(posterPath: String): ByteArray?
+}
+
+/**
  * Empty on anything that is not a usable list: malformed JSON, no results array, or
  * rows of a kind this module does not hold. The manual fields sit beneath the search
  * box on screen, so there is nothing to recover from and nothing to explain.
@@ -74,12 +87,12 @@ fun parseSearchResults(json: String): List<TmdbResult> = runCatching {
 @Singleton
 class TmdbClient @Inject constructor(
     private val preferences: PreferencesRepository,
-) {
+) : Tmdb {
     /**
      * Empty on no key, no network, a non-200, or unreadable JSON -- every failure is
      * the same failure, because the answer to all of them is the same: type it in.
      */
-    suspend fun search(query: String): List<TmdbResult> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String): List<TmdbResult> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
         val key = preferences.preferences.first().tmdbKey ?: return@withContext emptyList()
 
@@ -113,11 +126,11 @@ class TmdbClient @Inject constructor(
      * matching the id back is one endpoint rather than two: this module already has
      * search, and a second path would be a second thing to keep working.
      */
-    suspend fun rating(tmdbId: Int, name: String): Double? =
+    override suspend fun rating(tmdbId: Int, name: String): Double? =
         search(name).firstOrNull { it.tmdbId == tmdbId }?.rating
 
     /** Null on any failure, so a poster that will not download is simply absent. */
-    suspend fun poster(posterPath: String): ByteArray? = withContext(Dispatchers.IO) {
+    override suspend fun poster(posterPath: String): ByteArray? = withContext(Dispatchers.IO) {
         val connection = (URL(posterUrl(posterPath)).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 20_000

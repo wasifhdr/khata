@@ -3,6 +3,7 @@ package com.wasif.khata.core.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
+import com.wasif.khata.core.data.entity.MediaEntity
 import com.wasif.khata.core.data.entity.TitleKind
 import com.wasif.khata.core.search.searchIndex
 import com.wasif.khata.core.tag.TagRepository
@@ -130,6 +131,28 @@ class WatchlistRepositoryTest {
         assertTrue(needsRefresh(tmdbId = 949, ratingAt = now - week - 1, now = now))
         // Never fetched, but it has an id to fetch by.
         assertTrue(needsRefresh(tmdbId = 949, ratingAt = null, now = now))
+    }
+
+    @Test
+    fun `setting a poster points the title at an existing media row`() = runTest {
+        val id = repository.saveTitle(film("Heat", tmdbId = 949))
+        val mediaId = db.mediaDao().upsert(
+            MediaEntity(
+                uuid = "m-1",
+                sha256 = "abc",
+                mimeType = "image/jpeg",
+                widthPx = 500,
+                heightPx = 750,
+                byteSize = 1_000,
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+        )
+        repository.setPoster(id, mediaId)
+
+        assertEquals(mediaId, db.watchlistDao().findTitle(id)?.posterMediaId)
+        // The summary joins the hash, so a grid of titles is one query.
+        assertEquals("abc", repository.observeSummary(id).first()!!.posterSha)
     }
 
     @Test
