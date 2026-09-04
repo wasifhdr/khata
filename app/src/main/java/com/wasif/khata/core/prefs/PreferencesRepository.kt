@@ -17,4 +17,5 @@ interface PreferencesRepository {
     suspend fun setDriveFolderId(id: String?)
     suspend fun setDriveUploaded(at: Long)
     suspend fun setDriveNeedsReconnect()
+    suspend fun setSearchIndexVersion(version: Int)
 }

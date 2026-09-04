@@ -8,6 +8,7 @@ import com.wasif.khata.core.data.SnapshotScheduler
 import com.wasif.khata.core.data.repository.BudgetCarryOver
 import com.wasif.khata.core.data.seed.DatabaseSeeder
 import com.wasif.khata.core.prefs.PreferencesRepository
+import com.wasif.khata.core.search.SearchIndexRebuild
 import com.wasif.khata.feature.widget.CashWidgetProvider
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -33,6 +34,8 @@ class KhataApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var budgetCarryOver: BudgetCarryOver
 
+    @Inject lateinit var searchIndexRebuild: SearchIndexRebuild
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -45,6 +48,12 @@ class KhataApplication : Application(), Configuration.Provider {
         // Moves a pre-existing global budget into a category row so nothing the user
         // set is silently dropped by the change to per-category limits.
         applicationScope.launch { budgetCarryOver.runIfNeeded() }
+
+        // Rebuilds search_fts once, so rows carry the merchant names and aliases the
+        // migration's SQL backfill could not reach. Off the main thread and behind
+        // the ledger appearing: search is a little incomplete for a moment on the
+        // one launch that does this, which beats blocking start-up on it.
+        applicationScope.launch { searchIndexRebuild.runIfNeeded() }
 
         // The widget is RemoteViews, so it does not observe DataStore the way
         // Glance would. The theme can only be changed from Settings, which means

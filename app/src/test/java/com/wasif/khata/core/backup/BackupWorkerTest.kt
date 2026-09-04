@@ -96,6 +96,7 @@ class BackupWorkerTest {
         override suspend fun setDriveFolderId(id: String?) = Unit
         override suspend fun setDriveUploaded(at: Long) = Unit
         override suspend fun setDriveNeedsReconnect() = Unit
+        override suspend fun setSearchIndexVersion(version: Int) = Unit
     }
 
     /** runTest returns a TestResult, not the block's value, so the result comes out

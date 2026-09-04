@@ -42,6 +42,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val DriveFolderId = stringPreferencesKey("drive_folder_id")
         val DriveLastUploadAt = longPreferencesKey("drive_last_upload_at")
         val DriveNeedsReconnect = intPreferencesKey("drive_needs_reconnect")
+        val SearchIndexVersion = intPreferencesKey("search_index_version")
     }
 
     override val preferences: Flow<KhataPreferences> = store.data
@@ -112,6 +113,10 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override suspend fun setBackfilled() {
         store.edit { it[Keys.Backfilled] = 1 }
+    }
+
+    override suspend fun setSearchIndexVersion(version: Int) {
+        store.edit { it[Keys.SearchIndexVersion] = version }
     }
 
     /**

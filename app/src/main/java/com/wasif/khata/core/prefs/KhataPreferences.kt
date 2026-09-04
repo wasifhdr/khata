@@ -59,6 +59,18 @@ data class KhataPreferences(
      * exists to run it.
      */
     val driveNeedsReconnect: Boolean = false,
+    /**
+     * Which shape of indexed text search_fts currently holds. The 7->8 migration
+     * backfilled the index in SQL, which could reach merchantRaw, note and
+     * counterparty but not a resolved merchant name or its aliases -- so a row raw-
+     * texted FP*8823 stayed unfindable by "foodpanda", which is the case the index
+     * exists for. Below SearchIndexRebuild.VERSION, the index is rebuilt once through
+     * the IndexSources, which see all of it.
+     *
+     * A number rather than a flag because the indexed text can change shape again;
+     * bumping the constant is then the whole of the fix.
+     */
+    val searchIndexVersion: Int = 0,
 ) {
     companion object {
         val Default = KhataPreferences(
@@ -74,6 +86,7 @@ data class KhataPreferences(
             driveFolderId = null,
             driveLastUploadAt = null,
             driveNeedsReconnect = false,
+            searchIndexVersion = 0,
         )
     }
 }
