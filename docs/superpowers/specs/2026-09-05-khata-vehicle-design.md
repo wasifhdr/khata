@@ -124,8 +124,11 @@ recent use, and creates a place when nothing matches** — the same `findOrCreat
 `TagRepository` and the restaurant name field, and for the same reason: being made to register a
 workshop before recording a repair is the chore principle 1 says gets abandoned.
 
-**The cost field uses `AmountKeypad`**, the wallet's own control. It exists, it is already
-thumb-sized, and money in this app has one input.
+**The cost field is a text field with a `৳` prefix, parsed by `Money.parse`** — the same control
+the visit editor uses, and for the same reason: this is one field among eight in a scrolling
+form. `AmountKeypad` is the widget's full-height keypad, built for three-tap cash entry with
+nothing else on screen, and dropping it into a form would take the whole viewport to collect one
+number.
 
 **Item rows are added one at a time** with a name and an optional cost, and reorder by
 `sortOrder`. No catalogue, no autocomplete over past item names — a prefix match over free text
@@ -169,7 +172,7 @@ Inherited, not reopened: `KhataTheme`, `core/ui/component`, petrol on verdigris 
 pale-aqua accent, serif numerals, Haze for the glass.
 
 Nothing here is visually new. Every surface is a list, a form, or a photo grid, all of which the
-restaurant module ships. `MoneyText` and `AmountKeypad` are reused as they are. `StarRating` is
+restaurant module ships. `MoneyText` is reused as it is. `StarRating` is
 **not** used — a service has no rating, and a car that needed work is not a car that disappointed
 you.
 

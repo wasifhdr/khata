@@ -24,7 +24,7 @@ screens. Photos, tags, and the workshop's location are spine calls and add no co
 - English interface. Bengali script must render in workshop names, item names, and notes.
 - Routine controls live in the bottom third of the screen; nothing routine in a top corner.
 - `BackupRepository.SCHEMA_VERSION` must equal the Room `version` at all times.
-- No new dependencies. Coil, Haze, `AmountKeypad`, `MoneyText`, `KhataGlass`, `FieldScaffold`
+- No new dependencies. Coil, Haze, `MoneyText`, `KhataGlass`, `FieldScaffold`
   already exist and are reused as-is.
 - Migration SQL is copied **verbatim** from `app/schemas/com.wasif.khata.core.data.KhataDatabase/12.json`
   after a build, never hand-written — Room compares an identity hash at open time.
@@ -770,13 +770,13 @@ git commit -m "feat(vehicle): brake pads and workshops are findable"
 - Test: `app/src/test/java/com/wasif/khata/feature/vehicle/ServiceEditorViewModelTest.kt`
 
 **Interfaces:**
-- Consumes: `VehicleRepository`, `PlaceRepository`, `PlaceDao`, `MediaStore`, `AmountKeypad`,
-  `FieldScaffold`, `KhataGlass`, `MoneyText`.
+- Consumes: `VehicleRepository`, `PlaceDao`, `MediaStore`, `FieldScaffold`, `KhataGlass`,
+  `MoneyText`, `Pill`, `SectionLabel`.
 - Produces: `ServiceEditorUiState(servicedAt, odometerKm, workshopQuery, workshopSuggestions,
   placeId, costMinor, items, note, photos, saving)`, `ServiceEditorActions`.
 
 Model this file on `feature/restaurants/VisitEditorScreen.kt` and its view model — same field
-order, same `AmountKeypad` usage, same photo picker, same save-and-pop.
+order, same `৳`-prefixed cost field, same photo picker, same save-and-pop.
 
 - [ ] **Step 1: Write the failing view-model tests**
 
