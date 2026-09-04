@@ -39,6 +39,8 @@ class UnmatchedScreenTest {
                     onBack = {},
                     onWriteRule = onWriteRule,
                     onNotATransaction = onNotATransaction,
+                    onAskGemini = {},
+                    canAskGemini = false,
                 )
             }
         }

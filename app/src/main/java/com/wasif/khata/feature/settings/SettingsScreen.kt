@@ -109,8 +109,11 @@ fun SettingsScreen(
     onOpenCategories: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    // Hoisted because the backup slot needs it too, and collecting twice would be two
+    // subscriptions to the same flow.
+    val prefs = viewModel.state.collectAsStateWithLifecycle().value
     SettingsContent(
-        prefs = viewModel.state.collectAsStateWithLifecycle().value,
+        prefs = prefs,
         ingestion = viewModel.ingestion.collectAsStateWithLifecycle().value,
         onBack = onBack,
         onPermissionRequested = viewModel::onPermissionRequested,
@@ -121,7 +124,7 @@ fun SettingsScreen(
         onOpenReconcile = onOpenReconcile,
         onOpenCategories = onOpenCategories,
         onGeminiKeyChanged = viewModel::onGeminiKeyChanged,
-        viewModel = viewModel,
+        backupSection = { BackupSection(prefs = prefs, viewModel = viewModel) },
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onFieldSelected = viewModel::onFieldSelected,
         onGroundSelected = viewModel::onGroundSelected,
@@ -144,7 +147,13 @@ fun SettingsContent(
     onOpenReconcile: () -> Unit,
     onOpenCategories: () -> Unit,
     onGeminiKeyChanged: (String?) -> Unit,
-    viewModel: SettingsViewModel,
+    /**
+     * A slot rather than the view model itself. Backup needs ten methods off
+     * SettingsViewModel, and taking the whole thing here meant a screen test could not
+     * construct this composable at all -- eleven dependencies to assert that "HOME
+     * VIEW" is on screen is not a test anybody writes, so the test rotted instead.
+     */
+    backupSection: @Composable () -> Unit,
     onHomeViewSelected: (HomeView) -> Unit,
     onFieldSelected: (FieldPalette) -> Unit,
     onGroundSelected: (Color) -> Unit,
@@ -190,7 +199,7 @@ fun SettingsContent(
                     onClick = onOpenCategories,
                 )
 
-                BackupSection(prefs = prefs, viewModel = viewModel)
+                backupSection()
 
                 SectionLabel("AI fallback")
                 GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
