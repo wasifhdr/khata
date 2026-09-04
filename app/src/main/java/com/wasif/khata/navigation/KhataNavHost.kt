@@ -42,6 +42,10 @@ import com.wasif.khata.feature.vehicle.ServiceEditorViewModel
 import com.wasif.khata.feature.vehicle.ServiceScreen
 import com.wasif.khata.feature.vehicle.ServiceViewModel
 import com.wasif.khata.feature.vehicle.VehicleScreen
+import com.wasif.khata.feature.watchlist.AddTitleScreen
+import com.wasif.khata.feature.watchlist.TitleScreen
+import com.wasif.khata.feature.watchlist.TitleViewModel
+import com.wasif.khata.feature.watchlist.WatchlistScreen
 import com.wasif.khata.feature.search.SearchScreen
 import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
@@ -68,6 +72,10 @@ object KhataRoutes {
     const val VehicleServiceNew = "vehicle/service/new"
     const val VehicleServiceEdit = "vehicle/service/{serviceId}/edit"
     const val VehicleCosts = "vehicle/costs"
+    const val Watchlist = "watchlist"
+    const val Title = "watchlist/{titleId}"
+    const val AddTitle = "watchlist/add"
+    const val ArgTitleId = "titleId"
     const val ArgServiceId = "serviceId"
     const val Search = "search"
     const val ArgRestaurantId = "restaurantId"
@@ -86,6 +94,8 @@ object KhataRoutes {
     fun visitEdit(id: Long): String = "restaurants/visit/$id"
 
     fun vehicleService(id: Long): String = "vehicle/service/$id"
+
+    fun title(id: Long): String = "watchlist/$id"
 
     /** -1 is "no restaurant yet", which is the visit-first case. */
     fun visitNew(restaurantId: Long = -1L): String = "restaurants/visit/new?restaurantId=$restaurantId"
@@ -158,6 +168,7 @@ fun KhataNavHost(
                 onOpenSearch = { navController.navigate(KhataRoutes.Search) },
                 onOpenRestaurants = { navController.navigate(KhataRoutes.Restaurants) },
                 onOpenVehicle = { navController.navigate(KhataRoutes.Vehicle) },
+                onOpenWatchlist = { navController.navigate(KhataRoutes.Watchlist) },
             )
         }
 
@@ -304,12 +315,42 @@ fun KhataNavHost(
             CostsScreen(onBack = { navController.popBackStack() })
         }
 
+        composable(KhataRoutes.Watchlist) {
+            WatchlistScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTitle = { id -> navController.navigate(KhataRoutes.title(id)) },
+                onAddTitle = { navController.navigate(KhataRoutes.AddTitle) },
+            )
+        }
+
+        // Registered before the {titleId} pattern so the literal wins outright; a
+        // LongType arg would not parse "add", but the order removes the question.
+        composable(KhataRoutes.AddTitle) {
+            AddTitleScreen(onDone = { navController.popBackStack() })
+        }
+
+        composable(
+            route = KhataRoutes.Title,
+            arguments = listOf(navArgument(KhataRoutes.ArgTitleId) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(KhataRoutes.ArgTitleId) ?: 0L
+            TitleScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = hiltViewModel<TitleViewModel, TitleViewModel.Factory>(
+                    key = "title-$id",
+                    creationCallback = { factory -> factory.create(id) },
+                ),
+                now = System.currentTimeMillis(),
+            )
+        }
+
         composable(KhataRoutes.Search) {
             SearchScreen(
                 onBack = { navController.popBackStack() },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
                 onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
                 onOpenService = { id -> navController.navigate(KhataRoutes.vehicleService(id)) },
+                onOpenTitle = { id -> navController.navigate(KhataRoutes.title(id)) },
             )
         }
 

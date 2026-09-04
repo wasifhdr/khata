@@ -58,6 +58,7 @@ fun ModulesScreen(
     onOpenSearch: () -> Unit,
     onOpenRestaurants: () -> Unit,
     onOpenVehicle: () -> Unit,
+    onOpenWatchlist: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
@@ -86,6 +87,7 @@ fun ModulesScreen(
         onOpenSearch = onOpenSearch,
         onOpenRestaurants = onOpenRestaurants,
         onOpenVehicle = onOpenVehicle,
+        onOpenWatchlist = onOpenWatchlist,
     )
 }
 
@@ -97,6 +99,7 @@ fun ModulesContent(
     onOpenSearch: () -> Unit,
     onOpenRestaurants: () -> Unit,
     onOpenVehicle: () -> Unit,
+    onOpenWatchlist: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -171,7 +174,13 @@ fun ModulesContent(
                         modifier = Modifier.weight(1f),
                         onClick = onOpenRestaurants,
                     )
-                    DormantTile(haze = haze, name = "Watchlist", modifier = Modifier.weight(1f))
+                    ModuleTile(
+                        haze = haze,
+                        name = "Watchlist",
+                        subline = "Up next, and watched",
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenWatchlist,
+                    )
                 }
                 Row(
                     Modifier.fillMaxWidth(),

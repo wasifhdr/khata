@@ -24,7 +24,7 @@ class ModulesScreenTest {
     fun theWordmarkIsBengaliAndNeverTransliterated() {
         compose.setContent {
             KhataTheme {
-                ModulesContent(ModulesUiState(monthSpend = Money(47_382_50)), {}, {}, {}, {}, {})
+                ModulesContent(ModulesUiState(monthSpend = Money(47_382_50)), {}, {}, {}, {}, {}, {})
             }
         }
 
@@ -39,7 +39,7 @@ class ModulesScreenTest {
     @Test
     fun unbuiltModulesSaySoRatherThanShowingFakeData() {
         compose.setContent {
-            KhataTheme { ModulesContent(ModulesUiState(), {}, {}, {}, {}, {}) }
+            KhataTheme { ModulesContent(ModulesUiState(), {}, {}, {}, {}, {}, {}) }
         }
 
         compose.onNodeWithText("RESTAURANTS").assertIsDisplayed()
@@ -51,7 +51,7 @@ class ModulesScreenTest {
     fun theBudgetRingIsAbsentUntilABudgetIsSet() {
         compose.setContent {
             KhataTheme {
-                ModulesContent(ModulesUiState(monthSpend = Money(47_382_50)), {}, {}, {}, {}, {})
+                ModulesContent(ModulesUiState(monthSpend = Money(47_382_50)), {}, {}, {}, {}, {}, {})
             }
         }
 
@@ -64,7 +64,7 @@ class ModulesScreenTest {
     fun theSettingsGearIsReachable() {
         var opened = false
         compose.setContent {
-            KhataTheme { ModulesContent(ModulesUiState(), {}, { opened = true }, {}, {}, {}) }
+            KhataTheme { ModulesContent(ModulesUiState(), {}, { opened = true }, {}, {}, {}, {}) }
         }
 
         compose.onNodeWithContentDescription("Settings").performClick()
