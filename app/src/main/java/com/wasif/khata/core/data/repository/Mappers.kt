@@ -24,6 +24,7 @@ fun TransactionEntity.toDomain() = Transaction(
     source = source,
     confidence = confidence,
     transferGroupId = transferGroupId,
+    rawMessageId = rawMessageId,
     updatedAt = updatedAt,
 )
 

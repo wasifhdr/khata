@@ -21,6 +21,9 @@ data class TransactionEditorUiState(
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
 
+    /** The SMS this row was parsed from. Null for a row typed by hand. */
+    val originalMessage: String? = null,
+
     val isEditing: Boolean = false,
     val isSaving: Boolean = false,
     val saveError: String? = null,

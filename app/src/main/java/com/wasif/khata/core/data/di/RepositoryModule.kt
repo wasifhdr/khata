@@ -1,5 +1,6 @@
 package com.wasif.khata.core.data.di
 
+import com.wasif.khata.core.data.dao.RawMessageDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.repository.ReferenceDataRepositoryImpl
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
@@ -19,6 +20,7 @@ import com.wasif.khata.core.sms.TeachRequest
 import com.wasif.khata.core.sms.ai.GeminiClient
 import com.wasif.khata.core.sms.ai.RuleSuggester
 import com.wasif.khata.core.sms.StartBackfill
+import com.wasif.khata.feature.editor.OriginalMessage
 import com.wasif.khata.feature.widget.RecentCategoryIds
 import dagger.Binds
 import dagger.Module
@@ -63,6 +65,10 @@ abstract class RepositoryModule {
         @Provides
         fun provideRecentCategoryIds(dao: TransactionDao) =
             RecentCategoryIds { accountId, limit -> dao.observeRecentCategoryIds(accountId, limit) }
+
+        @Provides
+        fun provideOriginalMessage(dao: RawMessageDao) =
+            OriginalMessage { id -> dao.findById(id)?.body }
 
         @Provides
         fun provideStartBackfill(scheduler: IngestionScheduler) = StartBackfill { scheduler.backfill() }

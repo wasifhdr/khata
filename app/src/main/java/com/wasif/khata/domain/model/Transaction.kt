@@ -22,5 +22,7 @@ data class Transaction(
     val source: TransactionSource,
     val confidence: Confidence,
     val transferGroupId: String?,
+    /** The SMS this was parsed from, so the editor can show it. Null when typed by hand. */
+    val rawMessageId: Long? = null,
     val updatedAt: Long,
 )

@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 class TransactionEditorViewModel @AssistedInject constructor(
     private val repository: TransactionRepository,
     private val referenceData: ReferenceDataRepository,
+    private val originalMessage: OriginalMessage,
     private val clock: KhataClock,
     @Assisted private val transactionId: Long?,
 ) : ViewModel(), TransactionEditorActions {
@@ -79,6 +80,14 @@ class TransactionEditorViewModel @AssistedInject constructor(
                             direction = existing.direction,
                             occurredAt = existing.occurredAt,
                         )
+                    }
+
+                    // Read once. The message it was parsed from does not change, and
+                    // observe() re-emits on every edit.
+                    val rawId = existing.rawMessageId
+                    if (rawId != null && _uiState.value.originalMessage == null) {
+                        val body = originalMessage.forRawMessage(rawId)
+                        _uiState.update { it.copy(originalMessage = body) }
                     }
                 }
             }

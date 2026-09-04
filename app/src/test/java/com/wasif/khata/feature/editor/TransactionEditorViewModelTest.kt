@@ -3,8 +3,10 @@ package com.wasif.khata.feature.editor
 import androidx.paging.PagingData
 import app.cash.turbine.test
 import com.wasif.khata.core.model.AccountType
+import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.model.Account
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -33,6 +36,8 @@ class TransactionEditorViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    private var existing: Transaction? = null
+    private var messageBodies: Map<Long, String> = emptyMap()
     private var savedDraft: TransactionDraft? = null
     private var saveResult: Result<Long> = Result.success(1L)
 
@@ -43,7 +48,7 @@ class TransactionEditorViewModelTest {
         ): Flow<PagingData<Transaction>> = flowOf(PagingData.empty())
         override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> =
             flowOf(PagingData.empty())
-        override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
+        override fun observe(id: Long): Flow<Transaction?> = flowOf(existing)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
         override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = Result.success(null)
 
@@ -94,7 +99,13 @@ class TransactionEditorViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel(transactionId: Long? = null) =
-        TransactionEditorViewModel(repository, referenceData, clock, transactionId)
+        TransactionEditorViewModel(
+            repository,
+            referenceData,
+            OriginalMessage { id -> messageBodies[id] },
+            clock,
+            transactionId,
+        )
 
     @Test
     fun `a new transaction defaults its timestamp to now`() {
@@ -212,5 +223,49 @@ class TransactionEditorViewModelTest {
         vm.onAmountChange("300")
 
         assertNull(vm.uiState.value.saveError)
+    }
+
+    private fun parsedTransaction(rawMessageId: Long?) = Transaction(
+        id = 5,
+        uuid = "t-5",
+        accountId = 3,
+        amount = Money(50_000),
+        direction = TransactionDirection.DEBIT,
+        occurredAt = 1_000L,
+        merchantRaw = "EBL Account Transfer",
+        merchantId = null,
+        categoryId = null,
+        note = null,
+        source = TransactionSource.SMS,
+        confidence = Confidence.HIGH,
+        transferGroupId = null,
+        rawMessageId = rawMessageId,
+        updatedAt = 1_000L,
+    )
+
+    @Test
+    fun `a parsed transaction shows the message it came from`() = runTest(dispatcher) {
+        // "EBL Account Transfer" alone cannot say whether the money went to another of
+        // my accounts or to someone else. The message is where that is settled.
+        existing = parsedTransaction(rawMessageId = 9)
+        messageBodies = mapOf(9L to "AC 112***286 is debited with BDT 500 as EBL Account Transfer")
+
+        val state = viewModel(transactionId = 5).uiState
+        advanceUntilIdle()
+
+        assertEquals(
+            "AC 112***286 is debited with BDT 500 as EBL Account Transfer",
+            state.value.originalMessage,
+        )
+    }
+
+    @Test
+    fun `a transaction typed by hand has no message to show`() = runTest(dispatcher) {
+        existing = parsedTransaction(rawMessageId = null)
+
+        val state = viewModel(transactionId = 5).uiState
+        advanceUntilIdle()
+
+        assertNull(state.value.originalMessage)
     }
 }

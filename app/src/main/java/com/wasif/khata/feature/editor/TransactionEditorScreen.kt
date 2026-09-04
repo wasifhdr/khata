@@ -294,6 +294,22 @@ fun TransactionEditorContent(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                 )
 
+                // What the bank actually said, verbatim and read-only. "EBL Account
+                // Transfer" alone cannot say whether the money went to another of your
+                // accounts or to someone else, and this is where that is settled.
+                // Absent entirely on a row typed by hand, which has no message.
+                state.originalMessage?.let { message ->
+                    SectionLabel(top = spacing.md, text = "Original message")
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.screenHorizontal),
+                    )
+                }
+
                 state.saveError?.let { error ->
                     Text(
                         text = error,
