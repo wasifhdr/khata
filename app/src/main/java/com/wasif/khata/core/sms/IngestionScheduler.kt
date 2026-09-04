@@ -31,6 +31,15 @@ fun interface TeachRequest {
     suspend operator fun invoke(rawMessageId: Long)
 }
 
+/**
+ * Asking for a transfer-shaped row to be reviewed in three minutes, as a function
+ * type, for the same reason TeachRequest is one: the pipeline must not hold the
+ * scheduler that runs the worker that calls the pipeline.
+ */
+fun interface ScheduleTransferReview {
+    operator fun invoke(transactionId: Long)
+}
+
 /** Where one teach has got to. The screen that asked needs a terminal answer. */
 enum class TeachState { ASKING, WROTE_A_RULE, GAVE_UP }
 

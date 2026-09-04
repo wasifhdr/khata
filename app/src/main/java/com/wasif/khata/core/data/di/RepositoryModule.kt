@@ -19,7 +19,9 @@ import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
 import com.wasif.khata.core.sms.ai.GeminiClient
 import com.wasif.khata.core.sms.ai.RuleSuggester
+import com.wasif.khata.core.sms.ScheduleTransferReview
 import com.wasif.khata.core.sms.StartBackfill
+import com.wasif.khata.core.sms.TransferReviewScheduler
 import com.wasif.khata.feature.editor.OriginalMessage
 import com.wasif.khata.feature.widget.RecentCategoryIds
 import dagger.Binds
@@ -69,6 +71,10 @@ abstract class RepositoryModule {
         @Provides
         fun provideOriginalMessage(dao: RawMessageDao) =
             OriginalMessage { id -> dao.findById(id)?.body }
+
+        @Provides
+        fun provideScheduleTransferReview(scheduler: TransferReviewScheduler) =
+            ScheduleTransferReview { id -> scheduler.schedule(id) }
 
         @Provides
         fun provideStartBackfill(scheduler: IngestionScheduler) = StartBackfill { scheduler.backfill() }

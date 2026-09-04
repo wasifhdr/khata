@@ -64,6 +64,8 @@ class IngestionPipeline @Inject constructor(
     // Defaulted to a no-op so the many tests that build a pipeline directly are not
     // all about the AI. The real binding decides whether a key is set.
     private val teach: TeachRequest = TeachRequest {},
+    // Defaulted for the same reason: a pipeline built in a test is not about this.
+    private val scheduleTransferReview: ScheduleTransferReview = ScheduleTransferReview {},
 ) {
 
     suspend fun ingest(sender: String, body: String, receivedAt: Long): IngestResult {
@@ -217,7 +219,12 @@ class IngestionPipeline @Inject constructor(
             if (parsed.kind == RuleKind.ATM_WITHDRAWAL) {
                 depositIntoCash(transactionId, parsed, occurredAt, now)
             } else {
-                pairing.pair(transactionId)
+                val group = pairing.pair(transactionId)
+                // Only when pairing did not already answer it. Scheduling regardless
+                // would wake a worker three minutes later to find nothing to do.
+                if (group == null && isTransferShaped(parsed.merchant)) {
+                    scheduleTransferReview(transactionId)
+                }
             }
 
             if (existing != null) IngestResult.Updated(transactionId) else IngestResult.Recorded(transactionId)
