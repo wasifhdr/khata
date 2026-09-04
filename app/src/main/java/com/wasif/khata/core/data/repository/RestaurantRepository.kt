@@ -166,6 +166,8 @@ class RestaurantRepository @Inject constructor(
         searchIndex.reindex(ENTITY_RESTAURANT, restaurantId)
     }
 
+    suspend fun visit(id: Long): RestaurantVisitEntity? = dao.findVisit(id)
+
     suspend fun dishesFor(visitId: Long): List<VisitDishEntity> = dao.dishesFor(visitId)
 
     suspend fun companionsFor(visitId: Long): List<TagEntity> =

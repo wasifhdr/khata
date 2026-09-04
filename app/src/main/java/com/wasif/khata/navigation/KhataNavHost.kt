@@ -29,6 +29,8 @@ import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
+import com.wasif.khata.feature.restaurants.VisitEditorScreen
+import com.wasif.khata.feature.restaurants.VisitEditorViewModel
 import com.wasif.khata.feature.search.SearchScreen
 import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
@@ -47,7 +49,7 @@ object KhataRoutes {
     const val RuleEditor = "rules/new/{rawMessageId}"
     const val Restaurants = "restaurants"
     const val Restaurant = "restaurants/{restaurantId}"
-    const val VisitNew = "restaurants/visit/new"
+    const val VisitNew = "restaurants/visit/new?restaurantId={restaurantId}"
     const val VisitEdit = "restaurants/visit/{visitId}"
     const val Wishlist = "wishlist"
     const val Search = "search"
@@ -65,6 +67,9 @@ object KhataRoutes {
     fun restaurant(id: Long): String = "restaurants/$id"
 
     fun visitEdit(id: Long): String = "restaurants/visit/$id"
+
+    /** -1 is "no restaurant yet", which is the visit-first case. */
+    fun visitNew(restaurantId: Long = -1L): String = "restaurants/visit/new?restaurantId=$restaurantId"
 }
 
 @Composable
@@ -146,6 +151,38 @@ fun KhataNavHost(homeView: HomeView) {
             )
         }
 
+        composable(
+            route = KhataRoutes.VisitNew,
+            arguments = listOf(
+                navArgument(KhataRoutes.ArgRestaurantId) {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+            ),
+        ) { entry ->
+            val restaurantId = entry.arguments?.getLong(KhataRoutes.ArgRestaurantId) ?: -1L
+            VisitEditorScreen(
+                onDone = { navController.popBackStack() },
+                viewModel = visitEditorViewModel(
+                    visitId = null,
+                    restaurantId = restaurantId.takeIf { it > 0 },
+                ),
+            )
+        }
+
+        composable(
+            route = KhataRoutes.VisitEdit,
+            arguments = listOf(navArgument(KhataRoutes.ArgVisitId) { type = NavType.LongType }),
+        ) { entry ->
+            VisitEditorScreen(
+                onDone = { navController.popBackStack() },
+                viewModel = visitEditorViewModel(
+                    visitId = entry.arguments?.getLong(KhataRoutes.ArgVisitId),
+                    restaurantId = null,
+                ),
+            )
+        }
+
         composable(KhataRoutes.Search) {
             SearchScreen(
                 onBack = { navController.popBackStack() },
@@ -223,6 +260,13 @@ fun KhataNavHost(homeView: HomeView) {
         }
     }
 }
+
+@Composable
+private fun visitEditorViewModel(visitId: Long?, restaurantId: Long?): VisitEditorViewModel =
+    hiltViewModel<VisitEditorViewModel, VisitEditorViewModel.Factory>(
+        key = "visit-$visitId-$restaurantId",
+        creationCallback = { factory -> factory.create(visitId, restaurantId) },
+    )
 
 @Composable
 private fun editorViewModel(transactionId: Long?): TransactionEditorViewModel =
