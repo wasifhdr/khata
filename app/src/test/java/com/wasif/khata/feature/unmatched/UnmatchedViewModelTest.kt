@@ -15,6 +15,7 @@ import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.ReparseUseCase
 import com.wasif.khata.core.sms.RuleEngine
 import com.wasif.khata.core.sms.TransferPairing
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.ui.theme.ThemeSpec
 import kotlinx.coroutines.flow.Flow
@@ -71,7 +72,11 @@ class UnmatchedViewModelTest {
             accountDao = db.accountDao(),
             merchantDao = db.merchantDao(),
             engine = RuleEngine(),
-            pairing = TransferPairing(db.transactionDao(), clock),
+            pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            ),
             clock = clock,
         )
     }

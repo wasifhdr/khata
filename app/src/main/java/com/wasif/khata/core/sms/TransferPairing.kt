@@ -2,6 +2,7 @@ package com.wasif.khata.core.sms
 
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import java.util.UUID
 import javax.inject.Inject
@@ -15,6 +16,7 @@ private const val WINDOW_MILLIS = 15L * 60L * 1000L
 @Singleton
 class TransferPairing @Inject constructor(
     private val transactionDao: TransactionDao,
+    private val notifier: TransferNotifier,
     private val clock: KhataClock,
 ) {
 
@@ -42,6 +44,12 @@ class TransferPairing @Inject constructor(
 
         val group = UUID.randomUUID().toString()
         transactionDao.markAsTransfer(listOf(subject.id, candidate.id), group, clock.now())
+        // markAsTransfer clears the review flag, but a notification already on screen
+        // is not in the database. Pairing can happen up to fifteen minutes out, well
+        // after the three-minute question was asked, and a question the owner can no
+        // longer answer correctly is worse than never having asked it.
+        notifier.retract(subject.id)
+        notifier.retract(candidate.id)
         return group
     }
 }

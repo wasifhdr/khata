@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.seed.DatabaseSeeder
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -45,7 +46,11 @@ class SenderFilterTest {
             accountDao = db.accountDao(),
             merchantDao = db.merchantDao(),
             engine = RuleEngine(),
-            pairing = TransferPairing(db.transactionDao(), clock),
+            pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            ),
             clock = clock,
         )
     }

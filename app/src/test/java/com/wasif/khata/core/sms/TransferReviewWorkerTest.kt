@@ -8,6 +8,7 @@ import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import java.util.UUID
 import kotlinx.coroutines.test.runTest
@@ -33,7 +34,13 @@ class TransferReviewWorkerTest {
             ApplicationProvider.getApplicationContext(),
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
-        review = TransferReview(db.transactionDao(), clock)
+        review = TransferReview(
+            db.transactionDao(),
+            // The real one: Robolectric's notification manager is a shadow, so this
+            // posts nowhere and the test still exercises the path that posts.
+            TransferNotifier(ApplicationProvider.getApplicationContext()),
+            clock,
+        )
     }
 
     @After

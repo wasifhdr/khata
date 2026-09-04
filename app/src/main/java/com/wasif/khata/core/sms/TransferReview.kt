@@ -2,6 +2,7 @@ package com.wasif.khata.core.sms
 
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.model.TransactionKind
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,6 +42,7 @@ fun isTransferShaped(merchantRaw: String?): Boolean {
 @Singleton
 class TransferReview @Inject constructor(
     private val transactionDao: TransactionDao,
+    private val notifier: TransferNotifier,
     private val clock: KhataClock,
 ) {
     /**
@@ -51,10 +53,19 @@ class TransferReview @Inject constructor(
         // findById already filters deletedAt IS NULL, which is what makes a deleted
         // row silent without a second check.
         val row = transactionDao.findById(transactionId) ?: return
-        if (row.transferGroupId != null) return
+        if (row.transferGroupId != null) {
+            // It answered itself while the clock ran.
+            notifier.retract(transactionId)
+            return
+        }
         if (row.kind != TransactionKind.NORMAL) return
         if (!isTransferShaped(row.merchantRaw)) return
 
         transactionDao.setReviewPending(transactionId, pending = true, updatedAt = clock.now())
+        notifier.ask(
+            transactionId = transactionId,
+            amountMinor = row.amountMinor,
+            merchantRaw = row.merchantRaw,
+        )
     }
 }

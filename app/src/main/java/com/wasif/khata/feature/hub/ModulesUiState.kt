@@ -8,4 +8,6 @@ data class ModulesUiState(
     /** Null when no budget is set — the ring is not drawn rather than drawn at zero. */
     val budgetFraction: Float? = null,
     val lastTransaction: Transaction? = null,
+    /** Something is waiting to be settled as a transfer or not. */
+    val hasPendingReview: Boolean = false,
 )

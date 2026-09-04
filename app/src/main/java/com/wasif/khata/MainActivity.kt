@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.wasif.khata.core.notify.EXTRA_TRANSACTION_ID
 import com.wasif.khata.core.permission.AndroidSmsPermissionChecker
 import com.wasif.khata.core.ui.theme.KhataTheme
 import com.wasif.khata.navigation.KhataNavHost
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
                     KhataNavHost(
                         homeView = state.preferences.homeView,
                         sharedPlaceText = sharedPlaceText,
+                        settleTransactionId = intent
+                            ?.getLongExtra(EXTRA_TRANSACTION_ID, -1L)
+                            ?.takeIf { it > 0L },
                     )
                 }
             }

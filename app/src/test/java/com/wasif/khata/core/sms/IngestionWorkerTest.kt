@@ -16,6 +16,7 @@ import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.sms.ai.DraftedRule
 import com.wasif.khata.core.sms.ai.RuleDrafter
 import com.wasif.khata.core.sms.ai.RuleSuggester
+import com.wasif.khata.core.notify.TransferNotifier
 import com.wasif.khata.core.time.KhataClock
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -65,7 +66,11 @@ class IngestionWorkerTest {
             accountDao = db.accountDao(),
             merchantDao = db.merchantDao(),
             engine = RuleEngine(),
-            pairing = TransferPairing(db.transactionDao(), clock),
+            pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            ),
             clock = clock,
         )
         backfill = BackfillUseCase(FakeSource(listOf(IncomingMessage("bKash", PAYMENT, 1_000L))), pipeline)

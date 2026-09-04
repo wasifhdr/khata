@@ -2,6 +2,7 @@ package com.wasif.khata.feature.wallet
 
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.domain.model.Account
+import com.wasif.khata.domain.model.Transaction
 
 /** One slice of the month's spending. */
 data class CategorySlice(
@@ -20,6 +21,8 @@ data class WalletUiState(
     val categories: List<CategorySlice> = emptyList(),
     /** Net worth per day, oldest first. Fewer than two points draws nothing. */
     val netWorthTrend: List<Long> = emptyList(),
+    /** Movements waiting to be settled as own-account transfers, or not. */
+    val pendingReviews: List<Transaction> = emptyList(),
 ) {
     val driftingAccounts: Int get() = accounts.count { it.hasBalanceDrift }
 }
