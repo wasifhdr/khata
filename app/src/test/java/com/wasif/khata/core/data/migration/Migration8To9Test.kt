@@ -107,7 +107,7 @@ class Migration8To9Test {
         }
 
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_8_9)
+            .addMigrations(MIGRATION_8_9, MIGRATION_9_10)
             .allowMainThreadQueries()
             .build()
 

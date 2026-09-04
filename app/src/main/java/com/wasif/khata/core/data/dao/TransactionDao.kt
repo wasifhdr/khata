@@ -102,17 +102,6 @@ interface TransactionDao {
     @Query("UPDATE transactions SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long)
 
-    // Anything other than HIGH, not just LOW: the pipeline records MEDIUM for every
-    // newly-seen merchant, which is the common case for an SMS transaction.
-    @Query(
-        "SELECT * FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH' " +
-            "ORDER BY occurredAt DESC, id DESC"
-    )
-    fun pagingSourceNeedsAttention(): PagingSource<Int, TransactionEntity>
-
-    @Query("SELECT COUNT(*) FROM transactions WHERE deletedAt IS NULL AND confidence != 'HIGH'")
-    fun observeNeedsAttentionCount(): Flow<Int>
-
     @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
     suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?
 
@@ -138,11 +127,32 @@ interface TransactionDao {
         toMillis: Long,
     ): List<TransactionEntity>
 
+    // Clears the review flag as well as marking the pair. A partner arriving at minute
+    // five answers the question that was asked at minute three, and a stale question
+    // the owner can no longer answer correctly is worse than never asking.
     @Query(
         "UPDATE transactions SET transferGroupId = :groupId, kind = 'TRANSFER', " +
-            "updatedAt = :updatedAt WHERE id IN (:ids)"
+            "transferReviewPending = 0, updatedAt = :updatedAt WHERE id IN (:ids)"
     )
     suspend fun markAsTransfer(ids: List<Long>, groupId: String, updatedAt: Long)
+
+    @Query(
+        "UPDATE transactions SET transferReviewPending = :pending, updatedAt = :updatedAt " +
+            "WHERE id = :id",
+    )
+    suspend fun setReviewPending(id: Long, pending: Boolean, updatedAt: Long)
+
+    @Query(
+        "SELECT * FROM transactions WHERE transferReviewPending = 1 AND deletedAt IS NULL " +
+            "ORDER BY occurredAt DESC, id DESC",
+    )
+    fun observePendingReviews(): Flow<List<TransactionEntity>>
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE transferReviewPending = 1 AND deletedAt IS NULL")
+    fun observePendingReviewCount(): Flow<Int>
+
+    @Query("SELECT * FROM transactions WHERE accountId = :accountId AND deletedAt IS NULL")
+    suspend fun allForAccount(accountId: Long): List<TransactionEntity>
 
     // Paired rows are excluded: money that left one of your accounts and arrived
     // in another was never spent. Keyed on transferGroupId rather than on kind,

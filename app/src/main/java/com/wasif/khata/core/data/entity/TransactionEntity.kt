@@ -36,6 +36,15 @@ data class TransactionEntity(
      * is a GROUP BY, and a contacts model is a bigger idea than this needs.
      */
     val counterparty: String? = null,
+    /**
+     * Set when a transfer-shaped row went three minutes without a partner message and
+     * the owner has not yet said whether it left their accounts. Cleared by either
+     * answer, and by a partner arriving late.
+     *
+     * Not nullable and defaulted false, which is what makes the feature forward-only:
+     * every row already in the database is silent the moment the migration runs.
+     */
+    val transferReviewPending: Boolean = false,
     val source: TransactionSource,
     val confidence: Confidence,
     val rawMessageId: Long?,

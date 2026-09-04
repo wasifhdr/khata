@@ -3,6 +3,17 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // DEFAULT 0 is the whole of "forward-only": every row that already exists is
+        // settled as far as this feature is concerned, and none of them will ever ask.
+        db.execSQL(
+            "ALTER TABLE `transactions` ADD COLUMN `transferReviewPending` " +
+                "INTEGER NOT NULL DEFAULT 0",
+        )
+    }
+}
+
 val MIGRATION_8_9 = object : Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Confidence used to mean "the merchant has a category", which put 1122 of

@@ -48,7 +48,7 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         TagLinkEntity::class,
         SearchFtsEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {

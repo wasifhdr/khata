@@ -18,6 +18,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
     suspend fun getAll(): List<AccountEntity>
 
+    @Query("SELECT * FROM accounts WHERE id = :id")
+    suspend fun findById(id: Long): AccountEntity?
+
     @Query("SELECT COUNT(*) FROM accounts")
     suspend fun countIncludingDeleted(): Int
 
