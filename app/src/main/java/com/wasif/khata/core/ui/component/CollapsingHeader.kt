@@ -229,17 +229,36 @@ fun ScrollState.collapseFraction(over: Dp = CollapseOver): Float {
 }
 
 /**
- * The same for a list. Anything past the first item counts as fully collapsed: the
- * offset resets on every item boundary, so it alone would make the header spring
- * back open halfway down a long ledger.
+ * The same for a list, which has no single offset to read: an item's own offset resets
+ * at every boundary, so it alone would make the header spring back open halfway down a
+ * long ledger. The distance scrolled is the heights of the items already passed plus
+ * how far into the current one we are.
+ *
+ * Treating anything past the first item as fully collapsed instead is what made the
+ * ledger snap: its first item is a day header about 40dp tall against 160dp of air, so
+ * the fraction climbed to a quarter and then jumped the rest in one frame.
+ *
+ * Heights are recorded as items are measured, which is exactly the items scrolled
+ * through on the way down. One that was never measured means the list jumped straight
+ * to the middle, which is past the header's air by definition, so it collapses rather
+ * than guessing a distance.
  */
 @Composable
 fun LazyListState.collapseFraction(over: Dp = CollapseOver): Float {
     val px = with(LocalDensity.current) { over.toPx() }
+    val heights = remember(this) { mutableMapOf<Int, Int>() }
     return remember(this, px) {
         derivedStateOf {
-            if (firstVisibleItemIndex > 0) 1f
-            else (firstVisibleItemScrollOffset / px).coerceIn(0f, 1f)
+            layoutInfo.visibleItemsInfo.forEach { heights[it.index] = it.size }
+
+            var passed = 0f
+            for (index in 0 until firstVisibleItemIndex) {
+                // Everything above the header's air is the same answer, and a ledger
+                // is thousands of rows long -- there is no reason to add them all up.
+                if (passed >= px) break
+                passed += heights[index] ?: return@derivedStateOf 1f
+            }
+            ((passed + firstVisibleItemScrollOffset) / px).coerceIn(0f, 1f)
         }
     }.value
 }

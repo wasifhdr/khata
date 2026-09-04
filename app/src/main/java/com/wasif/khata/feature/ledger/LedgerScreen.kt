@@ -130,15 +130,25 @@ fun LedgerContent(
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
         Box(Modifier.fillMaxSize()) {
-          Column(
+          Box(
               Modifier
                   .align(Alignment.TopCenter)
                   .fillMaxWidth()
                   // Declared before the list, so without this the list would draw
                   // over the bar and take its taps. zIndex orders both.
                   .zIndex(1f)
-                  .onSizeChanged { headerPx = it.height }
-                  .collapsingGlass(haze, collapse)
+                  .onSizeChanged { headerPx = it.height },
+          ) {
+            // The surface, and nothing else. collapsingGlass fades itself in with the
+            // collapse, so whatever it is attached to fades with it -- on the controls'
+            // own container that meant the month, the spend and the search field all
+            // going to nothing on the first pixel of scroll and returning further down.
+            // It sizes itself to the controls, which are what decide the height.
+            Box(Modifier.matchParentSize().collapsingGlass(haze, collapse))
+
+          Column(
+              Modifier
+                  .fillMaxWidth()
                   .windowInsetsPadding(WindowInsets.statusBars),
           ) {
             Row(Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs)) {
@@ -226,6 +236,7 @@ fun LedgerContent(
                 }
             }
 
+          }
           }
 
             LazyColumn(
