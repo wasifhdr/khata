@@ -10,9 +10,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,10 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.time.toDhakaLocalDate
+import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
+import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.hazeSource
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
@@ -67,26 +72,14 @@ fun NotesContent(
     onNewNote: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val list = rememberLazyListState()
 
-    FieldScaffold(Modifier.fillMaxSize()) { _ ->
-        Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars)) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                NavCircle(Icons.AutoMirrored.Filled.ArrowBack, "Back", onClick = onBack)
-                Text(
-                    text = "NOTES",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Box(Modifier.padding(end = spacing.sm))
-            }
-
+    FieldScaffold(Modifier.fillMaxSize()) { haze ->
+        Box(Modifier.fillMaxSize()) {
             LazyColumn(
-                Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(bottom = spacing.lg),
+                state = list,
+                modifier = Modifier.fillMaxSize().hazeSource(haze),
+                contentPadding = PaddingValues(top = CollapsingHeaderHeight, bottom = spacing.xxl),
             ) {
                 if (state.isEmpty) {
                     item {
@@ -109,11 +102,23 @@ fun NotesContent(
                         onTogglePinned = { actions.onTogglePinned(note.id, !note.pinned) },
                     )
                 }
+
+                item { Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars)) }
             }
+
+            CollapsingTopBar(
+                heading = "Notes",
+                subline = Subline,
+                collapse = list.collapseFraction(),
+                hazeState = haze,
+                onBack = onBack,
+            )
 
             Box(
                 Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
             ) {
                 Pill(
@@ -126,6 +131,8 @@ fun NotesContent(
         }
     }
 }
+
+private const val Subline = "Everything worth writing down"
 
 @Composable
 private fun NoteRow(note: NoteCard, onClick: () -> Unit, onTogglePinned: () -> Unit) {
