@@ -7,7 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -333,12 +333,13 @@ private fun ModuleTile(
 ) {
     val spacing = LocalSpacing.current
 
-    // Square, and the same corner radius as the wallet card above it, so the hub reads as one
-    // family of surfaces rather than a card with four smaller strangers underneath.
-    KhataGlass(hazeState = haze, modifier = modifier.aspectRatio(1f)) {
+    // Height comes from the content rather than a square's aspect ratio: three stat lines and a
+    // heading need what they need, and forcing the box taller than that is the air this tile had
+    // too much of. The corner radius still matches the wallet card above.
+    KhataGlass(hazeState = haze, modifier = modifier) {
         Column(
             Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .padding(spacing.md),
         ) {
@@ -346,16 +347,16 @@ private fun ModuleTile(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(34.dp),
             )
             Text(
                 text = name.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = spacing.xs),
+                modifier = Modifier.padding(top = spacing.sm),
             )
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(spacing.md))
 
             tile.stats.forEach { stat -> StatLine(stat) }
         }
