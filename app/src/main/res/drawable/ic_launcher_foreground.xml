@@ -20,9 +20,9 @@
         android:name="art"
         android:pivotX="277.5"
         android:pivotY="277.5"
-        android:scaleX="0.764"
-        android:scaleY="0.764">
-        <group android:translateX="-41.5" android:translateY="-0.5">
+        android:scaleX="0.795"
+        android:scaleY="0.795">
+        <group android:translateX="2.5" android:translateY="-0.5">
             <path
                 android:name="page"
                 android:pathData="M362 125C378.569 125 392 138.431 392 155V238.275L373 265.323V155C373 148.925 368.075 144 362 144H188C181.925 144 177 148.925 177 155V401C177 407.075 181.925 412 188 412H362C368.075 412 373 407.075 373 401V351.499L392 342.385V401C392 417.31 378.985 430.579 362.774 430.99L362 431H188L187.226 430.99C171.272 430.586 158.414 417.728 158.01 401.774L158 401V155C158 138.431 171.431 125 188 125H362ZM392 268H388.503L392 263.018V268Z"

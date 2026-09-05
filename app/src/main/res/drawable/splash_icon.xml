@@ -16,9 +16,9 @@
         android:name="art"
         android:pivotX="277.5"
         android:pivotY="277.5"
-        android:scaleX="0.833"
-        android:scaleY="0.833">
-        <group android:translateX="-41.5" android:translateY="-0.5">
+        android:scaleX="0.867"
+        android:scaleY="0.867">
+        <group android:translateX="2.5" android:translateY="-0.5">
             <group
                 android:name="page_group"
                 android:pivotX="275.0"
