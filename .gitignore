@@ -20,3 +20,6 @@ captures/
 keystore.properties
 *.jks
 .kotlin/
+
+# Session scratch: worktrees, screenshots, local settings.
+.claude/
