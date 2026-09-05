@@ -7,32 +7,30 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import com.wasif.khata.core.data.KhataDatabase
-import com.wasif.khata.core.model.Confidence
-
+import com.wasif.khata.core.data.entity.NoteEntity
 import java.io.File
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-private const val TEST_DB = "migration-9-10-test.db"
+private const val TEST_DB = "migration-13-14-test.db"
 private const val SCHEMA_DIR = "schemas/com.wasif.khata.core.data.KhataDatabase"
 
 /**
- * Builds a real version-9 database from the exported schema and migrates it, rather
+ * Builds a real version-13 database from the exported schema and migrates it, rather
  * than using MigrationTestHelper, which cannot agree with Robolectric about database
  * paths. Validation is not lost: the test reopens the migrated file through Room
  * itself, so Room's own identity-hash and column checks run against the result.
  */
 @RunWith(RobolectricTestRunner::class)
-class Migration9To10Test {
+class Migration13To14Test {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -57,13 +55,13 @@ class Migration9To10Test {
         return JSONObject(file!!.readText()).getJSONObject("database")
     }
 
-    /** Recreates schema v9 exactly as Room would have, identity hash included. */
-    private fun createV9Database(): SupportSQLiteDatabase {
-        val database = schemaJson(9)
+    /** Recreates schema v13 exactly as Room would have, identity hash included. */
+    private fun createV13Database(): SupportSQLiteDatabase {
+        val database = schemaJson(13)
         val helper = FrameworkSQLiteOpenHelperFactory().create(
             SupportSQLiteOpenHelper.Configuration.builder(context)
                 .name(TEST_DB)
-                .callback(object : SupportSQLiteOpenHelper.Callback(9) {
+                .callback(object : SupportSQLiteOpenHelper.Callback(13) {
                     override fun onCreate(db: SupportSQLiteDatabase) = Unit
                     override fun onUpgrade(db: SupportSQLiteDatabase, old: Int, new: Int) = Unit
                 })
@@ -88,31 +86,38 @@ class Migration9To10Test {
             "INSERT OR REPLACE INTO room_master_table (id, identity_hash) VALUES (42, ?)",
             arrayOf(database.getString("identityHash")),
         )
-        db.version = 9
+        db.version = 13
         return db
     }
 
     @Test
-    fun `every existing row starts settled, because history is not backfilled`() = runTest {
-        createV9Database().use { db ->
-            db.execSQL(
-                "INSERT INTO transactions (uuid, accountId, amountMinor, direction, kind, " +
-                    "occurredAt, merchantRaw, note, counterparty, source, confidence, " +
-                    "createdAt, updatedAt) VALUES " +
-                    "('t1', 1, 500000, 'DEBIT', 'NORMAL', 1000, 'EBL Account Transfer', NULL, " +
-                    "NULL, 'SMS', 'HIGH', 1000, 1000)",
-            )
-        }
+    fun `the notes table exists and Room agrees with the schema it was created from`() = runTest {
+        createV13Database().close()
 
+        // Room verifies the identity hash and every column on open. A migration whose SQL
+        // drifted from the exported schema throws here rather than passing quietly.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
-            .allowMainThreadQueries()
+            .addMigrations(MIGRATION_13_14)
             .build()
 
-        // Transfer-shaped, unpaired, and still silent: the ledger's past is left alone
-        // on purpose, so nothing arrives asking about a transfer from four years ago.
-        assertFalse(db.transactionDao().findById(1)!!.transferReviewPending)
-        assertEquals(0, db.transactionDao().observePendingReviewCount().first())
+        val dao = db.noteDao()
+        val id = dao.upsert(
+            NoteEntity(
+                uuid = "n-1",
+                content = """[{"type":"text","id":"b1","text":"passport renewal"}]""",
+                createdAt = 1,
+                updatedAt = 1,
+            ),
+        )
+
+        val row = dao.findById(id)!!
+        assertTrue(row.content.contains("passport renewal"))
+        assertEquals(false, row.pinned)
+
+        // Pinned sorts above recently edited, which is the table's whole ordering.
+        dao.setPinned(id, pinned = true, now = 2)
+        assertEquals(true, dao.findById(id)?.pinned)
+
         db.close()
     }
 }

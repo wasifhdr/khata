@@ -100,7 +100,7 @@ class Migration12To13Test {
         // Room verifies the identity hash and every column on open. A migration whose
         // SQL drifted from the exported schema throws here rather than passing quietly.
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_12_13)
+            .addMigrations(MIGRATION_12_13, MIGRATION_13_14)
             .build()
 
         val dao = db.watchlistDao()
@@ -132,7 +132,7 @@ class Migration12To13Test {
     fun `tmdbId is unique, so the same entry cannot become two rows`() = runTest {
         createV12Database().close()
         val db = Room.databaseBuilder(context, KhataDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_12_13)
+            .addMigrations(MIGRATION_12_13, MIGRATION_13_14)
             .build()
 
         val dao = db.watchlistDao()

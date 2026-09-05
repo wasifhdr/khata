@@ -8,6 +8,7 @@ import com.wasif.khata.core.data.dao.CategoryBudgetDao
 import com.wasif.khata.core.data.dao.CategoryDao
 import com.wasif.khata.core.data.dao.MediaDao
 import com.wasif.khata.core.data.dao.MerchantDao
+import com.wasif.khata.core.data.dao.NoteDao
 import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RawMessageDao
@@ -25,6 +26,7 @@ import com.wasif.khata.core.data.entity.MediaEntity
 import com.wasif.khata.core.data.entity.MediaLinkEntity
 import com.wasif.khata.core.data.entity.MerchantAliasEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
+import com.wasif.khata.core.data.entity.NoteEntity
 import com.wasif.khata.core.data.entity.ParsingRuleEntity
 import com.wasif.khata.core.data.entity.PlaceEntity
 import com.wasif.khata.core.data.entity.RawMessageEntity
@@ -66,8 +68,9 @@ import com.wasif.khata.core.data.entity.VisitDishEntity
         ServiceItemEntity::class,
         TitleEntity::class,
         WatchEntity::class,
+        NoteEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {
@@ -86,4 +89,5 @@ abstract class KhataDatabase : RoomDatabase() {
     abstract fun restaurantDao(): RestaurantDao
     abstract fun vehicleDao(): VehicleDao
     abstract fun watchlistDao(): WatchlistDao
+    abstract fun noteDao(): NoteDao
 }

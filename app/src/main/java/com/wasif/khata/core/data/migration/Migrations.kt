@@ -3,6 +3,24 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Statements copied verbatim from schemas/14.json, as every migration since 7 -> 8.
+        //
+        // One table. A note's blocks live in `content` as JSON rather than in rows of their
+        // own: nothing queries a block, and a paragraph split would otherwise renumber every
+        // sibling row on a keystroke.
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `notes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT " +
+                "NOT NULL, `uuid` TEXT NOT NULL, `content` TEXT NOT NULL, " +
+                "`pinned` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER)",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_notes_uuid` ON `notes` (`uuid`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_notes_updatedAt` ON `notes` (`updatedAt`)")
+    }
+}
+
 val MIGRATION_12_13 = object : Migration(12, 13) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Statements copied verbatim from schemas/13.json, as every migration since
