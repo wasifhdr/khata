@@ -62,8 +62,6 @@ class WatchlistRepository @Inject constructor(
 
     suspend fun find(id: Long): TitleEntity? = dao.findTitle(id)
 
-    suspend fun summariesByIds(ids: List<Long>): List<TitleSummary> = dao.summariesByIds(ids)
-
     /**
      * Resolved by tmdbId first and by name second, so the same film added twice is one
      * row -- the findOrCreate shape the tag and restaurant repositories already use.
@@ -126,11 +124,6 @@ class WatchlistRepository @Inject constructor(
     suspend fun deleteWatch(id: Long, titleId: Long) {
         dao.softDeleteWatch(id, clock.now())
         searchIndex.reindex(ENTITY_TITLE, titleId)
-    }
-
-    suspend fun deleteTitle(id: Long) {
-        dao.softDeleteTitle(id, clock.now())
-        searchIndex.remove(ENTITY_TITLE, id)
     }
 
     suspend fun recommendersFor(titleId: Long): List<String> =

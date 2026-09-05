@@ -119,7 +119,4 @@ interface WatchlistDao {
 
     @Query("UPDATE watches SET deletedAt = :now, updatedAt = :now WHERE id = :id")
     suspend fun softDeleteWatch(id: Long, now: Long)
-
-    @Query("UPDATE titles SET deletedAt = :now, updatedAt = :now WHERE id = :id")
-    suspend fun softDeleteTitle(id: Long, now: Long)
 }

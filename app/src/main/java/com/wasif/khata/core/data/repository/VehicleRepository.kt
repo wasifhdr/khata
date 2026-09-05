@@ -89,7 +89,7 @@ class VehicleRepository @Inject constructor(
 
     fun observeVehicle(): Flow<VehicleEntity?> = dao.observeVehicle()
 
-    suspend fun observeVehicleOnce(): VehicleEntity? = dao.firstVehicle()
+    suspend fun vehicle(): VehicleEntity? = dao.firstVehicle()
 
     suspend fun saveVehicle(vehicle: VehicleEntity) {
         dao.upsert(vehicle.copy(updatedAt = clock.now()))
@@ -110,8 +110,6 @@ class VehicleRepository @Inject constructor(
     suspend fun findService(id: Long): ServiceEntity? = dao.findService(id)
 
     suspend fun items(serviceId: Long): List<ServiceItemEntity> = dao.itemsFor(serviceId)
-
-    suspend fun summariesByIds(ids: List<Long>): List<ServiceSummary> = dao.summariesByIds(ids)
 
     suspend fun photosFor(entityId: Long): List<MediaEntity> =
         mediaDao.mediaFor(ENTITY_VEHICLE_SERVICE, entityId)

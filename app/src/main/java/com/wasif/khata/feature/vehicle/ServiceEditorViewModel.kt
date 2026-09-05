@@ -179,7 +179,7 @@ class ServiceEditorViewModel @AssistedInject constructor(
                 // The dash reading is the car's as well as the job's, and the newest
                 // one is the current one. An older reading entered later must not
                 // wind the odometer back.
-                repository.observeVehicleOnce()?.let { vehicle ->
+                repository.vehicle()?.let { vehicle ->
                     val reading = state.odometerKm
                     if (reading != null && reading > (vehicle.odometerKm ?: 0)) {
                         repository.saveVehicle(vehicle.copy(odometerKm = reading))

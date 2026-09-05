@@ -19,7 +19,6 @@ data class ServiceDetailUiState(
     val summary: ServiceSummary? = null,
     val items: List<ServiceItemEntity> = emptyList(),
     val photoModels: List<String> = emptyList(),
-    val mapsUrl: String? = null,
 )
 
 // Hilt needs the assisted factory named here to resolve hiltViewModel's generic
@@ -46,7 +45,6 @@ class ServiceViewModel @AssistedInject constructor(
             items = items,
             photoModels = repository.photosFor(serviceId)
                 .map { mediaStore.fileFor(it.sha256).toURI().toString() },
-            mapsUrl = summary?.mapsUrl,
         )
     }.stateIn(
         scope = viewModelScope,

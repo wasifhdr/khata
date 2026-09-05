@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.sms.IngestProgress
@@ -90,7 +91,12 @@ class SettingsScreenTest {
             }
         }
 
-        compose.onNodeWithText("Takes effect the next time you open Khata").assertIsDisplayed()
+        // Scrolled to first: Settings is one long scrolling column, so asserting a
+        // node is *displayed* without scrolling to it is really asserting where the
+        // section happens to sit. Adding a field above it should not break this test.
+        compose.onNodeWithText("Takes effect the next time you open Khata")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     // --- The MESSAGES section ---------------------------------------------

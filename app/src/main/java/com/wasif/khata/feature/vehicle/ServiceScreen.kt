@@ -111,7 +111,7 @@ fun ServiceContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    state.mapsUrl?.let { url ->
+                    summary.mapsUrl?.let { url ->
                         Box(Modifier.padding(top = spacing.sm)) {
                             Pill(
                                 text = "Open in Maps",

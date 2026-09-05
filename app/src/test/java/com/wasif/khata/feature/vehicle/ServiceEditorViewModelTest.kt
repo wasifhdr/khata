@@ -157,7 +157,7 @@ class ServiceEditorViewModelTest {
             onSave()
         }
         dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(42_000, repository.observeVehicleOnce()?.odometerKm)
+        assertEquals(42_000, repository.vehicle()?.odometerKm)
 
         // A job entered later but read earlier: the car has not driven backwards.
         viewModel().apply {
@@ -165,7 +165,7 @@ class ServiceEditorViewModelTest {
             onSave()
         }
         dispatcher.scheduler.advanceUntilIdle()
-        assertEquals(42_000, repository.observeVehicleOnce()?.odometerKm)
+        assertEquals(42_000, repository.vehicle()?.odometerKm)
     }
 
     @Test

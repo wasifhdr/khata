@@ -7,7 +7,6 @@ import com.wasif.khata.core.watch.TmdbResult
 data class AddTitleUiState(
     val query: String = "",
     val results: List<TmdbResult> = emptyList(),
-    val searching: Boolean = false,
 
     // The manual fields are never replaced by a search result: picking one fills them
     // in, so the keyboard is always the fallback rather than a separate mode to

@@ -81,7 +81,7 @@ class VehicleViewModel @Inject constructor(
 
     private fun edit(change: (VehicleEntity) -> VehicleEntity) {
         viewModelScope.launch {
-            repository.observeVehicleOnce()?.let { repository.saveVehicle(change(it)) }
+            repository.vehicle()?.let { repository.saveVehicle(change(it)) }
         }
     }
 }

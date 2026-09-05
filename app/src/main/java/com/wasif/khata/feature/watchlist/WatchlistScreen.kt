@@ -189,13 +189,13 @@ private fun TitleRow(card: TitleCard, onClick: () -> Unit) {
  * set large -- a shape that reads as a poster without pretending to be one.
  */
 @Composable
-private fun Poster(model: String?, name: String, width: Int = 56) {
+private fun Poster(model: String?, name: String) {
     val spacing = LocalSpacing.current
     val shape = MaterialTheme.shapes.small
 
     Box(
         Modifier
-            .width(width.dp)
+            .width(56.dp)
             .aspectRatio(2f / 3f)
             .clip(shape),
         contentAlignment = Alignment.Center,

@@ -60,14 +60,13 @@ class AddTitleViewModel @Inject constructor(
 
     private suspend fun search(raw: String) {
         if (raw.isBlank()) {
-            _state.update { it.copy(results = emptyList(), searching = false) }
+            _state.update { it.copy(results = emptyList()) }
             return
         }
-        _state.update { it.copy(searching = true) }
         // Empty covers no key, no network, a non-200 and nothing found alike. All four
         // leave the manual fields exactly where they already are.
         val found = tmdb.search(raw)
-        _state.update { if (it.query == raw) it.copy(results = found, searching = false) else it }
+        _state.update { if (it.query == raw) it.copy(results = found) else it }
     }
 
     override fun onQueryChange(value: String) = _state.update { it.copy(query = value) }
