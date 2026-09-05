@@ -139,6 +139,9 @@ class MediaStore @Inject constructor(
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        // Dimensions rather than the mime type: BitmapFactory reports no mime type on some
+        // platforms for images it decodes perfectly well, and rejecting those would refuse
+        // real pictures to catch fake ones.
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
 
         val hash = sha256(bytes)

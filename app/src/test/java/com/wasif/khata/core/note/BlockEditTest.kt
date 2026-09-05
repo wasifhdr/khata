@@ -140,6 +140,25 @@ class BlockEditTest {
     }
 
     @Test
+    fun `an image lands after the focused block, with somewhere to type beneath it`() {
+        val blocks = listOf(Block.Text("b1", text = "above"), Block.Text("b2", text = "below"))
+
+        val result = insertImageAfter(blocks, "b1", Block.Image("img", "abc", 10, 10), "new")
+
+        assertEquals(listOf("b1", "img", "new", "b2"), result.map { it.id })
+        assertEquals("", (result[2] as Block.Text).text)
+    }
+
+    @Test
+    fun `an image with nothing focused goes at the end, where a shared picture belongs`() {
+        val blocks = listOf(Block.Text("b1", text = "above"))
+
+        val result = insertImageAfter(blocks, null, Block.Image("img", "abc", 10, 10), "new")
+
+        assertEquals(listOf("b1", "img", "new"), result.map { it.id })
+    }
+
+    @Test
     fun `an image occupies a whole number of rules`() {
         assertEquals(3, rulesFor(heightPx = 200, ruleSpacingPx = 70))
         assertEquals(2, rulesFor(heightPx = 140, ruleSpacingPx = 70))

@@ -196,6 +196,23 @@ fun plainTextOf(document: NoteDocument): String = document.blocks
     .joinToString(" ")
 
 /**
+ * Puts an image after the block the caret was in, with an empty paragraph beneath it so there
+ * is somewhere to keep typing. With no focused block it goes at the end, which is where a
+ * picture shared into a note belongs.
+ */
+fun insertImageAfter(
+    blocks: List<Block>,
+    focusedBlockId: String?,
+    image: Block.Image,
+    newParagraphId: String,
+): List<Block> {
+    val at = blocks.indexOfFirst { it.id == focusedBlockId }.takeIf { it >= 0 } ?: blocks.lastIndex
+    return blocks.toMutableList().apply {
+        addAll(at + 1, listOf(image, Block.Text(id = newParagraphId)))
+    }
+}
+
+/**
  * How many rules an image occupies, rounded up. A picture that ends part-way through a rule
  * pushes every line beneath it off the grid, which is the one thing the ruled page cannot do.
  */
