@@ -61,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import com.wasif.khata.core.time.toDhakaLocalDate
+import com.wasif.khata.core.ui.component.AmountField
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.NavCircle
@@ -210,14 +211,11 @@ fun ServiceEditorContent(
 
                 SectionLabel("What it cost")
                 Column(Modifier.padding(horizontal = spacing.screenHorizontal)) {
-                    OutlinedTextField(
+                    AmountField(
                         value = state.costInput,
                         onValueChange = actions::onCostChange,
-                        placeholder = { Text("০") },
-                        prefix = { Text("৳") },
-                        singleLine = true,
+                        title = "What it cost",
                         isError = state.costHasError,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth().testTag("costField"),
                     )
                     if (state.costHasError) {
@@ -351,13 +349,11 @@ private fun ItemRowEditor(
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
-        OutlinedTextField(
+        AmountField(
             value = item.costInput,
             onValueChange = onCost,
-            placeholder = { Text("৳") },
-            singleLine = true,
+            title = item.name.ifBlank { "Part or repair" },
             isError = item.costHasError,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier
                 .padding(start = spacing.xs)
                 .width(112.dp),

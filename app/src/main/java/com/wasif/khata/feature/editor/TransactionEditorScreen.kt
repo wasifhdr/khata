@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -31,6 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,11 +40,11 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.ui.component.AmountKeypadDialog
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.component.Pill
@@ -84,6 +85,17 @@ fun TransactionEditorContent(
     onBack: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    var editingAmount by rememberSaveable { mutableStateOf(false) }
+
+    if (editingAmount) {
+        AmountKeypadDialog(
+            title = "Amount",
+            value = state.amountInput,
+            onValueChange = actions::onAmountChange,
+            onDismiss = { editingAmount = false },
+            onConfirm = { editingAmount = false },
+        )
+    }
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
         Column(
@@ -138,32 +150,32 @@ fun TransactionEditorContent(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    BasicTextField(
-                        value = state.amountInput,
-                        onValueChange = actions::onAmountChange,
-                        textStyle = MaterialTheme.typography.displayLarge.copy(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontFeatureSettings = "tnum",
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
+                    // The keypad rather than the system keyboard, the same one the
+                    // widget takes an amount with. The readout is the button: a
+                    // caret here would promise an IME that never arrives.
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = spacing.xs)
+                            .clickable { editingAmount = true }
                             .testTag("amountField"),
-                        decorationBox = { inner ->
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "৳",
-                                    style = MaterialTheme.typography.displayLarge.copy(
-                                        color = MaterialTheme.colorScheme.primary,
-                                    ),
-                                )
-                                Box(Modifier.weight(1f)) { inner() }
-                            }
-                        },
-                    )
+                    ) {
+                        Text(
+                            text = "৳",
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                            ),
+                        )
+                        Text(
+                            text = state.amountInput.ifEmpty { "0" },
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontFeatureSettings = "tnum",
+                            ),
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                     if (state.amountHasError) {
                         // Durable text under the field, never a transient toast.
                         Text(

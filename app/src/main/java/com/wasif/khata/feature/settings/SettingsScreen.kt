@@ -69,6 +69,7 @@ import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.Pill
+import com.wasif.khata.core.ui.component.AmountKeypadDialog
 import com.wasif.khata.core.ui.component.SectionLabel
 import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
@@ -398,8 +399,8 @@ private fun WalletSection(
 }
 
 /**
- * Confirm stays disabled until the text is a sum. Both callers write a balance
- * outright, and an empty box reading as zero would be a wipe nobody typed.
+ * Confirm stays disabled until the keys spell a sum. Both callers write a balance
+ * outright, and an empty readout counting as zero would be a wipe nobody typed.
  */
 @Composable
 private fun AmountDialog(
@@ -410,33 +411,18 @@ private fun AmountDialog(
     onDismiss: () -> Unit,
     onConfirm: (Money) -> Unit,
 ) {
-    val spacing = LocalSpacing.current
     var text by rememberSaveable { mutableStateOf(initial.format(withSymbol = false)) }
     val amount = Money.parse(text)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
-                Text(body)
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    label = { Text("Amount") },
-                    prefix = { Text(Money.SYMBOL) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = amount != null,
-                onClick = { amount?.let(onConfirm) },
-            ) { Text(confirmLabel) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    AmountKeypadDialog(
+        title = title,
+        body = body,
+        value = text,
+        onValueChange = { text = it },
+        onDismiss = onDismiss,
+        confirmLabel = confirmLabel,
+        confirmEnabled = amount != null,
+        onConfirm = { amount?.let(onConfirm) },
     )
 }
 

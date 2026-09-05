@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import com.wasif.khata.core.time.toDhakaLocalDate
+import com.wasif.khata.core.ui.component.AmountField
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.NavCircle
@@ -193,14 +194,11 @@ fun VisitEditorContent(
 
                 SectionLabel("Cost")
                 Column(Modifier.padding(horizontal = spacing.screenHorizontal)) {
-                    OutlinedTextField(
+                    AmountField(
                         value = state.costInput,
                         onValueChange = actions::onCostChange,
-                        placeholder = { Text("০") },
-                        prefix = { Text("৳") },
-                        singleLine = true,
+                        title = "What it cost",
                         isError = state.costHasError,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth().testTag("costField"),
                     )
                     if (state.costHasError) {

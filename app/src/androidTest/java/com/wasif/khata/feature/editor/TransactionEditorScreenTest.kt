@@ -5,10 +5,10 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
@@ -84,13 +84,10 @@ class TransactionEditorScreenTest {
     fun theAmountIsTheLargestThingOnScreen() {
         // The old build made the amount a labelled OutlinedTextField the same
         // size as everything else, which is most of what "everything is the same
-        // size" was pointing at. The amount is rendered as a currency symbol
-        // Text next to a BasicTextField, two separate nodes in the real tree —
-        // assert each rather than requiring them to be reshaped into one string.
-        // assertTextEquals fails here: the merged node carries both
-        // Text = ["৳"] (from the decorationBox symbol) and EditableText = "540"
-        // (the typed value), so "Text + EditableText" is ["৳", "540"], not
-        // ["540"] alone. assertTextContains checks membership instead.
+        // size" was pointing at. The amount is now a currency symbol Text next to
+        // the readout, two separate nodes in the real tree -- assert each rather
+        // than requiring them to be reshaped into one string. assertTextEquals
+        // fails on the merged node, which carries both.
         setContent(
             TransactionEditorUiState(amountInput = "540", accountId = 1),
             NoopActions,
@@ -150,13 +147,16 @@ class TransactionEditorScreenTest {
     }
 
     @Test
-    fun `typing an amount reports the change`() {
+    fun tappingTheAmountOpensTheKeypadAndItsKeysReportTheChange() {
         val actions = RecordingActions()
         setContent(TransactionEditorUiState(accounts = listOf(bkash)), actions)
 
-        composeRule.onNodeWithTag("amountField").performTextInput("250")
+        // The system keyboard is never offered here, so the only way in is the
+        // readout itself. Each key reports as it is pressed, the way typing did.
+        composeRule.onNodeWithTag("amountField").performClick()
+        composeRule.onNodeWithContentDescription("2").performClick()
 
-        assertEquals("250", actions.amount)
+        assertEquals("2", actions.amount)
     }
 
     @Test
