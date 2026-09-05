@@ -150,4 +150,34 @@ object KhataIcons {
             close()
         }
     }.build()
+
+    /** A wallet: a body with a flap and a clasp, at the same weight as the module icons. */
+    val Wallet: ImageVector = ImageVector.Builder(
+        name = "Wallet",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(4f, 6f); lineTo(20f, 6f); lineTo(20f, 19f); lineTo(4f, 19f)
+            close()
+            moveTo(5.6f, 7.6f); lineTo(5.6f, 17.4f); lineTo(18.4f, 17.4f)
+            lineTo(18.4f, 7.6f)
+            close()
+        }
+        path(fill = SolidColor(Color.Black)) {
+            // The flap, folded over the top edge.
+            moveTo(4f, 6f); lineTo(15f, 4f); lineTo(15.3f, 5.6f); lineTo(6.5f, 7.2f)
+            close()
+        }
+        path(fill = SolidColor(Color.Black)) {
+            // The clasp, sitting proud of the right edge.
+            moveTo(14.5f, 11f); lineTo(20.5f, 11f); lineTo(20.5f, 15f); lineTo(14.5f, 15f)
+            close()
+            moveTo(16.1f, 12.6f); lineTo(16.1f, 13.4f); lineTo(18.9f, 13.4f)
+            lineTo(18.9f, 12.6f)
+            close()
+        }
+    }.build()
 }

@@ -248,16 +248,25 @@ private fun WalletCard(state: ModulesUiState, onClick: () -> Unit) {
 
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
+                // Same icon-then-name opening as a module tile, and the same 34dp, so the
+                // card is built to the tiles' height rather than nudged towards it.
+                Icon(
+                    imageVector = KhataIcons.Wallet,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(34.dp),
+                )
                 Text(
                     text = "WALLET",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = spacing.sm),
                 )
+                Spacer(Modifier.height(spacing.xs))
                 MoneyText(
                     money = state.monthSpend,
                     direction = null,
                     style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"),
-                    modifier = Modifier.padding(top = spacing.sm),
                 )
                 Text(
                     text = "spent this month",
