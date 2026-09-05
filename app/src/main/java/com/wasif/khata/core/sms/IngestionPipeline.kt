@@ -21,6 +21,7 @@ import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.time.KhataClock
+import com.wasif.khata.domain.repository.StatedBalance
 import java.security.MessageDigest
 import java.util.UUID
 import javax.inject.Inject
@@ -283,10 +284,43 @@ class IngestionPipeline @Inject constructor(
         )
         val id = if (cashId == -1L) existing!!.id else cashId
 
-        if (existing == null) accountDao.adjustBalance(cash.id, parsed.amount.minor, now)
+        // Same rule the bank side follows: a withdrawal older than the cash figure
+        // Khata was last given is already inside it. Without this, re-reading six
+        // years of messages after a start over pays every old withdrawal back in.
+        val alreadyCounted = cash.reportedBalanceAt?.let { occurredAt <= it } == true
+        if (existing == null && !alreadyCounted) {
+            accountDao.adjustBalance(cash.id, parsed.amount.minor, now)
+        }
         if (withdrawal.transferGroupId == null) {
             transactionDao.markAsTransfer(listOf(withdrawalId, id), UUID.randomUUID().toString(), now)
         }
+    }
+
+    /**
+     * The newest balance each account's own messages state. Read straight back out
+     * of the stored messages rather than off the accounts, because after a start
+     * over the accounts are exactly what is not trusted.
+     *
+     * Walks newest-first and stops once every account has answered, so on a real
+     * inbox this parses a handful of messages rather than six years of them.
+     */
+    suspend fun latestStatedBalances(): Map<Long, StatedBalance> {
+        val rules = parsingRuleDao.enabled()
+        val accounts = accountDao.getAll().filter { it.type != AccountType.CASH }
+        val found = mutableMapOf<Long, StatedBalance>()
+
+        for (message in rawMessageDao.allForReparse().asReversed()) {
+            if (found.size == accounts.size) break
+            val parsed = (engine.parse(message.sender, message.body, rules) as? ParseOutcome.Parsed)
+                ?.value ?: continue
+            val balance = parsed.balance ?: continue
+            val account = resolveAccount(message.sender, parsed.accountTail) ?: continue
+            if (account.type == AccountType.CASH) continue
+            found.getOrPut(account.id) {
+                StatedBalance(balance.minor, parsed.occurredAt ?: message.receivedAt)
+            }
+        }
+        return found
     }
 
     private suspend fun resolveAccount(sender: String, tail: String?): AccountEntity? {

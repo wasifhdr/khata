@@ -32,6 +32,11 @@ interface TagDao {
     )
     suspend fun detach(tagId: Long, entityType: String, entityId: Long, now: Long)
 
+    // Transaction ids restart at 1 once the table is emptied, so a link left
+    // behind would re-attach itself to whatever new row lands on that id.
+    @Query("DELETE FROM tag_links WHERE entityType = :entityType")
+    suspend fun deleteLinksOfType(entityType: String)
+
     @Query(
         "SELECT t.* FROM tags t JOIN tag_links l ON l.tagId = t.id " +
             "WHERE l.entityType = :entityType AND l.entityId = :entityId " +

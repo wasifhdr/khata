@@ -22,6 +22,10 @@ interface MediaDao {
     @Upsert
     suspend fun upsertLink(link: MediaLinkEntity)
 
+    // Same reason as tag_links: emptied ids are handed out again.
+    @Query("DELETE FROM media_links WHERE entityType = :entityType")
+    suspend fun deleteLinksOfType(entityType: String)
+
     @Query(
         "SELECT m.* FROM media m JOIN media_links l ON l.mediaId = m.id " +
             "WHERE l.entityType = :entityType AND l.entityId = :entityId " +

@@ -109,6 +109,13 @@ interface TransactionDao {
     @Query("UPDATE transactions SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long)
 
+    /**
+     * Hard, not soft: "start over" means the ledger is gone, and a soft-deleted row
+     * still sits in a backup and still holds an id that a tag link could point at.
+     */
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
     suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?
 

@@ -53,6 +53,23 @@ interface AccountDao {
     )
     suspend fun applyStatedBalance(accountId: Long, balanceMinor: Long, at: Long, now: Long)
 
+    /**
+     * Forgets everything Khata worked out for this account and takes [balanceMinor]
+     * as the whole truth: it is the opening balance, the current balance and the
+     * last statement all at once, because after a start over there are no
+     * transactions left for it to be the sum of.
+     *
+     * [at] guards later messages the same way [applyStatedBalance] does -- anything
+     * that happened at or before the statement this balance came from is already
+     * inside it.
+     */
+    @Query(
+        "UPDATE accounts SET openingBalanceMinor = :balanceMinor, " +
+            "currentBalanceMinor = :balanceMinor, reportedBalanceMinor = :balanceMinor, " +
+            "reportedBalanceAt = :at, unexplainedMinor = 0, updatedAt = :now WHERE id = :accountId"
+    )
+    suspend fun startOverAt(accountId: Long, balanceMinor: Long, at: Long, now: Long)
+
     @Query("UPDATE accounts SET unexplainedMinor = 0, updatedAt = :now WHERE id = :accountId")
     suspend fun clearUnexplained(accountId: Long, now: Long)
 

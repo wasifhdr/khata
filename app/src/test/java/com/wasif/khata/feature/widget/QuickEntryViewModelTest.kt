@@ -13,6 +13,7 @@ import com.wasif.khata.domain.model.Account
 import com.wasif.khata.domain.model.Category
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.ReferenceDataRepository
+import com.wasif.khata.domain.repository.StatedBalance
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
 import java.time.Instant
@@ -184,7 +185,8 @@ private class FakeTransactionRepository(
     override fun pagedTransactions(query: String): Flow<PagingData<Transaction>> = TODO()
     override fun observe(id: Long): Flow<Transaction?> = TODO()
     override suspend fun recordUnexplained(draft: TransactionDraft): Result<Long> = TODO()
-    override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = TODO()
+    override suspend fun setBalance(accountId: Long, targetMinor: Long, at: Long): Result<Long?> = TODO()
+    override suspend fun startOver(statedBalances: Map<Long, StatedBalance>, cashMinor: Long): Result<Unit> = TODO()
     override suspend fun delete(id: Long): Result<Unit> = TODO()
     override suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long) =
         Result.success(Unit)

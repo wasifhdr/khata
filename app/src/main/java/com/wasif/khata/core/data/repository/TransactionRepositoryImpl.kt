@@ -8,6 +8,9 @@ import androidx.paging.map
 import androidx.room.withTransaction
 import com.wasif.khata.core.data.KhataDatabase
 import com.wasif.khata.core.data.dao.AccountDao
+import com.wasif.khata.core.data.dao.BalanceSnapshotDao
+import com.wasif.khata.core.data.dao.MediaDao
+import com.wasif.khata.core.data.dao.TagDao
 import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.entity.TransactionEntity
@@ -15,6 +18,7 @@ import com.wasif.khata.core.data.entity.signedMinor
 import com.wasif.khata.core.model.Confidence
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
+import com.wasif.khata.core.model.AccountType
 import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.model.TransactionSource
 import com.wasif.khata.core.search.SearchIndex
@@ -23,6 +27,7 @@ import com.wasif.khata.core.time.KhataClock
 import com.wasif.khata.core.time.dhakaDayIndexToLocalDate
 import com.wasif.khata.domain.error.DataError
 import com.wasif.khata.domain.model.Transaction
+import com.wasif.khata.domain.repository.StatedBalance
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
 import java.time.LocalDate
@@ -40,6 +45,9 @@ class TransactionRepositoryImpl @Inject constructor(
     private val transactionDao: TransactionDao,
     private val accountDao: AccountDao,
     private val merchantDao: MerchantDao,
+    private val snapshots: BalanceSnapshotDao,
+    private val tagDao: TagDao,
+    private val mediaDao: MediaDao,
     private val searchIndex: SearchIndex,
     private val clock: KhataClock,
 ) : TransactionRepository {
@@ -187,11 +195,13 @@ class TransactionRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = runCatchingData {
+    override suspend fun setBalance(accountId: Long, targetMinor: Long, at: Long): Result<Long?> = runCatchingData {
         db.withTransaction {
             val account = accountDao.getAll().firstOrNull { it.id == accountId } ?: throw DataError.NotFound
-            val balance = account.currentBalanceMinor
-            if (balance == 0L) return@withTransaction null
+            // What has to move to land on the target, which is what the adjustment
+            // row records -- the target itself is never written to the balance.
+            val delta = targetMinor - account.currentBalanceMinor
+            if (delta == 0L) return@withTransaction null
 
             val now = clock.now()
             // Opposite sign to the balance, so the two cancel.
@@ -199,13 +209,13 @@ class TransactionRepositoryImpl @Inject constructor(
                 TransactionEntity(
                     uuid = UUID.randomUUID().toString(),
                     accountId = accountId,
-                    amountMinor = kotlin.math.abs(balance),
-                    direction = if (balance > 0) TransactionDirection.DEBIT else TransactionDirection.CREDIT,
+                    amountMinor = kotlin.math.abs(delta),
+                    direction = if (delta < 0) TransactionDirection.DEBIT else TransactionDirection.CREDIT,
                     occurredAt = at,
                     merchantRaw = null,
                     merchantId = null,
                     categoryId = null,
-                    note = "Starting again from zero",
+                    note = "Balance set by hand to ${Money(targetMinor).format()}",
                     counterparty = null,
                     source = TransactionSource.MANUAL,
                     confidence = Confidence.HIGH,
@@ -218,10 +228,41 @@ class TransactionRepositoryImpl @Inject constructor(
                     updatedAt = now,
                 )
             )
-            accountDao.adjustBalance(accountId, -balance, now)
+            accountDao.adjustBalance(accountId, delta, now)
             searchIndex.reindex("transaction", rowId)
             rowId
         }
+    }
+
+    override suspend fun startOver(
+        statedBalances: Map<Long, StatedBalance>,
+        cashMinor: Long,
+    ): Result<Unit> = runCatchingData {
+        val now = clock.now()
+        db.withTransaction {
+            transactionDao.deleteAll()
+            snapshots.deleteAll()
+            // The rows deleteAll leaves pointing nowhere. Ids are handed out again
+            // from an emptied table, so these would attach themselves to whatever
+            // lands on the id next.
+            tagDao.deleteLinksOfType("transaction")
+            mediaDao.deleteLinksOfType("transaction")
+
+            for (account in accountDao.getAll()) {
+                // Cash has no message to read a balance off, so the person holding
+                // it is the source. Dated now: it is true as of this moment and
+                // nothing older should be applied on top.
+                val stated = if (account.type == AccountType.CASH) {
+                    StatedBalance(cashMinor, now)
+                } else {
+                    // An account with no message stating a balance has nothing to
+                    // rebuild from; zero is the honest answer, not a guess.
+                    statedBalances[account.id] ?: StatedBalance(0L, now)
+                }
+                accountDao.startOverAt(account.id, stated.minor, stated.at, now)
+            }
+        }
+        searchIndex.reindexAll()
     }
 
     override suspend fun settleAsOwnTransfer(
