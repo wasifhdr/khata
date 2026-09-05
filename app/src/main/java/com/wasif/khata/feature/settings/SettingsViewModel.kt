@@ -158,6 +158,8 @@ class SettingsViewModel @Inject constructor(
 
     fun onGeminiKeyChanged(key: String?) = viewModelScope.launch { repository.setGeminiKey(key) }
 
+    fun onTmdbKeyChanged(key: String?) = viewModelScope.launch { repository.setTmdbKey(key) }
+
     fun onBackupPassphraseChanged(passphrase: String?) =
         viewModelScope.launch { repository.setBackupPassphrase(passphrase) }
 

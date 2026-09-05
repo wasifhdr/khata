@@ -35,7 +35,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.data.dao.RestaurantSummary
+import com.wasif.khata.core.data.dao.ServiceSummary
+import com.wasif.khata.core.data.dao.TitleSummary
 import com.wasif.khata.core.data.entity.PlaceEntity
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.time.toDhakaLocalDate
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.MoneyText
@@ -52,6 +55,8 @@ fun SearchScreen(
     onBack: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
     onOpenRestaurant: (Long) -> Unit,
+    onOpenService: (Long) -> Unit,
+    onOpenTitle: (Long) -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -61,6 +66,8 @@ fun SearchScreen(
         onBack = onBack,
         onOpenTransaction = onOpenTransaction,
         onOpenRestaurant = onOpenRestaurant,
+        onOpenService = onOpenService,
+        onOpenTitle = onOpenTitle,
     )
 }
 
@@ -76,6 +83,8 @@ fun SearchContent(
     onBack: () -> Unit,
     onOpenTransaction: (Long) -> Unit,
     onOpenRestaurant: (Long) -> Unit,
+    onOpenService: (Long) -> Unit,
+    onOpenTitle: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     val focus = remember { FocusRequester() }
@@ -113,9 +122,9 @@ fun SearchContent(
             }
 
             when {
-                !state.hasQuery -> Hint("Dishes, people, merchants, places.")
+                !state.hasQuery -> Hint("Dishes, people, merchants, parts, titles, places.")
                 state.isEmpty && !state.searching -> Hint("Nothing matches “${state.query}”.")
-                else -> Results(state, onOpenTransaction, onOpenRestaurant)
+                else -> Results(state, onOpenTransaction, onOpenRestaurant, onOpenService, onOpenTitle)
             }
         }
     }
@@ -138,6 +147,8 @@ private fun Results(
     state: SearchUiState,
     onOpenTransaction: (Long) -> Unit,
     onOpenRestaurant: (Long) -> Unit,
+    onOpenService: (Long) -> Unit,
+    onOpenTitle: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = spacing.xxl)) {
@@ -151,6 +162,18 @@ private fun Results(
             item { SectionLabel("Restaurants", top = spacing.lg) }
             items(state.restaurants, key = { "r-${it.id}" }) { row ->
                 RestaurantRow(row) { onOpenRestaurant(row.id) }
+            }
+        }
+        if (state.services.isNotEmpty()) {
+            item { SectionLabel("Car service", top = spacing.lg) }
+            items(state.services, key = { "s-${it.id}" }) { row ->
+                ServiceRow(row) { onOpenService(row.id) }
+            }
+        }
+        if (state.titles.isNotEmpty()) {
+            item { SectionLabel("Watchlist", top = spacing.lg) }
+            items(state.titles, key = { "ti-${it.id}" }) { row ->
+                TitleSearchRow(row) { onOpenTitle(row.id) }
             }
         }
         if (state.places.isNotEmpty()) {
@@ -221,6 +244,72 @@ private fun RestaurantRow(row: RestaurantSummary, onClick: () -> Unit) {
         row.dishAverage?.let { average ->
             Text(
                 text = "%.1f".format(average),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ServiceRow(row: ServiceSummary, onClick: () -> Unit) {
+    val spacing = LocalSpacing.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            // The items are the headline: what a search for "brake" was looking for.
+            // A date alone would make every result look the same.
+            Text(
+                text = row.itemNames ?: row.placeName ?: "Service",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = row.servicedAt.toDhakaLocalDate().format(DayFormat),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        row.costMinor?.let { MoneyText(money = Money(it), direction = null) }
+    }
+}
+
+@Composable
+private fun TitleSearchRow(row: TitleSummary, onClick: () -> Unit) {
+    val spacing = LocalSpacing.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = row.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = if (row.watchCount == 0) "Up next" else "Watched",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        row.verdict?.let { verdict ->
+            Text(
+                text = "%.1f".format(verdict),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
             )

@@ -32,6 +32,7 @@ data class KhataPreferences(
      * switch that could disagree with whether a key exists is a switch that will.
      */
     val geminiKey: String? = null,
+    val tmdbKey: String? = null,
     /**
      * The PBKDF2 output, Base64 -- not the passphrase. A nightly backup needs a key
      * without prompting, and storing the phrase would hand a compromised device the
@@ -80,6 +81,7 @@ data class KhataPreferences(
             hasRequestedSmsPermission = false,
             hasBackfilled = false,
             geminiKey = null,
+            tmdbKey = null,
             backupKey = null,
             backupSalt = null,
             driveConnected = false,

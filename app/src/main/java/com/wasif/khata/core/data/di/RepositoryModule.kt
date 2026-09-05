@@ -17,6 +17,10 @@ import com.wasif.khata.core.search.IndexSource
 import com.wasif.khata.core.search.PlaceIndexSource
 import com.wasif.khata.core.search.RestaurantIndexSource
 import com.wasif.khata.core.search.TransactionIndexSource
+import com.wasif.khata.core.search.TitleIndexSource
+import com.wasif.khata.core.watch.Tmdb
+import com.wasif.khata.core.watch.TmdbClient
+import com.wasif.khata.core.search.VehicleServiceIndexSource
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
 import com.wasif.khata.core.sms.ai.GeminiClient
@@ -73,6 +77,18 @@ abstract class RepositoryModule {
     @Binds
     @IntoSet
     abstract fun bindPlaceIndexSource(impl: PlaceIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindVehicleServiceIndexSource(impl: VehicleServiceIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindTitleIndexSource(impl: TitleIndexSource): IndexSource
+
+    @Binds
+    @Singleton
+    abstract fun bindTmdb(impl: TmdbClient): Tmdb
 
     companion object {
         @Provides

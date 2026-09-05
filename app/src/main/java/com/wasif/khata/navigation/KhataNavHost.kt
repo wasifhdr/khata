@@ -36,6 +36,16 @@ import com.wasif.khata.feature.restaurants.RestaurantViewModel
 import com.wasif.khata.feature.restaurants.RestaurantsScreen
 import com.wasif.khata.feature.restaurants.VisitEditorScreen
 import com.wasif.khata.feature.restaurants.VisitEditorViewModel
+import com.wasif.khata.feature.vehicle.CostsScreen
+import com.wasif.khata.feature.vehicle.ServiceEditorScreen
+import com.wasif.khata.feature.vehicle.ServiceEditorViewModel
+import com.wasif.khata.feature.vehicle.ServiceScreen
+import com.wasif.khata.feature.vehicle.ServiceViewModel
+import com.wasif.khata.feature.vehicle.VehicleScreen
+import com.wasif.khata.feature.watchlist.AddTitleScreen
+import com.wasif.khata.feature.watchlist.TitleScreen
+import com.wasif.khata.feature.watchlist.TitleViewModel
+import com.wasif.khata.feature.watchlist.WatchlistScreen
 import com.wasif.khata.feature.search.SearchScreen
 import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
@@ -57,6 +67,16 @@ object KhataRoutes {
     const val VisitNew = "restaurants/visit/new?restaurantId={restaurantId}"
     const val VisitEdit = "restaurants/visit/{visitId}"
     const val Wishlist = "wishlist"
+    const val Vehicle = "vehicle"
+    const val VehicleService = "vehicle/service/{serviceId}"
+    const val VehicleServiceNew = "vehicle/service/new"
+    const val VehicleServiceEdit = "vehicle/service/{serviceId}/edit"
+    const val VehicleCosts = "vehicle/costs"
+    const val Watchlist = "watchlist"
+    const val Title = "watchlist/{titleId}"
+    const val AddTitle = "watchlist/add"
+    const val ArgTitleId = "titleId"
+    const val ArgServiceId = "serviceId"
     const val Search = "search"
     const val ArgRestaurantId = "restaurantId"
     const val ArgVisitId = "visitId"
@@ -72,6 +92,10 @@ object KhataRoutes {
     fun restaurant(id: Long): String = "restaurants/$id"
 
     fun visitEdit(id: Long): String = "restaurants/visit/$id"
+
+    fun vehicleService(id: Long): String = "vehicle/service/$id"
+
+    fun title(id: Long): String = "watchlist/$id"
 
     /** -1 is "no restaurant yet", which is the visit-first case. */
     fun visitNew(restaurantId: Long = -1L): String = "restaurants/visit/new?restaurantId=$restaurantId"
@@ -143,6 +167,8 @@ fun KhataNavHost(
                 onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
                 onOpenSearch = { navController.navigate(KhataRoutes.Search) },
                 onOpenRestaurants = { navController.navigate(KhataRoutes.Restaurants) },
+                onOpenVehicle = { navController.navigate(KhataRoutes.Vehicle) },
+                onOpenWatchlist = { navController.navigate(KhataRoutes.Watchlist) },
             )
         }
 
@@ -244,11 +270,87 @@ fun KhataNavHost(
             )
         }
 
+        composable(KhataRoutes.Vehicle) {
+            VehicleScreen(
+                onBack = { navController.popBackStack() },
+                onOpenService = { id -> navController.navigate(KhataRoutes.vehicleService(id)) },
+                onLogService = { navController.navigate(KhataRoutes.VehicleServiceNew) },
+                onOpenCosts = { navController.navigate(KhataRoutes.VehicleCosts) },
+            )
+        }
+
+        composable(KhataRoutes.VehicleServiceNew) {
+            ServiceEditorScreen(
+                onDone = { navController.popBackStack() },
+                viewModel = serviceEditorViewModel(serviceId = null),
+            )
+        }
+
+        composable(
+            route = KhataRoutes.VehicleService,
+            arguments = listOf(navArgument(KhataRoutes.ArgServiceId) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(KhataRoutes.ArgServiceId) ?: 0L
+            ServiceScreen(
+                onBack = { navController.popBackStack() },
+                onEdit = { serviceId -> navController.navigate(KhataRoutes.vehicleService(serviceId) + "/edit") },
+                viewModel = hiltViewModel<ServiceViewModel, ServiceViewModel.Factory>(
+                    key = "service-$id",
+                    creationCallback = { factory -> factory.create(id) },
+                ),
+            )
+        }
+
+        composable(
+            route = KhataRoutes.VehicleServiceEdit,
+            arguments = listOf(navArgument(KhataRoutes.ArgServiceId) { type = NavType.LongType }),
+        ) { entry ->
+            ServiceEditorScreen(
+                onDone = { navController.popBackStack() },
+                viewModel = serviceEditorViewModel(serviceId = entry.arguments?.getLong(KhataRoutes.ArgServiceId)),
+            )
+        }
+
+        composable(KhataRoutes.VehicleCosts) {
+            CostsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(KhataRoutes.Watchlist) {
+            WatchlistScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTitle = { id -> navController.navigate(KhataRoutes.title(id)) },
+                onAddTitle = { navController.navigate(KhataRoutes.AddTitle) },
+            )
+        }
+
+        // Registered before the {titleId} pattern so the literal wins outright; a
+        // LongType arg would not parse "add", but the order removes the question.
+        composable(KhataRoutes.AddTitle) {
+            AddTitleScreen(onDone = { navController.popBackStack() })
+        }
+
+        composable(
+            route = KhataRoutes.Title,
+            arguments = listOf(navArgument(KhataRoutes.ArgTitleId) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(KhataRoutes.ArgTitleId) ?: 0L
+            TitleScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = hiltViewModel<TitleViewModel, TitleViewModel.Factory>(
+                    key = "title-$id",
+                    creationCallback = { factory -> factory.create(id) },
+                ),
+                now = System.currentTimeMillis(),
+            )
+        }
+
         composable(KhataRoutes.Search) {
             SearchScreen(
                 onBack = { navController.popBackStack() },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
                 onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
+                onOpenService = { id -> navController.navigate(KhataRoutes.vehicleService(id)) },
+                onOpenTitle = { id -> navController.navigate(KhataRoutes.title(id)) },
             )
         }
 
@@ -327,6 +429,13 @@ private fun visitEditorViewModel(visitId: Long?, restaurantId: Long?): VisitEdit
     hiltViewModel<VisitEditorViewModel, VisitEditorViewModel.Factory>(
         key = "visit-$visitId-$restaurantId",
         creationCallback = { factory -> factory.create(visitId, restaurantId) },
+    )
+
+@Composable
+private fun serviceEditorViewModel(serviceId: Long?): ServiceEditorViewModel =
+    hiltViewModel<ServiceEditorViewModel, ServiceEditorViewModel.Factory>(
+        key = "service-editor-$serviceId",
+        creationCallback = { factory -> factory.create(serviceId) },
     )
 
 @Composable

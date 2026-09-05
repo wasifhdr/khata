@@ -124,6 +124,7 @@ fun SettingsScreen(
         onOpenReconcile = onOpenReconcile,
         onOpenCategories = onOpenCategories,
         onGeminiKeyChanged = viewModel::onGeminiKeyChanged,
+        onTmdbKeyChanged = viewModel::onTmdbKeyChanged,
         backupSection = { BackupSection(prefs = prefs, viewModel = viewModel) },
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onFieldSelected = viewModel::onFieldSelected,
@@ -147,6 +148,7 @@ fun SettingsContent(
     onOpenReconcile: () -> Unit,
     onOpenCategories: () -> Unit,
     onGeminiKeyChanged: (String?) -> Unit,
+    onTmdbKeyChanged: (String?) -> Unit,
     /**
      * A slot rather than the view model itself. Backup needs ten methods off
      * SettingsViewModel, and taking the whole thing here meant a screen test could not
@@ -203,6 +205,8 @@ fun SettingsContent(
 
                 SectionLabel("AI fallback")
                 GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
+
+                TmdbKeyField(current = prefs.tmdbKey, onChange = onTmdbKeyChanged)
 
 
                 SectionLabel("Home view")
@@ -587,6 +591,41 @@ private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
                     "A message no rule matches stays in the review list."
                 } else {
                     "A message no rule matches is sent to Gemini to draft a rule."
+                },
+            )
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.screenHorizontal),
+    )
+}
+
+/**
+ * The same shape as the Gemini field beside it. Without a key the watchlist's search
+ * box simply returns nothing and the manual fields take over, so this is an
+ * enhancement to switch on rather than a setting to get right.
+ */
+@Composable
+private fun TmdbKeyField(current: String?, onChange: (String?) -> Unit) {
+    val spacing = LocalSpacing.current
+    var text by rememberSaveable { mutableStateOf("") }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            text = input
+            onChange(input.ifBlank { null })
+        },
+        label = { Text("TMDB API key") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            StatusSupport(
+                isSet = current != null,
+                text = if (current == null) {
+                    "Titles are typed in by hand."
+                } else {
+                    "Searching TMDB fills in the year, poster and public rating."
                 },
             )
         },

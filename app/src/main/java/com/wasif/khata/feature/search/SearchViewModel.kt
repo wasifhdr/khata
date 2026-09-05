@@ -6,7 +6,11 @@ import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.SearchDao
 import com.wasif.khata.core.data.dao.TransactionDao
+import com.wasif.khata.core.data.dao.VehicleDao
+import com.wasif.khata.core.data.dao.WatchlistDao
 import com.wasif.khata.core.data.repository.ENTITY_RESTAURANT
+import com.wasif.khata.core.data.repository.ENTITY_TITLE
+import com.wasif.khata.core.data.repository.ENTITY_VEHICLE_SERVICE
 import com.wasif.khata.core.data.repository.toDomain
 import com.wasif.khata.core.search.ftsQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,6 +34,8 @@ class SearchViewModel @Inject constructor(
     private val searchDao: SearchDao,
     private val transactions: TransactionDao,
     private val restaurants: RestaurantDao,
+    private val vehicles: VehicleDao,
+    private val titles: WatchlistDao,
     private val places: PlaceDao,
 ) : ViewModel(), SearchActions {
 
@@ -60,6 +66,8 @@ class SearchViewModel @Inject constructor(
                 it.copy(
                     transactions = emptyList(),
                     restaurants = emptyList(),
+                    services = emptyList(),
+                    titles = emptyList(),
                     places = emptyList(),
                     searching = false,
                 )
@@ -73,6 +81,8 @@ class SearchViewModel @Inject constructor(
             .findByIds(searchDao.idsMatching("transaction", query))
             .map { it.toDomain() }
         val foundRestaurants = restaurants.summariesByIds(searchDao.idsMatching(ENTITY_RESTAURANT, query))
+        val foundServices = vehicles.summariesByIds(searchDao.idsMatching(ENTITY_VEHICLE_SERVICE, query))
+        val foundTitles = titles.summariesByIds(searchDao.idsMatching(ENTITY_TITLE, query))
         val foundPlaces = places.findByIds(searchDao.idsMatching("place", query))
 
         _state.update {
@@ -83,6 +93,8 @@ class SearchViewModel @Inject constructor(
                 it.copy(
                     transactions = foundTransactions,
                     restaurants = foundRestaurants,
+                    services = foundServices,
+                    titles = foundTitles,
                     places = foundPlaces,
                     searching = false,
                 )
