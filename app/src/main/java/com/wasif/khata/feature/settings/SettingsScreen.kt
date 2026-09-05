@@ -64,10 +64,12 @@ import androidx.compose.ui.platform.LocalContext
 import com.wasif.khata.core.drive.DriveFile
 import com.wasif.khata.core.permission.AndroidSmsPermissionChecker
 import com.wasif.khata.core.permission.SmsPermissionState
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.Pill
+import com.wasif.khata.core.ui.component.AmountKeypadDialog
 import com.wasif.khata.core.ui.component.SectionLabel
 import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
@@ -118,12 +120,14 @@ fun SettingsScreen(
         onBack = onBack,
         onPermissionRequested = viewModel::onPermissionRequested,
         onBackfill = viewModel::onBackfill,
-        onResetCash = viewModel::onResetCash,
+        onSetCash = viewModel::onSetCash,
+        onStartOver = viewModel::onStartOver,
         onReparse = viewModel::onReparse,
         onOpenUnmatched = onOpenUnmatched,
         onOpenReconcile = onOpenReconcile,
         onOpenCategories = onOpenCategories,
         onGeminiKeyChanged = viewModel::onGeminiKeyChanged,
+        onTmdbKeyChanged = viewModel::onTmdbKeyChanged,
         backupSection = { BackupSection(prefs = prefs, viewModel = viewModel) },
         onHomeViewSelected = viewModel::onHomeViewSelected,
         onFieldSelected = viewModel::onFieldSelected,
@@ -141,12 +145,14 @@ fun SettingsContent(
     onBack: () -> Unit,
     onPermissionRequested: () -> Unit,
     onBackfill: () -> Unit,
-    onResetCash: () -> Unit,
+    onSetCash: (Money) -> Unit,
+    onStartOver: (Money) -> Unit,
     onReparse: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
     onOpenCategories: () -> Unit,
     onGeminiKeyChanged: (String?) -> Unit,
+    onTmdbKeyChanged: (String?) -> Unit,
     /**
      * A slot rather than the view model itself. Backup needs ten methods off
      * SettingsViewModel, and taking the whole thing here meant a screen test could not
@@ -185,7 +191,6 @@ fun SettingsContent(
                     state = ingestion,
                     onPermissionRequested = onPermissionRequested,
                     onBackfill = onBackfill,
-                    onResetCash = onResetCash,
                     onReparse = onReparse,
                     onOpenUnmatched = onOpenUnmatched,
                     onOpenReconcile = onOpenReconcile,
@@ -203,6 +208,8 @@ fun SettingsContent(
 
                 SectionLabel("AI fallback")
                 GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
+
+                TmdbKeyField(current = prefs.tmdbKey, onChange = onTmdbKeyChanged)
 
 
                 SectionLabel("Home view")
@@ -286,6 +293,12 @@ fun SettingsContent(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
+
+                WalletSection(
+                    cashBalance = ingestion.cashBalance,
+                    onSetCash = onSetCash,
+                    onStartOver = onStartOver,
+                )
             }
 
             CollapsingTopBar(
@@ -299,12 +312,125 @@ fun SettingsContent(
     }
 }
 
+/**
+ * Last on the page on purpose: both rows overwrite what the ledger worked out, and
+ * one of them throws it away. Nothing should reach them on the way to somewhere else.
+ */
+@Composable
+private fun WalletSection(
+    cashBalance: Money,
+    onSetCash: (Money) -> Unit,
+    onStartOver: (Money) -> Unit,
+) {
+    var settingCash by rememberSaveable { mutableStateOf(false) }
+    var confirmingStartOver by rememberSaveable { mutableStateOf(false) }
+    var startOverCash by rememberSaveable { mutableStateOf(false) }
+
+    SectionLabel("Wallet")
+
+    ActionRow(
+        title = "Set cash value in wallet",
+        subtitle = "Cash reads ${cashBalance.format()}. Count what is in your pocket and enter it; " +
+            "the difference is recorded as an adjustment.",
+        onClick = { settingCash = true },
+    )
+
+    ActionRow(
+        title = "Start over wallet calculations",
+        subtitle = "Throws away every transaction and works every balance out again " +
+            "from nothing.",
+        onClick = { confirmingStartOver = true },
+    )
+
+    if (settingCash) {
+        AmountDialog(
+            title = "Set cash value",
+            body = "Cash currently reads ${cashBalance.format()}.",
+            confirmLabel = "Set",
+            initial = cashBalance,
+            onDismiss = { settingCash = false },
+            onConfirm = {
+                settingCash = false
+                onSetCash(it)
+            },
+        )
+    }
+
+    if (confirmingStartOver) {
+        AlertDialog(
+            onDismissRequest = { confirmingStartOver = false },
+            title = { Text("Start over?") },
+            text = {
+                Text(
+                    "Every transaction Khata holds is deleted and every balance is " +
+                        "worked out again from nothing. Bank and bKash balances are taken " +
+                        "from the most recent message each one sent. Cash has no message, " +
+                        "so Khata will ask you what it holds. Your messages are kept, so " +
+                        "Re-read with the current rules can rebuild the history " +
+                        "afterwards. This cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmingStartOver = false
+                    startOverCash = true
+                }) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingStartOver = false }) { Text("Cancel") }
+            },
+        )
+    }
+
+    if (startOverCash) {
+        AmountDialog(
+            title = "How much cash do you have?",
+            body = "Count the notes in your pocket. Every other balance is read back " +
+                "out of your messages.",
+            confirmLabel = "Start over",
+            initial = Money.ZERO,
+            onDismiss = { startOverCash = false },
+            onConfirm = {
+                startOverCash = false
+                onStartOver(it)
+            },
+        )
+    }
+}
+
+/**
+ * Confirm stays disabled until the keys spell a sum. Both callers write a balance
+ * outright, and an empty readout counting as zero would be a wipe nobody typed.
+ */
+@Composable
+private fun AmountDialog(
+    title: String,
+    body: String,
+    confirmLabel: String,
+    initial: Money,
+    onDismiss: () -> Unit,
+    onConfirm: (Money) -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf(initial.format(withSymbol = false)) }
+    val amount = Money.parse(text)
+
+    AmountKeypadDialog(
+        title = title,
+        body = body,
+        value = text,
+        onValueChange = { text = it },
+        onDismiss = onDismiss,
+        confirmLabel = confirmLabel,
+        confirmEnabled = amount != null,
+        onConfirm = { amount?.let(onConfirm) },
+    )
+}
+
 @Composable
 private fun MessagesSection(
     state: IngestionState,
     onPermissionRequested: () -> Unit,
     onBackfill: () -> Unit,
-    onResetCash: () -> Unit,
     onReparse: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
@@ -395,18 +521,6 @@ private fun MessagesSection(
         },
         onClick = onOpenUnmatched,
     )
-
-    // Withdrawals top the cash account up; nothing takes money out of it until
-    // cash spending is entered. Six years of that leaves a figure that is honest
-    // about what left the bank and wrong about what is in your pocket.
-    if (state.cashBalance.minor != 0L) {
-        ActionRow(
-            title = "Start cash again from zero",
-            subtitle = "Cash holds ${state.cashBalance.format()} that was withdrawn and never spent here. " +
-                "Writes it off as of today.",
-            onClick = onResetCash,
-        )
-    }
 
     ActionRow(
         title = "Check balances",
@@ -587,6 +701,41 @@ private fun GeminiKeyField(current: String?, onChange: (String?) -> Unit) {
                     "A message no rule matches stays in the review list."
                 } else {
                     "A message no rule matches is sent to Gemini to draft a rule."
+                },
+            )
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.screenHorizontal),
+    )
+}
+
+/**
+ * The same shape as the Gemini field beside it. Without a key the watchlist's search
+ * box simply returns nothing and the manual fields take over, so this is an
+ * enhancement to switch on rather than a setting to get right.
+ */
+@Composable
+private fun TmdbKeyField(current: String?, onChange: (String?) -> Unit) {
+    val spacing = LocalSpacing.current
+    var text by rememberSaveable { mutableStateOf("") }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            text = input
+            onChange(input.ifBlank { null })
+        },
+        label = { Text("TMDB API key") },
+        singleLine = true,
+        visualTransformation = PasswordVisualTransformation(),
+        supportingText = {
+            StatusSupport(
+                isSet = current != null,
+                text = if (current == null) {
+                    "Titles are typed in by hand."
+                } else {
+                    "Searching TMDB fills in the year, poster and public rating."
                 },
             )
         },

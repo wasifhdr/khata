@@ -65,7 +65,8 @@ class DriftViewModelTest {
     private fun viewModel() = DriftViewModel(
         ReconciliationRepository(db.accountDao()),
         TransactionRepositoryImpl(
-            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(),
+            db.balanceSnapshotDao(), db.tagDao(), db.mediaDao(), searchIndex(db), clock,
         ),
         clock,
     )

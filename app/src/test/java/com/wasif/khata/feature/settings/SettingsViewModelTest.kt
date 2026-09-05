@@ -68,6 +68,7 @@ class SettingsViewModelTest {
         override suspend fun setSmsPermissionRequested() = Unit
         override suspend fun setBackfilled() = Unit
         override suspend fun setGeminiKey(key: String?) = Unit
+        override suspend fun setTmdbKey(key: String?) = Unit
         override suspend fun setBackupPassphrase(passphrase: String?) = Unit
         override suspend fun setDriveConnected(connected: Boolean) = Unit
         override suspend fun setDriveFolderId(id: String?) = Unit
@@ -137,11 +138,13 @@ class SettingsViewModelTest {
         repository = repo,
         smsPermission = SmsPermissionRepository(checker, repo),
         scheduler = IngestionScheduler(ApplicationProvider.getApplicationContext()),
+        pipeline = pipeline,
         backups = BackupRepository(ApplicationProvider.getApplicationContext(), db, clock),
         rawMessageDao = db.rawMessageDao(),
         accountDao = db.accountDao(),
         transactions = TransactionRepositoryImpl(
-            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(),
+            db.balanceSnapshotDao(), db.tagDao(), db.mediaDao(), searchIndex(db), clock,
         ),
         clock = clock,
         driveAuth = DriveAuth(ApplicationProvider.getApplicationContext(), repo),

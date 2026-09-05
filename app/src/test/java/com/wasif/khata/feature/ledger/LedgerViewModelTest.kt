@@ -21,6 +21,7 @@ import com.wasif.khata.domain.model.Account
 import com.wasif.khata.domain.model.Category
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.ReferenceDataRepository
+import com.wasif.khata.domain.repository.StatedBalance
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
 import java.time.Instant
@@ -126,7 +127,8 @@ class LedgerViewModelTest {
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
-        override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = Result.success(null)
+        override suspend fun setBalance(accountId: Long, targetMinor: Long, at: Long): Result<Long?> = Result.success(null)
+        override suspend fun startOver(statedBalances: Map<Long, StatedBalance>, cashMinor: Long): Result<Unit> = Result.success(Unit)
         override suspend fun delete(id: Long) = Result.success(Unit)
         override suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long) =
             Result.success(Unit)
@@ -164,7 +166,8 @@ class LedgerViewModelTest {
         override fun observe(id: Long): Flow<Transaction?> = flowOf(null)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
-        override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> = Result.success(null)
+        override suspend fun setBalance(accountId: Long, targetMinor: Long, at: Long): Result<Long?> = Result.success(null)
+        override suspend fun startOver(statedBalances: Map<Long, StatedBalance>, cashMinor: Long): Result<Unit> = Result.success(Unit)
         override suspend fun delete(id: Long) = Result.success(Unit)
         override suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long) =
             Result.success(Unit)

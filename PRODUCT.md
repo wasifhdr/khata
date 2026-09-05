@@ -112,9 +112,9 @@ indoor use.
   **One exception (user decision, 2026-08-28):** the brand lockup on the home screen is
   Bengali — the wordmark খাতা and the tagline সব হিসাব, এক খাতায়. Two fixed strings,
   never localised, never extended. Every other string in the interface is English.
-- **Explicitly undecided:** which module is built after the wallet. Restaurants,
-  notes, deadlines, car servicing, movies, and a lending ledger are all candidates.
-  The order will be chosen once the wallet module is finished, not before.
+- **Module order, settled three deep (2026-09-05):** restaurants, then car servicing, then
+  movies and TV. Notes, deadlines, and a lending ledger remain candidates with no order
+  assigned. The wallet's D11 deferral is spent; the next choice is made after these ship.
 
 ## Brand Commitments
 

@@ -59,6 +59,7 @@ class SettingsViewModel @Inject constructor(
     private val repository: PreferencesRepository,
     private val smsPermission: SmsPermissionRepository,
     private val scheduler: IngestionScheduler,
+    private val pipeline: com.wasif.khata.core.sms.IngestionPipeline,
     private val backups: BackupRepository,
     rawMessageDao: RawMessageDao,
     private val accountDao: AccountDao,
@@ -112,16 +113,33 @@ class SettingsViewModel @Inject constructor(
     fun onBackfill() = scheduler.backfill()
 
     /**
-     * Six years of ATM withdrawals with no cash spending entered against them leave
-     * the cash account holding money that is long gone. This writes that off as of
-     * today so the figure starts meaning something.
+     * Nothing takes money out of the cash account until cash spending is entered, so
+     * the figure drifts up from every withdrawal and only the person holding the
+     * notes can say what is actually there.
      */
-    fun onResetCash() {
+    fun onSetCash(amount: Money) {
         viewModelScope.launch {
             val cash = accountDao.getAll().firstOrNull { it.type == AccountType.CASH } ?: return@launch
-            transactions.resetToZero(cash.id, clock.now()).fold(
-                onSuccess = { _lastAction.value = "Cash starts again from zero" },
-                onFailure = { _lastAction.value = "Could not reset cash. Please try again." },
+            transactions.setBalance(cash.id, amount.minor, clock.now()).fold(
+                onSuccess = { _lastAction.value = "Cash is now ${amount.format()}" },
+                onFailure = { _lastAction.value = "Could not set cash. Please try again." },
+            )
+        }
+    }
+
+    /**
+     * Every transaction goes, and each balance is rebuilt from the last figure its
+     * own messages stated -- cash from [cash], which has no messages. The stored
+     * messages are kept: they are what the bank balances are read back out of, and
+     * "re-read with the current rules" is still there for anyone who wants the
+     * history rebuilt rather than abandoned.
+     */
+    fun onStartOver(cash: Money) {
+        viewModelScope.launch {
+            val stated = pipeline.latestStatedBalances()
+            transactions.startOver(stated, cash.minor).fold(
+                onSuccess = { _lastAction.value = "Started over. Balances taken from the latest messages." },
+                onFailure = { _lastAction.value = "Could not start over. Please try again." },
             )
         }
     }
@@ -157,6 +175,8 @@ class SettingsViewModel @Inject constructor(
     fun onHomeViewSelected(view: HomeView) = viewModelScope.launch { repository.setHomeView(view) }
 
     fun onGeminiKeyChanged(key: String?) = viewModelScope.launch { repository.setGeminiKey(key) }
+
+    fun onTmdbKeyChanged(key: String?) = viewModelScope.launch { repository.setTmdbKey(key) }
 
     fun onBackupPassphraseChanged(passphrase: String?) =
         viewModelScope.launch { repository.setBackupPassphrase(passphrase) }

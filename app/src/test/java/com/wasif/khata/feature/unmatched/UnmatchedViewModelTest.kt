@@ -121,6 +121,7 @@ class UnmatchedViewModelTest {
         override suspend fun setSmsPermissionRequested() = Unit
         override suspend fun setBackfilled() = Unit
         override suspend fun setGeminiKey(key: String?) = Unit
+        override suspend fun setTmdbKey(key: String?) = Unit
         override suspend fun setBackupPassphrase(passphrase: String?) = Unit
         override suspend fun setDriveConnected(connected: Boolean) = Unit
         override suspend fun setDriveFolderId(id: String?) = Unit

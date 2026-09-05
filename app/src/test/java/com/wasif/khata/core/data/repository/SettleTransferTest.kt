@@ -46,7 +46,8 @@ class SettleTransferTest {
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
         repository = TransactionRepositoryImpl(
-            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(),
+            db.balanceSnapshotDao(), db.tagDao(), db.mediaDao(), searchIndex(db), clock,
         )
     }
 

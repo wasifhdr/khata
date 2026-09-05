@@ -2,6 +2,7 @@ package com.wasif.khata.core.media
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import com.wasif.khata.core.data.dao.MediaDao
@@ -116,6 +117,73 @@ class MediaStore @Inject constructor(
             }
             media
         }
+
+    /**
+     * A poster, already sized by whoever served it. Same hash, same write-once file,
+     * same row and link as a gallery import -- the bytes simply arrive over the wire
+     * instead of through the picker, so posters and photos cannot diverge.
+     *
+     * Not downscaled: a w500 poster is well under the 2048px edge and re-encoding it
+     * would cost quality to save nothing. BitmapFactory is safe here where it is not
+     * above, because it only reads the bounds -- the bytes are stored exactly as they
+     * arrived, so there is no orientation to lose. Null on anything unreadable, so a
+     * poster that will not decode is an absent poster rather than a failed save.
+     */
+    suspend fun importBytes(
+        bytes: ByteArray,
+        entityType: String,
+        entityId: Long,
+        sourceUrl: String? = null,
+    ): MediaEntity? = withContext(Dispatchers.IO) {
+        if (bytes.isEmpty()) return@withContext null
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        // Dimensions rather than the mime type: BitmapFactory reports no mime type on some
+        // platforms for images it decodes perfectly well, and rejecting those would refuse
+        // real pictures to catch fake ones.
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
+
+        val hash = sha256(bytes)
+        val file = fileFor(hash)
+        if (!file.exists()) {
+            val temp = File(dir(), "$hash.tmp")
+            temp.writeBytes(bytes)
+            if (!temp.renameTo(file)) {
+                temp.delete()
+                return@withContext null
+            }
+        }
+
+        val now = clock.now()
+        val media = dao.findByHash(hash) ?: MediaEntity(
+            uuid = UUID.randomUUID().toString(),
+            sha256 = hash,
+            mimeType = bounds.outMimeType ?: "image/jpeg",
+            widthPx = bounds.outWidth,
+            heightPx = bounds.outHeight,
+            byteSize = bytes.size.toLong(),
+            capturedAt = null,
+            originalUri = sourceUrl,
+            createdAt = now,
+            updatedAt = now,
+        ).let { it.copy(id = dao.upsert(it)) }
+
+        if (dao.linkCount(media.id, entityType, entityId) == 0) {
+            dao.upsertLink(
+                MediaLinkEntity(
+                    uuid = UUID.randomUUID().toString(),
+                    mediaId = media.id,
+                    entityType = entityType,
+                    entityId = entityId,
+                    sortOrder = dao.mediaFor(entityType, entityId).size,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+        }
+        media
+    }
 
     suspend fun detach(mediaId: Long, entityType: String, entityId: Long) =
         dao.detachLink(mediaId, entityType, entityId, clock.now())

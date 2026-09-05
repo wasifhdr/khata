@@ -43,7 +43,8 @@ class OwedMoneyTest {
             KhataDatabase::class.java,
         ).allowMainThreadQueries().build()
         repository = TransactionRepositoryImpl(
-            db, db.transactionDao(), db.accountDao(), db.merchantDao(), searchIndex(db), clock,
+            db, db.transactionDao(), db.accountDao(), db.merchantDao(),
+            db.balanceSnapshotDao(), db.tagDao(), db.mediaDao(), searchIndex(db), clock,
         )
         accountId = db.accountDao().upsert(
             AccountEntity(
@@ -145,7 +146,7 @@ class OwedMoneyTest {
     fun `resetting an account to zero writes a dated adjustment rather than editing the balance`() = runTest {
         repository.save(draft(162_100_00, TransactionDirection.CREDIT, TransactionKind.NORMAL)).getOrThrow()
 
-        repository.resetToZero(accountId, at = 9_000L).getOrThrow()
+        repository.setBalance(accountId, targetMinor = 0L, at = 9_000L).getOrThrow()
 
         assertEquals(0L, db.accountDao().getAll().single().currentBalanceMinor)
         val writeOff = db.transactionDao().allActive().last()
@@ -158,7 +159,7 @@ class OwedMoneyTest {
 
     @Test
     fun `resetting an account that is already zero writes nothing`() = runTest {
-        assertNull(repository.resetToZero(accountId, at = 9_000L).getOrThrow())
+        assertNull(repository.setBalance(accountId, targetMinor = 0L, at = 9_000L).getOrThrow())
         assertEquals(0, db.transactionDao().allActive().size)
     }
 }

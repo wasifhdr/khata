@@ -20,6 +20,11 @@ interface BalanceSnapshotDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(rows: List<BalanceSnapshotEntity>)
 
+    // Insert is IGNORE, so a stale snapshot would outlive the ledger it was taken
+    // from and never be corrected. Starting over drops them all.
+    @Query("DELETE FROM balance_snapshots")
+    suspend fun deleteAll()
+
     @Query("SELECT dayIndex FROM balance_snapshots WHERE accountId = :accountId AND deletedAt IS NULL")
     suspend fun existingDayIndices(accountId: Long): List<Long>
 

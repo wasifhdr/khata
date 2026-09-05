@@ -1,5 +1,6 @@
 package com.wasif.khata
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -56,6 +57,8 @@ class MainActivity : ComponentActivity() {
                 is MainUiState.Ready -> KhataTheme(spec = state.preferences.themeSpec) {
                     KhataNavHost(
                         homeView = state.preferences.homeView,
+                        sharedPlaceText = sharedPlaceText,
+                        sharedImageUri = sharedImageUri,
                         settleTransactionId = intent
                             ?.getLongExtra(EXTRA_TRANSACTION_ID, -1L)
                             ?.takeIf { it > 0L },
@@ -64,6 +67,25 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /**
+     * Null unless this launch was a share. Read once, in onCreate: MainActivity is
+     * launchMode standard, so a share starts a fresh instance rather than delivering
+     * a new intent to a running one.
+     */
+    private val sharedPlaceText: String?
+        get() = intent
+            ?.takeIf { it.action == Intent.ACTION_SEND && it.type == "text/plain" }
+            ?.getStringExtra(Intent.EXTRA_TEXT)
+
+    /** A picture shared from another app. Read once, for the same reason as above. */
+    private val sharedImageUri: String?
+        get() = intent
+            ?.takeIf { it.action == Intent.ACTION_SEND && it.type?.startsWith("image/") == true }
+            ?.let { intent ->
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.toString()
+            }
 
     override fun onDestroy() {
         permissionChecker.activity = null

@@ -9,6 +9,9 @@ import com.wasif.khata.domain.model.Transaction
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 
+/** The last balance an account's own messages stated, and when. */
+data class StatedBalance(val minor: Long, val at: Long)
+
 data class TransactionDraft(
     val id: Long?,
     val accountId: Long,
@@ -54,11 +57,23 @@ interface TransactionRepository {
     suspend fun recordUnexplained(draft: TransactionDraft): Result<Long>
 
     /**
-     * Writes off whatever an account currently holds, so it starts again from zero
-     * today. Written as a dated adjustment rather than by editing the balance, so
-     * the ledger still says what happened and when.
+     * Moves an account to [targetMinor] by writing the difference as a dated
+     * adjustment rather than by editing the balance, so the ledger still says what
+     * happened and when. Null when it already held that, since nothing moved.
      */
-    suspend fun resetToZero(accountId: Long, at: Long): Result<Long?>
+    suspend fun setBalance(accountId: Long, targetMinor: Long, at: Long): Result<Long?>
+
+    /**
+     * Throws the ledger away and rebuilds each balance from one number: the last
+     * one a bank stated for that account, and for cash the only source there is,
+     * [cashMinor] from the person holding it. Recovery for a history that drifted
+     * past arguing with -- six years of deleted messages leave a running total
+     * nothing can reconcile, and re-reading them only reproduces the same gaps.
+     */
+    suspend fun startOver(
+        statedBalances: Map<Long, StatedBalance>,
+        cashMinor: Long,
+    ): Result<Unit>
     suspend fun delete(id: Long): Result<Unit>
 
     /**

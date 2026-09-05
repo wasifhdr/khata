@@ -8,10 +8,14 @@ import com.wasif.khata.core.data.dao.CategoryBudgetDao
 import com.wasif.khata.core.data.dao.CategoryDao
 import com.wasif.khata.core.data.dao.MediaDao
 import com.wasif.khata.core.data.dao.MerchantDao
+import com.wasif.khata.core.data.dao.NoteDao
 import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RawMessageDao
+import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.SearchDao
+import com.wasif.khata.core.data.dao.VehicleDao
+import com.wasif.khata.core.data.dao.WatchlistDao
 import com.wasif.khata.core.data.dao.TagDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.entity.AccountEntity
@@ -22,13 +26,22 @@ import com.wasif.khata.core.data.entity.MediaEntity
 import com.wasif.khata.core.data.entity.MediaLinkEntity
 import com.wasif.khata.core.data.entity.MerchantAliasEntity
 import com.wasif.khata.core.data.entity.MerchantEntity
+import com.wasif.khata.core.data.entity.NoteEntity
 import com.wasif.khata.core.data.entity.ParsingRuleEntity
 import com.wasif.khata.core.data.entity.PlaceEntity
 import com.wasif.khata.core.data.entity.RawMessageEntity
+import com.wasif.khata.core.data.entity.RestaurantEntity
+import com.wasif.khata.core.data.entity.RestaurantVisitEntity
 import com.wasif.khata.core.data.entity.SearchFtsEntity
+import com.wasif.khata.core.data.entity.ServiceEntity
+import com.wasif.khata.core.data.entity.ServiceItemEntity
 import com.wasif.khata.core.data.entity.TagEntity
+import com.wasif.khata.core.data.entity.TitleEntity
 import com.wasif.khata.core.data.entity.TagLinkEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
+import com.wasif.khata.core.data.entity.VehicleEntity
+import com.wasif.khata.core.data.entity.WatchEntity
+import com.wasif.khata.core.data.entity.VisitDishEntity
 
 @Database(
     entities = [
@@ -47,8 +60,17 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         TagEntity::class,
         TagLinkEntity::class,
         SearchFtsEntity::class,
+        RestaurantEntity::class,
+        RestaurantVisitEntity::class,
+        VisitDishEntity::class,
+        VehicleEntity::class,
+        ServiceEntity::class,
+        ServiceItemEntity::class,
+        TitleEntity::class,
+        WatchEntity::class,
+        NoteEntity::class,
     ],
-    version = 10,
+    version = 14,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {
@@ -64,4 +86,8 @@ abstract class KhataDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun tagDao(): TagDao
     abstract fun searchDao(): SearchDao
+    abstract fun restaurantDao(): RestaurantDao
+    abstract fun vehicleDao(): VehicleDao
+    abstract fun watchlistDao(): WatchlistDao
+    abstract fun noteDao(): NoteDao
 }

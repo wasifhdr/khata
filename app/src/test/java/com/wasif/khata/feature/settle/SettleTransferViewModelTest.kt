@@ -10,6 +10,7 @@ import com.wasif.khata.domain.model.Account
 import com.wasif.khata.domain.model.Category
 import com.wasif.khata.domain.model.Transaction
 import com.wasif.khata.domain.repository.ReferenceDataRepository
+import com.wasif.khata.domain.repository.StatedBalance
 import com.wasif.khata.domain.repository.TransactionDraft
 import com.wasif.khata.domain.repository.TransactionRepository
 import com.wasif.khata.feature.editor.OriginalMessage
@@ -85,8 +86,10 @@ class SettleTransferViewModelTest {
         override fun observe(id: Long): Flow<Transaction?> = flowOf(pendingRow)
         override suspend fun save(draft: TransactionDraft) = Result.success(0L)
         override suspend fun recordUnexplained(draft: TransactionDraft) = Result.success(0L)
-        override suspend fun resetToZero(accountId: Long, at: Long): Result<Long?> =
+        override suspend fun setBalance(accountId: Long, targetMinor: Long, at: Long): Result<Long?> =
             Result.success(null)
+        override suspend fun startOver(statedBalances: Map<Long, StatedBalance>, cashMinor: Long) =
+            Result.success(Unit)
         override suspend fun delete(id: Long) = Result.success(Unit)
 
         override suspend fun settleAsOwnTransfer(

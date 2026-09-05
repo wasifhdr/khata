@@ -2,22 +2,26 @@ package com.wasif.khata.feature.hub
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +35,12 @@ import android.Manifest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -42,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.KhataGlass
+import com.wasif.khata.core.ui.component.KhataIcons
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.theme.KhataPalette
@@ -54,6 +65,11 @@ import dev.chrisbanes.haze.HazeState
 fun ModulesScreen(
     onOpenWallet: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenRestaurants: () -> Unit,
+    onOpenVehicle: () -> Unit,
+    onOpenWatchlist: () -> Unit,
+    onOpenNotes: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
@@ -79,6 +95,11 @@ fun ModulesScreen(
         state = state,
         onOpenWallet = onOpenWallet,
         onOpenSettings = onOpenSettings,
+        onOpenSearch = onOpenSearch,
+        onOpenRestaurants = onOpenRestaurants,
+        onOpenVehicle = onOpenVehicle,
+        onOpenWatchlist = onOpenWatchlist,
+        onOpenNotes = onOpenNotes,
     )
 }
 
@@ -87,6 +108,11 @@ fun ModulesContent(
     state: ModulesUiState,
     onOpenWallet: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onOpenRestaurants: () -> Unit,
+    onOpenVehicle: () -> Unit,
+    onOpenWatchlist: () -> Unit,
+    onOpenNotes: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -101,6 +127,16 @@ fun ModulesContent(
                 Modifier.fillMaxWidth().padding(horizontal = spacing.sm, vertical = spacing.xs),
                 horizontalArrangement = Arrangement.End,
             ) {
+                // Search sits beside settings rather than on the field: it reaches
+                // every module at once, so it belongs to the hub rather than to any
+                // one of the tiles below.
+                NavCircle(
+                    icon = Icons.Filled.Search,
+                    description = "Search",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    iconSize = 22.dp,
+                    onClick = onOpenSearch,
+                )
                 NavCircle(
                     icon = Icons.Filled.Settings,
                     description = "Settings",
@@ -140,8 +176,48 @@ fun ModulesContent(
                 verticalArrangement = Arrangement.spacedBy(spacing.sm),
             ) {
                 WalletCard(state = state, onClick = onOpenWallet)
-                DormantRow(haze = haze, left = "Restaurants", right = "Watchlist")
-                DormantRow(haze = haze, left = "Notes", right = "Car service")
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    ModuleTile(
+                        haze = haze,
+                        name = "Restaurants",
+                        icon = KhataIcons.Restaurant,
+                        tile = state.restaurants,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenRestaurants,
+                    )
+                    ModuleTile(
+                        haze = haze,
+                        name = "Watchlist",
+                        icon = KhataIcons.Watchlist,
+                        tile = state.watchlist,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenWatchlist,
+                    )
+                }
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                ) {
+                    ModuleTile(
+                        haze = haze,
+                        name = "Car service",
+                        icon = KhataIcons.Car,
+                        tile = state.vehicle,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenVehicle,
+                    )
+                    ModuleTile(
+                        haze = haze,
+                        name = "Notes",
+                        icon = KhataIcons.Notes,
+                        tile = state.notes,
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenNotes,
+                    )
+                }
             }
         }
     }
@@ -245,36 +321,91 @@ private fun BudgetRing(fraction: Float) {
     }
 }
 
+/** A live tile: the same glass, the same shape, and a destination behind it. */
 @Composable
-private fun DormantRow(haze: HazeState, left: String, right: String) {
+private fun ModuleTile(
+    haze: HazeState,
+    name: String,
+    icon: ImageVector,
+    tile: ModuleTileState,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val spacing = LocalSpacing.current
+
+    // Height comes from the content rather than a square's aspect ratio: three stat lines and a
+    // heading need what they need, and forcing the box taller than that is the air this tile had
+    // too much of. The corner radius still matches the wallet card above.
+    KhataGlass(hazeState = haze, modifier = modifier) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(spacing.md),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(34.dp),
+            )
+            Text(
+                text = name.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = spacing.sm),
+            )
+
+            Spacer(Modifier.height(spacing.md))
+
+            tile.stats.forEach { stat -> StatLine(stat) }
+        }
+    }
+}
+
+/**
+ * One stat on one line, always. A long restaurant name scrolls sideways on a loop rather than
+ * being cut off with an ellipsis: on a tile this size almost every interesting name would be
+ * truncated, and a name you cannot finish reading is not worth the row it sits on.
+ */
+@Composable
+private fun StatLine(stat: TileStat) {
     Row(
         Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalAlignment = Alignment.Bottom,
     ) {
-        listOf(left, right).forEach { name ->
-            KhataGlass(
-                hazeState = haze,
-                modifier = Modifier.weight(1f).height(96.dp),
-            ) {
-                // Unbuilt modules read as unbuilt. Hiding them would make the
-                // hub a launcher with one tile; faking data would be worse.
-                Column(
-                    Modifier.fillMaxSize().padding(spacing.md),
-                    verticalArrangement = Arrangement.Bottom,
-                ) {
-                    Text(
-                        text = name.uppercase(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Not built",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text(
+            text = stat.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = stat.value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 6.dp)
+                // Faded at the trailing edge, so text leaving the tile reads as scrolling
+                // rather than as truncation -- a hard clip looks exactly like the ellipsis
+                // the marquee is here to avoid.
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            0.85f to Color.Black,
+                            1f to Color.Transparent,
+                            startX = 0f,
+                            endX = size.width,
+                        ),
+                        blendMode = BlendMode.DstIn,
                     )
                 }
-            }
-        }
+                .basicMarquee(iterations = Int.MAX_VALUE),
+        )
     }
 }

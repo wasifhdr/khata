@@ -79,6 +79,13 @@ interface TransactionDao {
     @Query("SELECT id FROM transactions WHERE deletedAt IS NULL")
     suspend fun allIdsForIndex(): List<Long>
 
+    /** What the search screen shows for a set of matches, newest first. */
+    @Query(
+        "SELECT * FROM transactions WHERE id IN (:ids) AND deletedAt IS NULL " +
+            "ORDER BY occurredAt DESC, id DESC",
+    )
+    suspend fun findByIds(ids: List<Long>): List<TransactionEntity>
+
     /**
      * Backfills the category the user just confirmed onto the merchant's other
      * unreviewed rows, which is what makes confirming a merchant a one-time job
@@ -101,6 +108,13 @@ interface TransactionDao {
 
     @Query("UPDATE transactions SET deletedAt = :deletedAt, updatedAt = :deletedAt WHERE id = :id")
     suspend fun softDelete(id: Long, deletedAt: Long)
+
+    /**
+     * Hard, not soft: "start over" means the ledger is gone, and a soft-deleted row
+     * still sits in a backup and still holds an id that a tag link could point at.
+     */
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAll()
 
     @Query("SELECT * FROM transactions WHERE providerTxnId = :providerTxnId AND deletedAt IS NULL")
     suspend fun findByProviderTxnId(providerTxnId: String): TransactionEntity?

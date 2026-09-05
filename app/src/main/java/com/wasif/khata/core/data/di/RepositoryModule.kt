@@ -1,20 +1,37 @@
 package com.wasif.khata.core.data.di
 
+import com.wasif.khata.core.data.dao.NoteDao
 import com.wasif.khata.core.data.dao.RawMessageDao
+import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.TransactionDao
+import com.wasif.khata.core.data.dao.VehicleDao
+import com.wasif.khata.core.data.dao.WatchlistDao
 import com.wasif.khata.core.data.repository.ReferenceDataRepositoryImpl
 import com.wasif.khata.core.data.repository.TransactionRepositoryImpl
 import com.wasif.khata.domain.repository.ReferenceDataRepository
 import com.wasif.khata.domain.repository.TransactionRepository
 import com.wasif.khata.core.data.repository.BudgetRepository
 import com.wasif.khata.core.data.repository.MonthLimits
+import com.wasif.khata.core.note.notesStats
+import com.wasif.khata.feature.hub.ModuleSnapshot
+import com.wasif.khata.feature.hub.ModuleStats
+import java.util.UUID
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import com.wasif.khata.core.drive.DriveBackups
 import com.wasif.khata.core.drive.DriveClient
 import com.wasif.khata.core.drive.DriveMedia
 import com.wasif.khata.core.drive.DriveUploader
 import com.wasif.khata.core.prefs.PreferencesRepository
 import com.wasif.khata.core.search.IndexSource
+import com.wasif.khata.core.search.PlaceIndexSource
+import com.wasif.khata.core.search.RestaurantIndexSource
 import com.wasif.khata.core.search.TransactionIndexSource
+import com.wasif.khata.core.search.NoteIndexSource
+import com.wasif.khata.core.search.TitleIndexSource
+import com.wasif.khata.core.watch.Tmdb
+import com.wasif.khata.core.watch.TmdbClient
+import com.wasif.khata.core.search.VehicleServiceIndexSource
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
 import com.wasif.khata.core.sms.ai.GeminiClient
@@ -64,7 +81,54 @@ abstract class RepositoryModule {
     @IntoSet
     abstract fun bindTransactionIndexSource(impl: TransactionIndexSource): IndexSource
 
+    @Binds
+    @IntoSet
+    abstract fun bindRestaurantIndexSource(impl: RestaurantIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindPlaceIndexSource(impl: PlaceIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindVehicleServiceIndexSource(impl: VehicleServiceIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindTitleIndexSource(impl: TitleIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindNoteIndexSource(impl: NoteIndexSource): IndexSource
+
+    @Binds
+    @Singleton
+    abstract fun bindTmdb(impl: TmdbClient): Tmdb
+
     companion object {
+        /**
+         * The four module tiles' figures, combined here rather than in the view model so the
+         * hub depends on one lambda instead of four DAOs.
+         */
+        @Provides
+        fun provideModuleStats(
+            restaurants: RestaurantDao,
+            watchlist: WatchlistDao,
+            vehicles: VehicleDao,
+            notes: NoteDao,
+        ) = ModuleStats {
+            combine(
+                restaurants.hubStats(),
+                watchlist.hubStats(),
+                vehicles.hubStats(),
+                notes.observeContents().map { contents ->
+                    notesStats(contents) { UUID.randomUUID().toString() }
+                },
+            ) { restaurant, watched, car, note ->
+                ModuleSnapshot(restaurant, watched, car, note)
+            }
+        }
+
         @Provides
         fun provideRecentCategoryIds(dao: TransactionDao) =
             RecentCategoryIds { accountId, limit -> dao.observeRecentCategoryIds(accountId, limit) }
