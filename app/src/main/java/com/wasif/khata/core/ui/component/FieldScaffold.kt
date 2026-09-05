@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -91,32 +91,42 @@ fun FieldBackdrop(modifier: Modifier = Modifier) {
     val grain = remember { RuntimeShader(GrainShaderSource) }
 
     Box(
-        modifier.drawBehind {
-            drawRect(spec.ground)
+        // drawWithCache, not drawBehind: the brushes depend on the size and the
+        // spec and on nothing else, but a `Brush` built inside the draw lambda is
+        // a fresh Skia shader on every frame -- five of them, behind every screen,
+        // for a picture that never changes. Built here they survive until the size
+        // or the theme actually moves.
+        modifier.drawWithCache {
+            fun pool(colour: Color, alpha: Float, cx: Float, cy: Float, r: Float) =
+                Brush.radialGradient(
+                    colors = listOf(colour.copy(alpha = alpha * strength), Color.Transparent),
+                    center = Offset(size.width * cx, size.height * cy),
+                    radius = size.minDimension * r,
+                )
 
-            if (strength > 0f) {
-                fun pool(colour: Color, alpha: Float, cx: Float, cy: Float, r: Float) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(colour.copy(alpha = alpha * strength), Color.Transparent),
-                            center = Offset(size.width * cx, size.height * cy),
-                            radius = size.minDimension * r,
-                        ),
-                    )
-                }
-
-                pool(spec.field.keyStop, 0.85f, 0.14f, 0.02f, 1.15f)
-                pool(spec.field.keyStop, 0.55f, 0.92f, 0.16f, 0.95f)
-                pool(KhataPalette.heroStops.first(), 0.60f, 0.70f, 0.78f, 1.00f)
-                pool(spec.ground, 0.70f, 0.10f, 0.95f, 0.90f)
+            val pools = if (strength > 0f) {
+                listOf(
+                    pool(spec.field.keyStop, 0.85f, 0.14f, 0.02f, 1.15f),
+                    pool(spec.field.keyStop, 0.55f, 0.92f, 0.16f, 0.95f),
+                    pool(KhataPalette.heroStops.first(), 0.60f, 0.70f, 0.78f, 1.00f),
+                    pool(spec.ground, 0.70f, 0.10f, 0.95f, 0.90f),
+                )
+            } else {
+                emptyList()
             }
 
-            // Grain goes on last, over the ground as well as the pools: the flat
-            // ground is the darkest surface in the app and banding shows there
-            // too, so gating this on intensity would leave Off the one theme
-            // that bands.
             grain.setFloatUniform("alpha", FieldGrainAlpha)
-            drawRect(brush = ShaderBrush(grain))
+            val grainBrush = ShaderBrush(grain)
+
+            onDrawBehind {
+                drawRect(spec.ground)
+                pools.forEach { drawRect(brush = it) }
+                // Grain goes on last, over the ground as well as the pools: the
+                // flat ground is the darkest surface in the app and banding shows
+                // there too, so gating this on intensity would leave Off the one
+                // theme that bands.
+                drawRect(brush = grainBrush)
+            }
         },
     )
 }

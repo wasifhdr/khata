@@ -41,6 +41,7 @@ import com.wasif.khata.core.ui.theme.LocalThemeSpec
 import com.wasif.khata.core.ui.theme.PageHeadingCollapsedStyle
 import com.wasif.khata.core.ui.theme.PageHeadingStyle
 import com.wasif.khata.core.ui.theme.PageSublineStyle
+import dev.chrisbanes.haze.ExperimentalHazeApi
 import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeTint
@@ -182,6 +183,7 @@ fun BoxScope.CollapsingTopBar(
  * faded in as the page collapses. Separate from [KhataGlass] because a bar pinned to
  * the top edge has no top or sides to catch light, so the bevel would be wrong.
  */
+@OptIn(ExperimentalHazeApi::class)
 @Composable
 fun Modifier.collapsingGlass(hazeState: HazeState, collapse: Float): Modifier {
     val spec = LocalThemeSpec.current
@@ -203,7 +205,9 @@ fun Modifier.collapsingGlass(hazeState: HazeState, collapse: Float): Modifier {
                         blurRadius = 22.dp,
                         noiseFactor = 0.04f,
                     ),
-                )
+                ) {
+                    inputScale = GlassInputScale
+                }
             },
         )
         .drawBehind {

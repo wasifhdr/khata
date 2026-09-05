@@ -404,6 +404,12 @@ private fun GlassChoice(
     if (selected) {
         Box(modifier.clip(shape).background(MaterialTheme.colorScheme.secondaryContainer)) { content() }
     } else {
-        KhataGlass(hazeState = haze, modifier = modifier, shape = shape, content = content)
+        KhataGlass(
+            hazeState = haze,
+            modifier = modifier,
+            shape = shape,
+            refracts = false,
+            content = content,
+        )
     }
 }
