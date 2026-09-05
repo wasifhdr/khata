@@ -17,6 +17,8 @@ import com.wasif.khata.core.ui.motion.fadeThroughExit
 import com.wasif.khata.core.ui.motion.isHubTransition
 import com.wasif.khata.core.ui.motion.sharedAxisXEnter
 import com.wasif.khata.core.ui.motion.sharedAxisXExit
+import com.wasif.khata.core.ui.motion.popRevealEnter
+import com.wasif.khata.core.ui.motion.popRevealExit
 import com.wasif.khata.core.ui.motion.sharedAxisXPopEnter
 import com.wasif.khata.core.ui.motion.sharedAxisXPopExit
 import com.wasif.khata.core.ui.theme.LocalMotion
@@ -95,8 +97,8 @@ fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
         startDestination = start,
         enterTransition = { if (crossesHub()) sharedAxisXEnter(motion) else fadeThroughEnter(motion) },
         exitTransition = { if (crossesHub()) sharedAxisXExit(motion) else fadeThroughExit(motion) },
-        popEnterTransition = { if (crossesHub()) sharedAxisXPopEnter(motion) else fadeThroughEnter(motion) },
-        popExitTransition = { if (crossesHub()) sharedAxisXPopExit(motion) else fadeThroughExit(motion) },
+        popEnterTransition = { if (crossesHub()) sharedAxisXPopEnter(motion) else popRevealEnter() },
+        popExitTransition = { if (crossesHub()) sharedAxisXPopExit(motion) else popRevealExit(motion) },
     ) {
         composable(KhataRoutes.Modules) {
             ModulesScreen(
