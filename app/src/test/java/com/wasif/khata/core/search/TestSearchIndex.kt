@@ -12,6 +12,7 @@ fun searchIndex(db: KhataDatabase) = SearchIndex(
         RestaurantIndexSource(db.restaurantDao(), db.placeDao(), db.tagDao()),
         VehicleServiceIndexSource(db.vehicleDao(), db.placeDao(), db.tagDao()),
         TitleIndexSource(db.watchlistDao(), db.tagDao()),
+        NoteIndexSource(db.noteDao()),
     ),
     dao = db.searchDao(),
 )

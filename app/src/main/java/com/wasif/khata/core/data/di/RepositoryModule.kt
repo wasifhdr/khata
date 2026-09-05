@@ -17,6 +17,7 @@ import com.wasif.khata.core.search.IndexSource
 import com.wasif.khata.core.search.PlaceIndexSource
 import com.wasif.khata.core.search.RestaurantIndexSource
 import com.wasif.khata.core.search.TransactionIndexSource
+import com.wasif.khata.core.search.NoteIndexSource
 import com.wasif.khata.core.search.TitleIndexSource
 import com.wasif.khata.core.watch.Tmdb
 import com.wasif.khata.core.watch.TmdbClient
@@ -85,6 +86,10 @@ abstract class RepositoryModule {
     @Binds
     @IntoSet
     abstract fun bindTitleIndexSource(impl: TitleIndexSource): IndexSource
+
+    @Binds
+    @IntoSet
+    abstract fun bindNoteIndexSource(impl: NoteIndexSource): IndexSource
 
     @Binds
     @Singleton
