@@ -163,7 +163,7 @@ fun KhataNavHost(
         startDestination = start,
         enterTransition = { if (crossesHub()) sharedAxisXEnter(motion) else fadeThroughEnter(motion) },
         exitTransition = { if (crossesHub()) sharedAxisXExit(motion) else fadeThroughExit(motion) },
-        popEnterTransition = { if (crossesHub()) sharedAxisXPopEnter(motion) else popRevealEnter() },
+        popEnterTransition = { if (crossesHub()) sharedAxisXPopEnter(motion) else popRevealEnter(motion) },
         popExitTransition = { if (crossesHub()) sharedAxisXPopExit(motion) else popRevealExit(motion) },
     ) {
         composable(KhataRoutes.Modules) {

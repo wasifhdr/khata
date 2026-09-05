@@ -39,36 +39,38 @@ class KhataTransitionsTest {
     }
 
     @Test
-    fun `the back curve keeps up with the thumb instead of stalling`() {
-        // Predictive back *seeks* the pop transitions by finger travel rather
-        // than playing them over a duration, so the curve is read at whatever
-        // fraction of the drag the thumb has reached. A curve that has barely
-        // moved at the halfway point is a screen that ignores the first half of
-        // the gesture and then lurches -- which is exactly how the forward exit
-        // curve behaves, and why reusing it for back felt broken.
-        // A band, not a floor. There are two ways to get this wrong and the
-        // forward curves are one of each: Motion.exit stalls at 0.15, so the
-        // screen ignores the drag then lurches; Motion.enter races to 0.95, so
-        // it is gone before the thumb is halfway and snaps back from nowhere if
-        // the gesture is released. Near-proportional is the only answer that
-        // holds under a finger.
-        val halfway = SeekedBack.transform(0.5f)
+    fun `the back curve is the one SystemUI animates back with`() {
+        // Not a curve of our own choosing. The predictive back design spec gives
+        // the interpolator as (.1, .1, 0, 1) so that an app's transition and the
+        // system animation underneath it move together, and it is deliberately
+        // front-loaded -- most of the travel is spent early, because a back
+        // gesture should leave quickly and let the destination arrive.
+        //
+        // An earlier version of this used a near-proportional curve on the
+        // reasoning that a seeked transition should track the thumb one-to-one.
+        // That reasoning was wrong, and this pins the spec against it.
         assertTrue(
-            "the back curve should track the thumb near-proportionally, was $halfway",
-            halfway in 0.40f..0.62f,
+            "should be past three quarters by the fade-through threshold, was " +
+                SeekedBack.transform(0.35f),
+            SeekedBack.transform(0.35f) > 0.75f,
         )
-
-        val m = Motion()
-        assertTrue("Motion.exit stalls; it is what this curve exists to avoid", m.exit.transform(0.5f) < 0.40f)
-        assertTrue("Motion.enter races; it is the other way to get this wrong", m.enter.transform(0.5f) > 0.62f)
+        assertTrue(SeekedBack.transform(0f) == 0f)
+        assertTrue(SeekedBack.transform(1f) == 1f)
     }
 
     @Test
-    fun `the back curve starts and ends where a seek needs it to`() {
-        // A seeked transition is read at 0 the moment the gesture starts and at
-        // 1 when it commits. Anything else shows a jump on touch-down or on
-        // release.
-        assertTrue(SeekedBack.transform(0f) == 0f)
-        assertTrue(SeekedBack.transform(1f) == 1f)
+    fun `the crossfade is confined so the fade cannot outrun the movement`() {
+        // The bug this exists for: alpha travels 100% while a scale travels 10%,
+        // so given the same duration the fade always wins and the screen reads as
+        // gone before it has visibly moved. Confining the fade to a threshold and
+        // leaving the scale to run the whole way is what fixes that, so the fade
+        // must stay strictly shorter than the movement it sits inside.
+        assertTrue("the fade must end before the movement does", FadeThrough < 1f)
+        assertTrue("but it must actually happen", FadeThrough > 0f)
+
+        // And it must survive an instant Motion as a hard cut rather than as a
+        // stray frame of half-faded screen.
+        val instant = Motion.forDurationScale(0f)
+        assertTrue((instant.standard * FadeThrough).toInt() == 0)
     }
 }
