@@ -1,10 +1,11 @@
 # Khata (খাতা) — Design Spec: The Watchlist Module
 
 **Date:** 2026-09-05
-**Status:** Design decided. Implementation plan not yet written.
+**Status:** Shipped. Built on `feat/vehicle-and-watchlist`, merged to `main` 2026-09-05.
+Plan: `docs/superpowers/plans/2026-09-05-khata-watchlist.md`.
 **Requires:** `2026-09-04-khata-shared-spine-design.md` (media, tags, search) and
 `2026-09-04-khata-restaurants-design.md` — `StarRating`, Coil, and the global search screen ship
-there. Builds on the restaurants branch, not on `main`.
+there. Both are now on `main`.
 **Paired with:** `2026-09-05-khata-vehicle-design.md`. Designed in the same session, shipped
 separately. This module ships second, on migration **12 → 13**.
 

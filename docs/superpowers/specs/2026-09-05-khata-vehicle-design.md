@@ -1,10 +1,11 @@
 # Khata (খাতা) — Design Spec: The Car Servicing Module
 
 **Date:** 2026-09-05
-**Status:** Design decided. Implementation plan not yet written.
+**Status:** Shipped. Built on `feat/vehicle-and-watchlist`, merged to `main` 2026-09-05.
+Plan: `docs/superpowers/plans/2026-09-05-khata-vehicle.md`.
 **Requires:** `2026-09-04-khata-shared-spine-design.md` (places, media, tags, search) and
-`2026-09-04-khata-restaurants-design.md` — this module builds on the restaurants branch, not on
-`main`. `StarRating`, the photo-picker wiring, and the global search screen all ship there.
+`2026-09-04-khata-restaurants-design.md` — this module was built on the restaurants branch, which
+carries `StarRating`, the photo-picker wiring, and the global search screen. Both are now on `main`.
 **Settles:** `2026-09-04-khata-shared-spine-design.md` §3.1 — the deferred cross-module
 `transactionId` link. It is **dropped**, not pending. See C3.
 **Paired with:** `2026-09-05-khata-watchlist-design.md`. Designed in the same session, shipped
@@ -124,11 +125,17 @@ recent use, and creates a place when nothing matches** — the same `findOrCreat
 `TagRepository` and the restaurant name field, and for the same reason: being made to register a
 workshop before recording a repair is the chore principle 1 says gets abandoned.
 
-**The cost field is a text field with a `৳` prefix, parsed by `Money.parse`** — the same control
-the visit editor uses, and for the same reason: this is one field among eight in a scrolling
-form. `AmountKeypad` is the widget's full-height keypad, built for three-tap cash entry with
-nothing else on screen, and dropping it into a form would take the whole viewport to collect one
-number.
+**The bill total and each item's cost use `AmountField`**, which opens the app's own keypad in a
+dialog over the form. Item names, the odometer and the date keep the system keyboard: an odometer
+is not an amount, and a decimal point is wrong on it.
+
+*Superseded, and recorded rather than quietly rewritten (2026-09-05, commit `db909f9`).* This
+module shipped with a `৳`-prefixed text field, on the stated grounds that `AmountKeypad` was the
+widget's full-height control and would take the whole viewport to collect one number in an
+eight-field form. `AmountKeypadDialog` and `AmountField` removed that objection — the keypad now
+opens over whatever screen asks for it — and every amount in the app moved to one control, this
+one included. The original reasoning was sound about the control that existed when it was written;
+it stopped being true when the control changed.
 
 **Item rows are added one at a time** with a name and an optional cost, and reorder by
 `sortOrder`. No catalogue, no autocomplete over past item names — a prefix match over free text
