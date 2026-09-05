@@ -5,6 +5,8 @@
   fill is pushed by CashWidgetProvider from the tuner.
 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
+    <!-- Larger than half the pill's own height in any launcher: Canvas clamps
+      rx/ry to that half, so this always draws fully-rounded (stadium) ends. -->
+    <corners android:radius="200dp" />
     <solid android:color="@android:color/white" />
 </shape>

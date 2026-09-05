@@ -7,42 +7,53 @@
   The glyphs carry the meaning on their own; the colours reinforce. The words
   survive only as contentDescription, for a screen reader that cannot see either.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<!--
+  Outer frame is transparent and unpadded-by-background: a LinearLayout's
+  background paints its full bounds regardless of padding, so the pill itself
+  has to be a smaller inset child, not padding on the root.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_surface"
-    android:orientation="horizontal">
+    android:padding="10dp">
 
-    <TextView
-        android:id="@+id/spent"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:id="@+id/widget_root"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:contentDescription="@string/widget_spent"
-        android:gravity="center"
-        android:text="@string/widget_minus"
-        android:textSize="30sp" />
+        android:background="@drawable/widget_surface"
+        android:orientation="horizontal">
 
-    <!--
-      FrameLayout, not View: RemoteViews inflates only a whitelisted set of classes
-      and a bare View is not among them. It fails at inflation with "Class not
-      allowed to be inflated", which the launcher shows as "Can't load widget".
-    -->
-    <FrameLayout
-        android:id="@+id/separator"
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="12dp" />
+        <TextView
+            android:id="@+id/spent"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:contentDescription="@string/widget_spent"
+            android:gravity="center"
+            android:text="@string/widget_minus"
+            android:textSize="22sp" />
 
-    <TextView
-        android:id="@+id/received"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:contentDescription="@string/widget_received"
-        android:gravity="center"
-        android:text="@string/widget_plus"
-        android:textSize="30sp" />
-</LinearLayout>
+        <!--
+          FrameLayout, not View: RemoteViews inflates only a whitelisted set of classes
+          and a bare View is not among them. It fails at inflation with "Class not
+          allowed to be inflated", which the launcher shows as "Can't load widget".
+        -->
+        <FrameLayout
+            android:id="@+id/separator"
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/received"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:contentDescription="@string/widget_received"
+            android:gravity="center"
+            android:text="@string/widget_plus"
+            android:textSize="22sp" />
+    </LinearLayout>
+</FrameLayout>
