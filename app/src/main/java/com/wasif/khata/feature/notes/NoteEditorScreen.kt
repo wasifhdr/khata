@@ -75,7 +75,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
-import com.wasif.khata.core.media.MediaStore
 import com.wasif.khata.core.note.Block
 import com.wasif.khata.core.note.Mark
 import com.wasif.khata.core.note.Span
@@ -92,7 +91,6 @@ import com.wasif.khata.core.ui.theme.LocalSpacing
 fun NoteEditorScreen(
     onBack: () -> Unit,
     viewModel: NoteEditorViewModel,
-    mediaStore: MediaStore,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -111,7 +109,7 @@ fun NoteEditorScreen(
     NoteEditorContent(
         state = state,
         actions = viewModel,
-        fileFor = { sha -> mediaStore.fileFor(sha).toURI().toString() },
+        fileFor = viewModel::fileFor,
         onBack = {
             // The debounce has not necessarily fired; leaving must not cost the last sentence.
             viewModel.saveNow()

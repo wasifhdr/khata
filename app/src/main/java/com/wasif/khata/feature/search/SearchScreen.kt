@@ -37,8 +37,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.data.dao.RestaurantSummary
 import com.wasif.khata.core.data.dao.ServiceSummary
 import com.wasif.khata.core.data.dao.TitleSummary
+import com.wasif.khata.core.data.entity.NoteEntity
 import com.wasif.khata.core.data.entity.PlaceEntity
 import com.wasif.khata.core.model.Money
+import com.wasif.khata.core.note.NoteJson
+import com.wasif.khata.core.note.titleOf
 import com.wasif.khata.core.time.toDhakaLocalDate
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.MoneyText
@@ -57,6 +60,7 @@ fun SearchScreen(
     onOpenRestaurant: (Long) -> Unit,
     onOpenService: (Long) -> Unit,
     onOpenTitle: (Long) -> Unit,
+    onOpenNote: (Long) -> Unit,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -68,6 +72,7 @@ fun SearchScreen(
         onOpenRestaurant = onOpenRestaurant,
         onOpenService = onOpenService,
         onOpenTitle = onOpenTitle,
+        onOpenNote = onOpenNote,
     )
 }
 
@@ -85,6 +90,7 @@ fun SearchContent(
     onOpenRestaurant: (Long) -> Unit,
     onOpenService: (Long) -> Unit,
     onOpenTitle: (Long) -> Unit,
+    onOpenNote: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     val focus = remember { FocusRequester() }
@@ -122,9 +128,16 @@ fun SearchContent(
             }
 
             when {
-                !state.hasQuery -> Hint("Dishes, people, merchants, parts, titles, places.")
+                !state.hasQuery -> Hint("Dishes, people, merchants, parts, titles, notes, places.")
                 state.isEmpty && !state.searching -> Hint("Nothing matches “${state.query}”.")
-                else -> Results(state, onOpenTransaction, onOpenRestaurant, onOpenService, onOpenTitle)
+                else -> Results(
+                    state,
+                    onOpenTransaction,
+                    onOpenRestaurant,
+                    onOpenService,
+                    onOpenTitle,
+                    onOpenNote,
+                )
             }
         }
     }
@@ -149,6 +162,7 @@ private fun Results(
     onOpenRestaurant: (Long) -> Unit,
     onOpenService: (Long) -> Unit,
     onOpenTitle: (Long) -> Unit,
+    onOpenNote: (Long) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = spacing.xxl)) {
@@ -174,6 +188,12 @@ private fun Results(
             item { SectionLabel("Watchlist", top = spacing.lg) }
             items(state.titles, key = { "ti-${it.id}" }) { row ->
                 TitleSearchRow(row) { onOpenTitle(row.id) }
+            }
+        }
+        if (state.notes.isNotEmpty()) {
+            item { SectionLabel("Notes", top = spacing.lg) }
+            items(state.notes, key = { "n-${it.id}" }) { row ->
+                NoteSearchRow(row) { onOpenNote(row.id) }
             }
         }
         if (state.places.isNotEmpty()) {
@@ -316,6 +336,35 @@ private fun TitleSearchRow(row: TitleSummary, onClick: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun NoteSearchRow(row: NoteEntity, onClick: () -> Unit) {
+    val spacing = LocalSpacing.current
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+    ) {
+        Text(
+            // The stored JSON is not what anyone searched for, so the row shows the note's
+            // first line -- derived here rather than carried through the query.
+            text = noteTitle(row.content) ?: "Untitled",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = row.updatedAt.toDhakaLocalDate().format(DayFormat),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun noteTitle(content: String): String? =
+    titleOf(NoteJson.decode(content) { "" })
 
 @Composable
 private fun PlaceRow(row: PlaceEntity) {

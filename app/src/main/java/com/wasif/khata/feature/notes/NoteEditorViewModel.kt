@@ -255,6 +255,9 @@ class NoteEditorViewModel @AssistedInject constructor(
         }
     }
 
+    /** The file a picture block draws from, resolved by its content hash. */
+    fun fileFor(sha256: String): String = mediaStore.fileFor(sha256).toURI().toString()
+
     /** Leaving the screen must not lose the last few hundred milliseconds of typing. */
     fun saveNow() {
         saveJob?.cancel()

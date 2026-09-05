@@ -46,6 +46,10 @@ import com.wasif.khata.feature.watchlist.AddTitleScreen
 import com.wasif.khata.feature.watchlist.TitleScreen
 import com.wasif.khata.feature.watchlist.TitleViewModel
 import com.wasif.khata.feature.watchlist.WatchlistScreen
+import com.wasif.khata.feature.notes.NoteEditorScreen
+import com.wasif.khata.feature.notes.NoteEditorViewModel
+import com.wasif.khata.feature.notes.NotesScreen
+import com.wasif.khata.feature.notes.NotesViewModel
 import com.wasif.khata.feature.search.SearchScreen
 import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
@@ -76,6 +80,10 @@ object KhataRoutes {
     const val Title = "watchlist/{titleId}"
     const val AddTitle = "watchlist/add"
     const val ArgTitleId = "titleId"
+    const val Notes = "notes"
+    const val Note = "notes/{noteId}"
+    const val ArgNoteId = "noteId"
+    const val SharedImage = "notes/shared"
     const val ArgServiceId = "serviceId"
     const val Search = "search"
     const val ArgRestaurantId = "restaurantId"
@@ -97,6 +105,8 @@ object KhataRoutes {
 
     fun title(id: Long): String = "watchlist/$id"
 
+    fun note(id: Long): String = "notes/$id"
+
     /** -1 is "no restaurant yet", which is the visit-first case. */
     fun visitNew(restaurantId: Long = -1L): String = "restaurants/visit/new?restaurantId=$restaurantId"
 }
@@ -105,6 +115,7 @@ object KhataRoutes {
 fun KhataNavHost(
     homeView: HomeView,
     sharedPlaceText: String? = null,
+    sharedImageUri: String? = null,
     settleTransactionId: Long? = null,
 ) {
     val navController = rememberNavController()
@@ -135,6 +146,7 @@ fun KhataNavHost(
     // which is where they came from.
     val start = when {
         sharedPlaceText != null -> KhataRoutes.Wishlist
+        sharedImageUri != null -> KhataRoutes.SharedImage
         frozenHomeView == HomeView.Wallet -> KhataRoutes.Wallet
         else -> KhataRoutes.Modules
     }
@@ -169,6 +181,7 @@ fun KhataNavHost(
                 onOpenRestaurants = { navController.navigate(KhataRoutes.Restaurants) },
                 onOpenVehicle = { navController.navigate(KhataRoutes.Vehicle) },
                 onOpenWatchlist = { navController.navigate(KhataRoutes.Watchlist) },
+                onOpenNotes = { navController.navigate(KhataRoutes.Notes) },
             )
         }
 
@@ -344,6 +357,40 @@ fun KhataNavHost(
             )
         }
 
+        // A picture shared in has no note yet. This route makes one, drops the image in, and
+        // replaces itself with the editor -- so Back leaves the app rather than landing on a
+        // holding screen the user never asked for.
+        composable(KhataRoutes.SharedImage) {
+            val viewModel: NotesViewModel = hiltViewModel()
+            LaunchedEffect(sharedImageUri) {
+                val id = sharedImageUri?.let { viewModel.createWithImage(it) } ?: viewModel.create()
+                navController.navigate(KhataRoutes.note(id)) {
+                    popUpTo(KhataRoutes.SharedImage) { inclusive = true }
+                }
+            }
+        }
+
+        composable(KhataRoutes.Notes) {
+            NotesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenNote = { id -> navController.navigate(KhataRoutes.note(id)) },
+            )
+        }
+
+        composable(
+            route = KhataRoutes.Note,
+            arguments = listOf(navArgument(KhataRoutes.ArgNoteId) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(KhataRoutes.ArgNoteId) ?: 0L
+            NoteEditorScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = hiltViewModel<NoteEditorViewModel, NoteEditorViewModel.Factory>(
+                    key = "note-$id",
+                    creationCallback = { factory -> factory.create(id) },
+                ),
+            )
+        }
+
         composable(KhataRoutes.Search) {
             SearchScreen(
                 onBack = { navController.popBackStack() },
@@ -351,6 +398,7 @@ fun KhataNavHost(
                 onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
                 onOpenService = { id -> navController.navigate(KhataRoutes.vehicleService(id)) },
                 onOpenTitle = { id -> navController.navigate(KhataRoutes.title(id)) },
+                onOpenNote = { id -> navController.navigate(KhataRoutes.note(id)) },
             )
         }
 

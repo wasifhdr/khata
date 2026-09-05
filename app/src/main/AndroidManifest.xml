@@ -54,6 +54,8 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
+                <!-- A picture shared in opens a new note holding it. -->
+                <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
 

@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
                     KhataNavHost(
                         homeView = state.preferences.homeView,
                         sharedPlaceText = sharedPlaceText,
+                        sharedImageUri = sharedImageUri,
                         settleTransactionId = intent
                             ?.getLongExtra(EXTRA_TRANSACTION_ID, -1L)
                             ?.takeIf { it > 0L },
@@ -76,6 +77,15 @@ class MainActivity : ComponentActivity() {
         get() = intent
             ?.takeIf { it.action == Intent.ACTION_SEND && it.type == "text/plain" }
             ?.getStringExtra(Intent.EXTRA_TEXT)
+
+    /** A picture shared from another app. Read once, for the same reason as above. */
+    private val sharedImageUri: String?
+        get() = intent
+            ?.takeIf { it.action == Intent.ACTION_SEND && it.type?.startsWith("image/") == true }
+            ?.let { intent ->
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.toString()
+            }
 
     override fun onDestroy() {
         permissionChecker.activity = null

@@ -7,8 +7,10 @@ import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.SearchDao
 import com.wasif.khata.core.data.dao.TransactionDao
 import com.wasif.khata.core.data.dao.VehicleDao
+import com.wasif.khata.core.data.dao.NoteDao
 import com.wasif.khata.core.data.dao.WatchlistDao
 import com.wasif.khata.core.data.repository.ENTITY_RESTAURANT
+import com.wasif.khata.core.data.repository.ENTITY_NOTE
 import com.wasif.khata.core.data.repository.ENTITY_TITLE
 import com.wasif.khata.core.data.repository.ENTITY_VEHICLE_SERVICE
 import com.wasif.khata.core.data.repository.toDomain
@@ -36,6 +38,7 @@ class SearchViewModel @Inject constructor(
     private val restaurants: RestaurantDao,
     private val vehicles: VehicleDao,
     private val titles: WatchlistDao,
+    private val notes: NoteDao,
     private val places: PlaceDao,
 ) : ViewModel(), SearchActions {
 
@@ -68,6 +71,7 @@ class SearchViewModel @Inject constructor(
                     restaurants = emptyList(),
                     services = emptyList(),
                     titles = emptyList(),
+                    notes = emptyList(),
                     places = emptyList(),
                     searching = false,
                 )
@@ -83,6 +87,7 @@ class SearchViewModel @Inject constructor(
         val foundRestaurants = restaurants.summariesByIds(searchDao.idsMatching(ENTITY_RESTAURANT, query))
         val foundServices = vehicles.summariesByIds(searchDao.idsMatching(ENTITY_VEHICLE_SERVICE, query))
         val foundTitles = titles.summariesByIds(searchDao.idsMatching(ENTITY_TITLE, query))
+        val foundNotes = notes.findByIds(searchDao.idsMatching(ENTITY_NOTE, query))
         val foundPlaces = places.findByIds(searchDao.idsMatching("place", query))
 
         _state.update {
@@ -95,6 +100,7 @@ class SearchViewModel @Inject constructor(
                     restaurants = foundRestaurants,
                     services = foundServices,
                     titles = foundTitles,
+                    notes = foundNotes,
                     places = foundPlaces,
                     searching = false,
                 )

@@ -59,6 +59,7 @@ fun ModulesScreen(
     onOpenRestaurants: () -> Unit,
     onOpenVehicle: () -> Unit,
     onOpenWatchlist: () -> Unit,
+    onOpenNotes: () -> Unit,
     viewModel: ModulesViewModel = hiltViewModel(),
 ) {
     val state = viewModel.state.collectAsStateWithLifecycle().value
@@ -88,6 +89,7 @@ fun ModulesScreen(
         onOpenRestaurants = onOpenRestaurants,
         onOpenVehicle = onOpenVehicle,
         onOpenWatchlist = onOpenWatchlist,
+        onOpenNotes = onOpenNotes,
     )
 }
 
@@ -100,6 +102,7 @@ fun ModulesContent(
     onOpenRestaurants: () -> Unit,
     onOpenVehicle: () -> Unit,
     onOpenWatchlist: () -> Unit,
+    onOpenNotes: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
 
@@ -193,7 +196,13 @@ fun ModulesContent(
                         modifier = Modifier.weight(1f),
                         onClick = onOpenVehicle,
                     )
-                    DormantTile(haze = haze, name = "Notes", modifier = Modifier.weight(1f))
+                    ModuleTile(
+                        haze = haze,
+                        name = "Notes",
+                        subline = "Written on lined paper",
+                        modifier = Modifier.weight(1f),
+                        onClick = onOpenNotes,
+                    )
                 }
             }
         }
@@ -297,14 +306,6 @@ private fun BudgetRing(fraction: Float) {
         )
     }
 }
-
-/**
- * Unbuilt modules read as unbuilt. Hiding them would make the hub a launcher with
- * one tile; faking data would be worse.
- */
-@Composable
-private fun DormantTile(haze: HazeState, name: String, modifier: Modifier = Modifier) =
-    Tile(haze = haze, name = name, subline = "Not built", modifier = modifier, onClick = null)
 
 /** A live tile: the same glass, the same shape, and a destination behind it. */
 @Composable

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import com.wasif.khata.core.data.dao.RestaurantSummary
 import com.wasif.khata.core.data.dao.ServiceSummary
 import com.wasif.khata.core.data.dao.TitleSummary
+import com.wasif.khata.core.data.entity.NoteEntity
 import com.wasif.khata.core.data.entity.PlaceEntity
 import com.wasif.khata.domain.model.Transaction
 
@@ -13,6 +14,7 @@ data class SearchUiState(
     val restaurants: List<RestaurantSummary> = emptyList(),
     val services: List<ServiceSummary> = emptyList(),
     val titles: List<TitleSummary> = emptyList(),
+    val notes: List<NoteEntity> = emptyList(),
     val places: List<PlaceEntity> = emptyList(),
     val searching: Boolean = false,
 ) {
@@ -25,9 +27,9 @@ data class SearchUiState(
 
     val isEmpty: Boolean
         get() = transactions.isEmpty() && restaurants.isEmpty() && services.isEmpty() &&
-            titles.isEmpty() && places.isEmpty()
+            titles.isEmpty() && notes.isEmpty() && places.isEmpty()
 
-    val total: Int get() = transactions.size + restaurants.size + services.size + titles.size + places.size
+    val total: Int get() = transactions.size + restaurants.size + services.size + titles.size + notes.size + places.size
 }
 
 @Stable
