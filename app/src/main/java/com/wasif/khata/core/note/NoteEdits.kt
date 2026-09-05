@@ -220,3 +220,24 @@ fun rulesFor(heightPx: Int, ruleSpacingPx: Int): Int {
     if (ruleSpacingPx <= 0) return 0
     return (heightPx + ruleSpacingPx - 1) / ruleSpacingPx
 }
+
+/** What the hub tile shows: derived from the notes themselves, so nothing is stored twice. */
+data class NotesStats(val lastTitle: String?, val total: Int, val toDo: Int)
+
+/**
+ * [contents] is every live note's JSON, newest first. The title comes from the newest note and
+ * the to-do count from every unchecked checkbox across all of them -- the one number on the hub
+ * that asks you to do something rather than telling you what you already did.
+ */
+fun notesStats(contents: List<String>, newId: () -> String): NotesStats {
+    val documents = contents.map { NoteJson.decode(it, newId) }
+    return NotesStats(
+        lastTitle = documents.firstOrNull()?.let(::titleOf),
+        total = documents.size,
+        toDo = documents.sumOf { document ->
+            document.blocks
+                .filterIsInstance<Block.Text>()
+                .count { it.kind == TextKind.CHECK && !it.checked && it.text.isNotBlank() }
+        },
+    )
+}

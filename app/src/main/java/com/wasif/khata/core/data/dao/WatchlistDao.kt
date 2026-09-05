@@ -48,6 +48,13 @@ private const val SUMMARY_COLUMNS = """
     FROM titles t
 """
 
+/** The three numbers the hub tile shows, in one row. */
+data class WatchlistHubStats(
+    val lastName: String?,
+    val watchedCount: Int,
+    val queuedCount: Int,
+)
+
 @Dao
 interface WatchlistDao {
 
@@ -119,4 +126,23 @@ interface WatchlistDao {
 
     @Query("UPDATE watches SET deletedAt = :now, updatedAt = :now WHERE id = :id")
     suspend fun softDeleteWatch(id: Long, now: Long)
+
+    @Query(
+        """
+        SELECT
+          (SELECT t.name FROM titles t
+           JOIN watches w ON w.titleId = t.id
+           WHERE t.deletedAt IS NULL AND w.deletedAt IS NULL
+           ORDER BY w.watchedAt DESC, w.id DESC LIMIT 1) AS lastName,
+          (SELECT COUNT(*) FROM titles t
+           WHERE t.deletedAt IS NULL
+             AND EXISTS (SELECT 1 FROM watches w
+                         WHERE w.titleId = t.id AND w.deletedAt IS NULL)) AS watchedCount,
+          (SELECT COUNT(*) FROM titles t
+           WHERE t.deletedAt IS NULL
+             AND NOT EXISTS (SELECT 1 FROM watches w
+                             WHERE w.titleId = t.id AND w.deletedAt IS NULL)) AS queuedCount
+        """,
+    )
+    fun hubStats(): Flow<WatchlistHubStats>
 }

@@ -2,15 +2,17 @@ package com.wasif.khata.feature.hub
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +35,12 @@ import android.Manifest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -43,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.KhataGlass
+import com.wasif.khata.core.ui.component.KhataIcons
 import com.wasif.khata.core.ui.component.MoneyText
 import com.wasif.khata.core.ui.component.NavCircle
 import com.wasif.khata.core.ui.theme.KhataPalette
@@ -173,14 +183,16 @@ fun ModulesContent(
                     ModuleTile(
                         haze = haze,
                         name = "Restaurants",
-                        subline = "Been, and want to try",
+                        icon = KhataIcons.Restaurant,
+                        tile = state.restaurants,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenRestaurants,
                     )
                     ModuleTile(
                         haze = haze,
                         name = "Watchlist",
-                        subline = "Up next, and watched",
+                        icon = KhataIcons.Watchlist,
+                        tile = state.watchlist,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenWatchlist,
                     )
@@ -192,14 +204,16 @@ fun ModulesContent(
                     ModuleTile(
                         haze = haze,
                         name = "Car service",
-                        subline = "History and what it costs",
+                        icon = KhataIcons.Car,
+                        tile = state.vehicle,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenVehicle,
                     )
                     ModuleTile(
                         haze = haze,
                         name = "Notes",
-                        subline = "Written on lined paper",
+                        icon = KhataIcons.Notes,
+                        tile = state.notes,
                         modifier = Modifier.weight(1f),
                         onClick = onOpenNotes,
                     )
@@ -312,44 +326,85 @@ private fun BudgetRing(fraction: Float) {
 private fun ModuleTile(
     haze: HazeState,
     name: String,
-    subline: String,
+    icon: ImageVector,
+    tile: ModuleTileState,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-) = Tile(haze = haze, name = name, subline = subline, modifier = modifier, onClick = onClick)
-
-@Composable
-private fun Tile(
-    haze: HazeState,
-    name: String,
-    subline: String,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)?,
 ) {
     val spacing = LocalSpacing.current
-    KhataGlass(hazeState = haze, modifier = modifier.height(96.dp)) {
+
+    // Square, and the same corner radius as the wallet card above it, so the hub reads as one
+    // family of surfaces rather than a card with four smaller strangers underneath.
+    KhataGlass(hazeState = haze, modifier = modifier.aspectRatio(1f)) {
         Column(
             Modifier
                 .fillMaxSize()
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+                .clickable(onClick = onClick)
                 .padding(spacing.md),
-            verticalArrangement = Arrangement.Bottom,
         ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
             Text(
                 text = name.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                // A live tile takes the paper tier and a dormant one stays quiet,
-                // which is the difference readable without reading the subline.
-                color = if (onClick != null) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = spacing.xs),
             )
-            Text(
-                text = subline,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+
+            Spacer(Modifier.weight(1f))
+
+            tile.stats.forEach { stat -> StatLine(stat) }
         }
+    }
+}
+
+/**
+ * One stat on one line, always. A long restaurant name scrolls sideways on a loop rather than
+ * being cut off with an ellipsis: on a tile this size almost every interesting name would be
+ * truncated, and a name you cannot finish reading is not worth the row it sits on.
+ */
+@Composable
+private fun StatLine(stat: TileStat) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Text(
+            text = stat.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = stat.value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 6.dp)
+                // Faded at the trailing edge, so text leaving the tile reads as scrolling
+                // rather than as truncation -- a hard clip looks exactly like the ellipsis
+                // the marquee is here to avoid.
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            0.85f to Color.Black,
+                            1f to Color.Transparent,
+                            startX = 0f,
+                            endX = size.width,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
+                .basicMarquee(iterations = Int.MAX_VALUE),
+        )
     }
 }

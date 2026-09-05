@@ -53,6 +53,30 @@ class ModulesScreenTest {
     }
 
     @Test
+    fun aTileShowsItsThreeFiguresWithTheirLabels() {
+        compose.setContent {
+            KhataTheme {
+                ModulesContent(
+                    ModulesUiState(
+                        restaurants = ModuleTileState(
+                            listOf(
+                                TileStat("Last visit", "Sultans Dine"),
+                                TileStat("Visited", "4"),
+                                TileStat("Spent", "৳12,450.00"),
+                            ),
+                        ),
+                    ),
+                    {}, {}, {}, {}, {}, {}, {},
+                )
+            }
+        }
+
+        listOf("Last visit", "Sultans Dine", "Visited", "4", "Spent", "৳12,450.00").forEach {
+            compose.onNodeWithText(it).assertIsDisplayed()
+        }
+    }
+
+    @Test
     fun theBudgetRingIsAbsentUntilABudgetIsSet() {
         compose.setContent {
             KhataTheme {

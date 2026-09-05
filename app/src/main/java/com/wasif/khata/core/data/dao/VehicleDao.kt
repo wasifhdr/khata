@@ -59,6 +59,13 @@ private const val SUMMARY_COLUMNS = """
     FROM services s
 """
 
+/** The three the hub tile shows. The car is the first live vehicle, since there is only ever one. */
+data class VehicleHubStats(
+    val carName: String?,
+    val lastServicedAt: Long?,
+    val spentMinor: Long?,
+)
+
 @Dao
 interface VehicleDao {
 
@@ -168,4 +175,14 @@ interface VehicleDao {
 
     @Query("UPDATE service_items SET deletedAt = :now, updatedAt = :now WHERE serviceId = :serviceId")
     suspend fun softDeleteItemsFor(serviceId: Long, now: Long)
+
+    @Query(
+        """
+        SELECT
+          (SELECT name FROM vehicles WHERE deletedAt IS NULL ORDER BY id LIMIT 1) AS carName,
+          (SELECT MAX(servicedAt) FROM services WHERE deletedAt IS NULL) AS lastServicedAt,
+          (SELECT SUM(costMinor) FROM services WHERE deletedAt IS NULL) AS spentMinor
+        """,
+    )
+    fun hubStats(): Flow<VehicleHubStats>
 }

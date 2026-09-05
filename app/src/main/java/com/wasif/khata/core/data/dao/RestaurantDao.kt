@@ -51,6 +51,14 @@ private const val SUMMARY_COLUMNS = """
     FROM restaurants r
 """
 
+/** The three numbers the hub tile shows. One row, so the hub never loads a list it will not draw. */
+data class RestaurantHubStats(
+    val lastName: String?,
+    val visitedCount: Int,
+    /** All time, not this month: the wallet card owns "this month" and nothing else should. */
+    val spentMinor: Long?,
+)
+
 @Dao
 interface RestaurantDao {
 
@@ -192,4 +200,21 @@ interface RestaurantDao {
         """,
     )
     suspend fun dishAverage(restaurantId: Long): Double?
+
+    @Query(
+        """
+        SELECT
+          (SELECT r.name FROM restaurants r
+           JOIN restaurant_visits v ON v.restaurantId = r.id
+           WHERE r.deletedAt IS NULL AND v.deletedAt IS NULL
+           ORDER BY v.visitedAt DESC, v.id DESC LIMIT 1) AS lastName,
+          (SELECT COUNT(*) FROM restaurants r
+           WHERE r.deletedAt IS NULL
+             AND EXISTS (SELECT 1 FROM restaurant_visits v
+                         WHERE v.restaurantId = r.id AND v.deletedAt IS NULL)) AS visitedCount,
+          (SELECT SUM(v.costMinor) FROM restaurant_visits v
+           WHERE v.deletedAt IS NULL) AS spentMinor
+        """,
+    )
+    fun hubStats(): Flow<RestaurantHubStats>
 }

@@ -33,4 +33,14 @@ interface NoteDao {
 
     @Query("UPDATE notes SET deletedAt = :now, updatedAt = :now WHERE id = :id")
     suspend fun softDelete(id: Long, now: Long)
+
+    /**
+     * Every live note's content, newest first, for the hub tile. The unchecked-box count
+     * lives inside the JSON rather than in a column, so it cannot be a SQL aggregate.
+     *
+     * ponytail: reads every note's content on the hub. Fine for one person's notes; if this
+     * ever holds thousands, store an unchecked count as a column written on save.
+     */
+    @Query("SELECT content FROM notes WHERE deletedAt IS NULL ORDER BY updatedAt DESC")
+    fun observeContents(): Flow<List<String>>
 }
