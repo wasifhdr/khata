@@ -37,14 +37,19 @@ class ModulesScreenTest {
     }
 
     @Test
-    fun unbuiltModulesSaySoRatherThanShowingFakeData() {
+    fun everyTileNamesWhatItHoldsRatherThanStandingEmpty() {
         compose.setContent {
             KhataTheme { ModulesContent(ModulesUiState(), {}, {}, {}, {}, {}, {}, {}) }
         }
 
-        compose.onNodeWithText("RESTAURANTS").assertIsDisplayed()
+        // This test used to assert the opposite: that dormant tiles said "Not built". Notes
+        // was the last unbuilt module, so there is nothing left to label -- and a tile still
+        // saying it would now be a lie rather than an honest placeholder.
+        listOf("RESTAURANTS", "WATCHLIST", "CAR SERVICE", "NOTES").forEach { name ->
+            compose.onNodeWithText(name).assertIsDisplayed()
+        }
         val dormant = compose.onAllNodesWithText("Not built").fetchSemanticsNodes()
-        assertTrue("dormant modules must be labelled", dormant.isNotEmpty())
+        assertTrue("every module is built, so nothing may claim otherwise", dormant.isEmpty())
     }
 
     @Test
