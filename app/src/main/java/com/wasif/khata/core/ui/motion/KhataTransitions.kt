@@ -86,25 +86,48 @@ private fun Motion.thresholdIn() = tween<Float>(
 )
 
 /**
- * The destination is revealed rather than introduced -- it was already on the
- * stack underneath -- so it arrives at 110% and settles to 100% while the screen
- * being left recedes to 90% off the top of it. Both scales are the spec's.
+ * The screen being left **slides off** rather than fading out, and that is the
+ * whole point of this pair.
+ *
+ * Two earlier versions both expressed "leaving" as a fade, and both were wrong in
+ * the same way: a fade over an opaque destination does not read as the screen
+ * moving away, it reads as the screen *vanishing*, and it always beat the 10%
+ * scale it was paired with. Confining the fade to a threshold only moved the
+ * problem -- the spec's 35% mark is a moment when neither screen is showing,
+ * which the system fills with a backdrop of its own and this app fills with flat
+ * window colour, so it flashed.
+ *
+ * Nothing fades here. The outgoing screen leaves the screen edge under its own
+ * travel and is removed once it is already gone, so there is no frame where
+ * something disappears and no frame where nothing is drawn. The destination is
+ * simply uncovered, which is what a pop actually is.
+ *
+ * It also makes the pair behave the same whether predictive back **seeks** it by
+ * the thumb or the back button **plays** it at full speed. The previous version
+ * only looked right while being seeked, so the first gesture was fine and every
+ * one after it -- played, not seeked -- was not.
+ *
+ * A sideways slide is otherwise avoided in this app because it claims an
+ * adjacency that is not real. On back it claims nothing: it is the direction the
+ * gesture itself is pushing.
  */
-fun popRevealEnter(m: Motion): EnterTransition =
-    scaleIn(tween(m.standard, easing = SeekedBack), initialScale = 1.10f) +
-        fadeIn(m.thresholdIn())
+fun popRevealEnter(): EnterTransition = EnterTransition.None
 
 fun popRevealExit(m: Motion): ExitTransition =
-    scaleOut(tween(m.standard, easing = SeekedBack), targetScale = 0.90f) +
-        fadeOut(m.thresholdOut())
+    slideOutHorizontally(tween(m.standard, easing = SeekedBack)) { it } +
+        scaleOut(tween(m.standard, easing = SeekedBack), targetScale = 0.90f)
 
+// The hub pair keeps its cross-dissolve rather than the threshold: these two
+// slide only a fifth of the width, so neither ever clears the screen and a
+// threshold would leave the same blank moment with nothing to fill it. Overlapping
+// fades mean one of them is always opaque somewhere.
 fun sharedAxisXPopEnter(m: Motion): EnterTransition =
     slideInHorizontally(tween(m.standard, easing = SeekedBack)) { -(it * SharedAxisTravel).toInt() } +
-        fadeIn(m.thresholdIn())
+        fadeIn(tween(m.standard, easing = SeekedBack))
 
 fun sharedAxisXPopExit(m: Motion): ExitTransition =
     slideOutHorizontally(tween(m.standard, easing = SeekedBack)) { (it * SharedAxisTravel).toInt() } +
-        fadeOut(m.thresholdOut())
+        fadeOut(tween(m.standard, easing = SeekedBack))
 
 /**
  * Fade-through: the outgoing screen leaves before the incoming one arrives, so

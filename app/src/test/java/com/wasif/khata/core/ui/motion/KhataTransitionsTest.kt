@@ -59,12 +59,16 @@ class KhataTransitionsTest {
     }
 
     @Test
-    fun `the crossfade is confined so the fade cannot outrun the movement`() {
-        // The bug this exists for: alpha travels 100% while a scale travels 10%,
-        // so given the same duration the fade always wins and the screen reads as
-        // gone before it has visibly moved. Confining the fade to a threshold and
-        // leaving the scale to run the whole way is what fixes that, so the fade
-        // must stay strictly shorter than the movement it sits inside.
+    fun `the forward crossfade is confined so it cannot outrun the movement`() {
+        // Forward only. Alpha travels 100% while a slide travels 20%, so on one
+        // duration the fade wins and the move reads as a blink; the threshold
+        // ends the outgoing fade before the incoming one starts, so the slide is
+        // what carries it.
+        //
+        // The pop pair deliberately does not use this. A threshold has one moment
+        // where neither screen is showing, which is invisible in a transition that
+        // is played but can be held indefinitely in one that predictive back
+        // seeks -- so the pop expresses leaving with travel and no fade at all.
         assertTrue("the fade must end before the movement does", FadeThrough < 1f)
         assertTrue("but it must actually happen", FadeThrough > 0f)
 
