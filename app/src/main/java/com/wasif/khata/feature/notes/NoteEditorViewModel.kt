@@ -34,7 +34,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Long enough that a sentence is one write, short enough to survive a swipe away. */
-const val AUTOSAVE_DELAY_MS = 600L
+private const val AUTOSAVE_DELAY_MS = 600L
 
 // Hilt needs the assisted factory named here to resolve hiltViewModel's generic <VM, VMF>
 // overload; without it, injection silently falls back to a no-arg constructor and crashes.
