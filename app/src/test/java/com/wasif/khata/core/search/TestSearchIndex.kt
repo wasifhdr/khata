@@ -7,6 +7,9 @@ import com.wasif.khata.core.data.KhataDatabase
  * test in half these cases, and a fake would agree with whatever it was told.
  */
 fun searchIndex(db: KhataDatabase) = SearchIndex(
-    sources = setOf(TransactionIndexSource(db.transactionDao(), db.merchantDao(), db.tagDao())),
+    sources = setOf(
+        TransactionIndexSource(db.transactionDao(), db.merchantDao(), db.tagDao()),
+        RestaurantIndexSource(db.restaurantDao(), db.placeDao(), db.tagDao()),
+    ),
     dao = db.searchDao(),
 )

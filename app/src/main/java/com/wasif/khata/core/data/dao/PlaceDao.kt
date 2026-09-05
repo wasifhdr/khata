@@ -17,4 +17,11 @@ interface PlaceDao {
 
     @Query("SELECT * FROM places WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
     fun observeAll(): Flow<List<PlaceEntity>>
+
+    @Query("SELECT id FROM places WHERE deletedAt IS NULL")
+    suspend fun allIdsForIndex(): List<Long>
+
+    /** Newest first: FTS4 has no relevance ranking, so recency is the ordering. */
+    @Query("SELECT * FROM places WHERE id IN (:ids) AND deletedAt IS NULL ORDER BY createdAt DESC")
+    suspend fun findByIds(ids: List<Long>): List<PlaceEntity>
 }

@@ -45,6 +45,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+              Sharing a place out of Google Maps sends plain text: a name line and a
+              link line. This is the capture path 2026-08-26 called primary, and it
+              was unbuildable until places had somewhere to land.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!--

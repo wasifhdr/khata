@@ -30,6 +30,13 @@ import com.wasif.khata.feature.owed.OwedScreen
 import com.wasif.khata.feature.reconcile.DriftScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorScreen
 import com.wasif.khata.feature.ruleeditor.RuleEditorViewModel
+import com.wasif.khata.feature.restaurants.AddToWishlistScreen
+import com.wasif.khata.feature.restaurants.RestaurantScreen
+import com.wasif.khata.feature.restaurants.RestaurantViewModel
+import com.wasif.khata.feature.restaurants.RestaurantsScreen
+import com.wasif.khata.feature.restaurants.VisitEditorScreen
+import com.wasif.khata.feature.restaurants.VisitEditorViewModel
+import com.wasif.khata.feature.search.SearchScreen
 import com.wasif.khata.feature.unmatched.UnmatchedScreen
 import com.wasif.khata.feature.settings.SettingsScreen
 import com.wasif.khata.feature.wallet.WalletScreen
@@ -45,6 +52,14 @@ object KhataRoutes {
     const val Insights = "insights"
     const val Categories = "categories"
     const val RuleEditor = "rules/new/{rawMessageId}"
+    const val Restaurants = "restaurants"
+    const val Restaurant = "restaurants/{restaurantId}"
+    const val VisitNew = "restaurants/visit/new?restaurantId={restaurantId}"
+    const val VisitEdit = "restaurants/visit/{visitId}"
+    const val Wishlist = "wishlist"
+    const val Search = "search"
+    const val ArgRestaurantId = "restaurantId"
+    const val ArgVisitId = "visitId"
     const val EditorNew = "editor/new"
     const val EditorEdit = "editor/edit/{transactionId}"
     const val ArgTransactionId = "transactionId"
@@ -53,10 +68,21 @@ object KhataRoutes {
     fun editorEdit(id: Long): String = "editor/edit/$id"
 
     fun ruleEditor(rawMessageId: Long): String = "rules/new/$rawMessageId"
+
+    fun restaurant(id: Long): String = "restaurants/$id"
+
+    fun visitEdit(id: Long): String = "restaurants/visit/$id"
+
+    /** -1 is "no restaurant yet", which is the visit-first case. */
+    fun visitNew(restaurantId: Long = -1L): String = "restaurants/visit/new?restaurantId=$restaurantId"
 }
 
 @Composable
-fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
+fun KhataNavHost(
+    homeView: HomeView,
+    sharedPlaceText: String? = null,
+    settleTransactionId: Long? = null,
+) {
     val navController = rememberNavController()
 
     // The notification's "Own transfer" opens the app with a transaction on it. Wallet
@@ -80,9 +106,13 @@ fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
     // comment's promise above -- both hold for the rest of the process.
     // Settings tells the user the new value takes effect next launch.
     val frozenHomeView = remember { homeView }
-    val start = when (frozenHomeView) {
-        HomeView.Modules -> KhataRoutes.Modules
-        HomeView.Wallet -> KhataRoutes.Wallet
+    // A share is what this launch is for, so it is the root rather than something
+    // pushed onto one: back from it leaves the app and returns the user to Maps,
+    // which is where they came from.
+    val start = when {
+        sharedPlaceText != null -> KhataRoutes.Wishlist
+        frozenHomeView == HomeView.Wallet -> KhataRoutes.Wallet
+        else -> KhataRoutes.Modules
     }
 
     val motion = LocalMotion.current
@@ -111,6 +141,8 @@ fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
                     }
                 },
                 onOpenSettings = { navController.navigate(KhataRoutes.Settings) },
+                onOpenSearch = { navController.navigate(KhataRoutes.Search) },
+                onOpenRestaurants = { navController.navigate(KhataRoutes.Restaurants) },
             )
         }
 
@@ -137,6 +169,86 @@ fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
                 onBack = { navController.popBackStack() },
                 onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+            )
+        }
+
+        composable(KhataRoutes.Wishlist) {
+            AddToWishlistScreen(
+                onBack = { if (!navController.popBackStack()) navController.navigate(KhataRoutes.Modules) },
+                onSaved = { id ->
+                    navController.navigate(KhataRoutes.restaurant(id)) {
+                        popUpTo(KhataRoutes.Wishlist) { inclusive = true }
+                    }
+                },
+                onLogVisitInstead = { navController.navigate(KhataRoutes.visitNew()) },
+                sharedText = sharedPlaceText,
+            )
+        }
+
+        composable(KhataRoutes.Restaurants) {
+            RestaurantsScreen(
+                onBack = { navController.popBackStack() },
+                onLogVisit = { navController.navigate(KhataRoutes.visitNew()) },
+                onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
+                onAddToWishlist = { navController.navigate(KhataRoutes.Wishlist) },
+            )
+        }
+
+        composable(
+            route = KhataRoutes.Restaurant,
+            arguments = listOf(navArgument(KhataRoutes.ArgRestaurantId) { type = NavType.LongType }),
+        ) { entry ->
+            val id = entry.arguments?.getLong(KhataRoutes.ArgRestaurantId) ?: 0L
+            RestaurantScreen(
+                onBack = { navController.popBackStack() },
+                onLogVisit = { restaurantId ->
+                    navController.navigate(KhataRoutes.visitNew(restaurantId))
+                },
+                onOpenVisit = { visitId -> navController.navigate(KhataRoutes.visitEdit(visitId)) },
+                viewModel = hiltViewModel<RestaurantViewModel, RestaurantViewModel.Factory>(
+                    key = "restaurant-$id",
+                    creationCallback = { factory -> factory.create(id) },
+                ),
+            )
+        }
+
+        composable(
+            route = KhataRoutes.VisitNew,
+            arguments = listOf(
+                navArgument(KhataRoutes.ArgRestaurantId) {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+            ),
+        ) { entry ->
+            val restaurantId = entry.arguments?.getLong(KhataRoutes.ArgRestaurantId) ?: -1L
+            VisitEditorScreen(
+                onDone = { navController.popBackStack() },
+                viewModel = visitEditorViewModel(
+                    visitId = null,
+                    restaurantId = restaurantId.takeIf { it > 0 },
+                ),
+            )
+        }
+
+        composable(
+            route = KhataRoutes.VisitEdit,
+            arguments = listOf(navArgument(KhataRoutes.ArgVisitId) { type = NavType.LongType }),
+        ) { entry ->
+            VisitEditorScreen(
+                onDone = { navController.popBackStack() },
+                viewModel = visitEditorViewModel(
+                    visitId = entry.arguments?.getLong(KhataRoutes.ArgVisitId),
+                    restaurantId = null,
+                ),
+            )
+        }
+
+        composable(KhataRoutes.Search) {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+                onOpenRestaurant = { id -> navController.navigate(KhataRoutes.restaurant(id)) },
             )
         }
 
@@ -209,6 +321,13 @@ fun KhataNavHost(homeView: HomeView, settleTransactionId: Long? = null) {
         }
     }
 }
+
+@Composable
+private fun visitEditorViewModel(visitId: Long?, restaurantId: Long?): VisitEditorViewModel =
+    hiltViewModel<VisitEditorViewModel, VisitEditorViewModel.Factory>(
+        key = "visit-$visitId-$restaurantId",
+        creationCallback = { factory -> factory.create(visitId, restaurantId) },
+    )
 
 @Composable
 private fun editorViewModel(transactionId: Long?): TransactionEditorViewModel =

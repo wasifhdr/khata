@@ -11,6 +11,7 @@ import com.wasif.khata.core.data.dao.MerchantDao
 import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.dao.PlaceDao
 import com.wasif.khata.core.data.dao.RawMessageDao
+import com.wasif.khata.core.data.dao.RestaurantDao
 import com.wasif.khata.core.data.dao.SearchDao
 import com.wasif.khata.core.data.dao.TagDao
 import com.wasif.khata.core.data.dao.TransactionDao
@@ -25,10 +26,13 @@ import com.wasif.khata.core.data.entity.MerchantEntity
 import com.wasif.khata.core.data.entity.ParsingRuleEntity
 import com.wasif.khata.core.data.entity.PlaceEntity
 import com.wasif.khata.core.data.entity.RawMessageEntity
+import com.wasif.khata.core.data.entity.RestaurantEntity
+import com.wasif.khata.core.data.entity.RestaurantVisitEntity
 import com.wasif.khata.core.data.entity.SearchFtsEntity
 import com.wasif.khata.core.data.entity.TagEntity
 import com.wasif.khata.core.data.entity.TagLinkEntity
 import com.wasif.khata.core.data.entity.TransactionEntity
+import com.wasif.khata.core.data.entity.VisitDishEntity
 
 @Database(
     entities = [
@@ -47,8 +51,11 @@ import com.wasif.khata.core.data.entity.TransactionEntity
         TagEntity::class,
         TagLinkEntity::class,
         SearchFtsEntity::class,
+        RestaurantEntity::class,
+        RestaurantVisitEntity::class,
+        VisitDishEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {
@@ -64,4 +71,5 @@ abstract class KhataDatabase : RoomDatabase() {
     abstract fun mediaDao(): MediaDao
     abstract fun tagDao(): TagDao
     abstract fun searchDao(): SearchDao
+    abstract fun restaurantDao(): RestaurantDao
 }

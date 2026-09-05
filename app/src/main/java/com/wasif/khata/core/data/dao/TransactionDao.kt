@@ -79,6 +79,13 @@ interface TransactionDao {
     @Query("SELECT id FROM transactions WHERE deletedAt IS NULL")
     suspend fun allIdsForIndex(): List<Long>
 
+    /** What the search screen shows for a set of matches, newest first. */
+    @Query(
+        "SELECT * FROM transactions WHERE id IN (:ids) AND deletedAt IS NULL " +
+            "ORDER BY occurredAt DESC, id DESC",
+    )
+    suspend fun findByIds(ids: List<Long>): List<TransactionEntity>
+
     /**
      * Backfills the category the user just confirmed onto the merchant's other
      * unreviewed rows, which is what makes confirming a merchant a one-time job

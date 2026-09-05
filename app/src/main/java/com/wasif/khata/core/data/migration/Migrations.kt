@@ -3,6 +3,55 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Statements copied verbatim from schemas/11.json, the same way 7 -> 8 was
+        // built. Room compares the result against its own identity hash at open
+        // time, so anything hand-adjusted here fails at runtime rather than at
+        // compile time.
+        //
+        // Three tables and nothing else: companions are tag_links, photos are
+        // media_links, and a location is a places id -- all of which the spine
+        // already created at 7 -> 8.
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `restaurants` (`id` INTEGER PRIMARY KEY AUTOINCREMENT " +
+                "NOT NULL, `uuid` TEXT NOT NULL, `name` TEXT NOT NULL, `placeId` INTEGER, " +
+                "`coverMediaId` INTEGER, `note` TEXT, `createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER)",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_restaurants_uuid` ON `restaurants` (`uuid`)")
+
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `restaurant_visits` (`id` INTEGER PRIMARY KEY " +
+                "AUTOINCREMENT NOT NULL, `uuid` TEXT NOT NULL, `restaurantId` INTEGER NOT NULL, " +
+                "`visitedAt` INTEGER NOT NULL, `ambianceRating` INTEGER, `costMinor` INTEGER, " +
+                "`note` TEXT, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, " +
+                "`deletedAt` INTEGER)",
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS `index_restaurant_visits_uuid` " +
+                "ON `restaurant_visits` (`uuid`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_restaurant_visits_restaurantId` " +
+                "ON `restaurant_visits` (`restaurantId`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_restaurant_visits_visitedAt` " +
+                "ON `restaurant_visits` (`visitedAt`)",
+        )
+
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `visit_dishes` (`id` INTEGER PRIMARY KEY AUTOINCREMENT " +
+                "NOT NULL, `uuid` TEXT NOT NULL, `visitId` INTEGER NOT NULL, `name` TEXT NOT NULL, " +
+                "`rating` INTEGER, `sortOrder` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                "`updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER)",
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_visit_dishes_uuid` ON `visit_dishes` (`uuid`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_visit_dishes_visitId` ON `visit_dishes` (`visitId`)")
+    }
+}
+
 val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // DEFAULT 0 is the whole of "forward-only": every row that already exists is

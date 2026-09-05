@@ -105,6 +105,10 @@ dependencies {
   implementation(libs.androidx.compose.material3)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.haze)
+  // Earns its place on downsampling, not on async loading: a 100dp thumbnail must
+  // not decode a 2048px bitmap, and hand-rolling that is a worse LRU cache than
+  // Coil's.
+  implementation(libs.coil.compose)
   implementation(libs.androidx.datastore.preferences)
   // The account and an hour-long Drive token. Deliberately NOT
   // google-api-services-drive: Drive itself is four HttpURLConnection calls,
