@@ -8,7 +8,15 @@
       window background is resolved before any Compose code runs.
     -->
     <style name="Theme.Khata.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#061214</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_animated</item>
+        <!--
+          The GIF's own length: 31 frames at 30ms. Informational rather than a
+          cap, telling the system how long to hold the splash so the last stroke
+          is not cut off. The platform ignores anything past 1000ms, which this
+          is already inside.
+        -->
+        <item name="windowSplashScreenAnimationDuration">930</item>
         <item name="postSplashScreenTheme">@style/Theme.Khata</item>
     </style>
 

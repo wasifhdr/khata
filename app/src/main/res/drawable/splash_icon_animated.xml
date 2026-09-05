@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The splash icon, animating.
+
+  Hand-written because nothing Figma exports is an AnimatedVectorDrawable, and
+  that is the only thing the platform's splash screen will animate. The timings
+  below are not guesses: they were measured off the exported GIF frame by frame
+  (31 frames at 30ms), by tracking the page's bounding box and how much ink each
+  ruled line had accumulated in its own band.
+
+    0ms    the pencil alone, larger and turned further over
+    60ms   the page appears and grows out to full size
+    480ms  the first line starts drawing
+    600ms  the second
+    690ms  the third
+    900ms  the last stroke lands
+
+  930ms end to end, which is already inside the 1000ms the platform allows, so
+  nothing here is cut short. Re-timing means changing these and the duration in
+  themes.xml together.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_icon">
+
+    <!--
+      Invisible for the first two frames of the GIF, then fully opaque: the page
+      does not fade up under the growth, it cuts in and grows.
+    -->
+    <target android:name="page">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:startOffset="60"
+                android:duration="30" />
+        </aapt:attr>
+    </target>
+
+    <!--
+      0.70 to full over 700ms on a decelerate, which is the curve the measured
+      heights fall on: 0.73 at 90ms, 0.90 at 300ms, 0.99 at 600ms. Nearly all of
+      the movement is spent in the first third, and the rest is it settling.
+    -->
+    <target android:name="page_group">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="0.70"
+                    android:valueTo="1"
+                    android:startOffset="60"
+                    android:duration="700"
+                    android:interpolator="@android:interpolator/decelerate_quad" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="0.70"
+                    android:valueTo="1"
+                    android:startOffset="60"
+                    android:duration="700"
+                    android:interpolator="@android:interpolator/decelerate_quad" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <!--
+      The pencil starts nearer and turned further over, then pulls back as the
+      page arrives underneath it. Its ink area falls away over the opening
+      frames, which is what says it shrinks rather than grows; the bounding box
+      going from tall-and-narrow to square is the twelve degrees.
+    -->
+    <target android:name="pencil_group">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="scaleX"
+                    android:valueFrom="1.35"
+                    android:valueTo="1"
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/decelerate_quad" />
+                <objectAnimator
+                    android:propertyName="scaleY"
+                    android:valueFrom="1.35"
+                    android:valueTo="1"
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/decelerate_quad" />
+                <objectAnimator
+                    android:propertyName="rotation"
+                    android:valueFrom="-12"
+                    android:valueTo="0"
+                    android:duration="480"
+                    android:interpolator="@android:interpolator/decelerate_quad" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <!--
+      Linear, not eased: a pencil crossing a page keeps its speed, and each line
+      took the same 210ms in the GIF. The 110ms stagger is the gap measured
+      between one line starting and the next.
+    -->
+    <target android:name="line_1">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:animation">
+            <objectAnimator
+                android:propertyName="trimPathEnd"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:startOffset="480"
+                android:duration="210"
+                android:interpolator="@android:anim/linear_interpolator" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="line_2">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:animation">
+            <objectAnimator
+                android:propertyName="trimPathEnd"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:startOffset="600"
+                android:duration="210"
+                android:interpolator="@android:anim/linear_interpolator" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="line_3">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:animation">
+            <objectAnimator
+                android:propertyName="trimPathEnd"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:startOffset="690"
+                android:duration="210"
+                android:interpolator="@android:anim/linear_interpolator" />
+        </aapt:attr>
+    </target>
+</animated-vector>

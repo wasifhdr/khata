@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Duplicated from KhataPalette: a drawable is resolved long before any
+     Compose code runs, so it cannot read the theme. -->
+<resources>
+    <color name="icon_ink">#FFEDF2F1</color>
+
+    <!-- Verdigris, the default field. KhataPalette.fields[0].keyStop. -->
+    <color name="icon_background">#FF124740</color>
+
+    <!-- KhataPalette.ground. Deliberately not the icon's plate: this one is
+         painted before the first composed frame, and matching the app's ground
+         is what makes that hold invisible rather than a flash of colour. -->
+    <color name="splash_background">#FF061214</color>
+</resources>
