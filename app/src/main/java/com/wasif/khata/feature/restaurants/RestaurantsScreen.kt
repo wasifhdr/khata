@@ -141,7 +141,7 @@ fun RestaurantsContent(
 
             CollapsingTopBar(
                 heading = "Restaurants",
-                subline = subline(state),
+                subline = Subline,
                 collapse = list.collapseFraction(),
                 hazeState = haze,
                 onBack = onBack,
@@ -150,11 +150,7 @@ fun RestaurantsContent(
     }
 }
 
-private fun subline(state: RestaurantsUiState): String = when {
-    state.isEmpty -> "Nothing recorded yet"
-    state.wishlist.isEmpty() -> "${state.been.size} been"
-    else -> "${state.been.size} been · ${state.wishlist.size} to try"
-}
+private const val Subline = "Visited in the past or want to visit"
 
 @Composable
 private fun BeenRow(card: RestaurantCard, onClick: () -> Unit) {
