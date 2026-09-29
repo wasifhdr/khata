@@ -23,6 +23,8 @@ data class SettleTransferUiState(
     val merchantRaw: String? = null,
     val originalMessage: String? = null,
     val choices: List<Account> = emptyList(),
+    val recentPeople: List<String> = emptyList(),
+    val counterpartyInput: String = "",
     val done: Boolean = false,
 )
 
@@ -46,6 +48,7 @@ class SettleTransferViewModel @AssistedInject constructor(
         viewModelScope.launch {
             val row = repository.observe(transactionId).first() ?: return@launch
             val accounts = referenceData.observeAccounts().first()
+            val recentPeople = repository.observeRecentCounterparties(6).first()
             _state.update {
                 it.copy(
                     amount = row.amount,
@@ -56,6 +59,7 @@ class SettleTransferViewModel @AssistedInject constructor(
                     // Never the account it left: money cannot move to itself, and
                     // offering it invites a transfer that balances to nothing.
                     choices = accounts.filterNot { account -> account.id == row.accountId },
+                    recentPeople = recentPeople,
                 )
             }
         }
@@ -64,6 +68,19 @@ class SettleTransferViewModel @AssistedInject constructor(
     fun onAccountChosen(accountId: Long) {
         viewModelScope.launch {
             repository.settleAsOwnTransfer(transactionId, accountId)
+            _state.update { it.copy(done = true) }
+        }
+    }
+
+    fun onCounterpartyChange(name: String) {
+        _state.update { it.copy(counterpartyInput = name) }
+    }
+
+    fun onSettleAsOwed() {
+        val who = _state.value.counterpartyInput.trim()
+        if (who.isEmpty()) return
+        viewModelScope.launch {
+            repository.settleAsOwed(transactionId, who)
             _state.update { it.copy(done = true) }
         }
     }

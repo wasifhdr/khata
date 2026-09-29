@@ -38,6 +38,7 @@ class SettleTransferViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private var settled: Pair<Long, Long>? = null
+    private var settledOwed: Pair<Long, String>? = null
     private var dismissed: Long? = null
 
     private val pendingRow = Transaction(
@@ -100,6 +101,14 @@ class SettleTransferViewModelTest {
             return Result.success(Unit)
         }
 
+        override suspend fun settleAsOwed(
+            transactionId: Long,
+            counterparty: String,
+        ): Result<Unit> {
+            settledOwed = transactionId to counterparty
+            return Result.success(Unit)
+        }
+
         override suspend fun dismissTransferReview(transactionId: Long): Result<Unit> {
             dismissed = transactionId
             return Result.success(Unit)
@@ -111,6 +120,8 @@ class SettleTransferViewModelTest {
             flowOf(Money.ZERO)
         override fun observeMostRecent(): Flow<Transaction?> = flowOf(null)
         override fun observeDayTotals(): Flow<Map<LocalDate, Money>> = flowOf(emptyMap())
+        override fun observeRecentCounterparties(limit: Int): Flow<List<String>> =
+            flowOf(listOf("Rafi", "Sadia"))
     }
 
     private fun viewModel() = SettleTransferViewModel(
@@ -163,4 +174,32 @@ class SettleTransferViewModelTest {
                 viewModel.state.value.originalMessage,
             )
         }
+
+    @Test
+    fun `typing a person's name and settling as owed records it against their tab and closes`() =
+        runTest(dispatcher) {
+            val viewModel = viewModel()
+            advanceUntilIdle()
+
+            assertEquals(listOf("Rafi", "Sadia"), viewModel.state.value.recentPeople)
+            viewModel.onCounterpartyChange("  Rafi  ")
+            viewModel.onSettleAsOwed()
+            advanceUntilIdle()
+
+            assertEquals(7L to "Rafi", settledOwed)
+            assertTrue(viewModel.state.value.done)
+        }
+
+    @Test
+    fun `settling as owed with a blank name is a no-op`() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        advanceUntilIdle()
+
+        viewModel.onCounterpartyChange("   ")
+        viewModel.onSettleAsOwed()
+        advanceUntilIdle()
+
+        assertNull(settledOwed)
+        assertEquals(false, viewModel.state.value.done)
+    }
 }
