@@ -20,6 +20,7 @@ fun TransactionEntity.toDomain() = Transaction(
     categoryId = categoryId,
     note = note,
     counterparty = counterparty,
+    owed = Money(owedMinor),
     kind = kind,
     source = source,
     confidence = confidence,

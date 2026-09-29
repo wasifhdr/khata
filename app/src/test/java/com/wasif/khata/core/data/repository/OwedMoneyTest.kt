@@ -62,10 +62,12 @@ class OwedMoneyTest {
     private fun draft(
         amount: Long,
         direction: TransactionDirection,
-        kind: TransactionKind,
+        kind: TransactionKind = TransactionKind.NORMAL,
         who: String? = null,
+        owed: Long = if (who != null || kind == TransactionKind.IOU) amount else 0L,
+        id: Long? = null,
     ) = TransactionDraft(
-        id = null,
+        id = id,
         accountId = accountId,
         amount = Money(amount),
         direction = direction,
@@ -74,6 +76,7 @@ class OwedMoneyTest {
         categoryId = null,
         note = null,
         counterparty = who,
+        owed = Money(owed),
         kind = kind,
     )
 
@@ -82,7 +85,7 @@ class OwedMoneyTest {
 
     @Test
     fun `buying dinner is spending`() = runTest {
-        repository.save(draft(50_000, TransactionDirection.DEBIT, TransactionKind.NORMAL)).getOrThrow()
+        repository.save(draft(50_000, TransactionDirection.DEBIT)).getOrThrow()
 
         assertEquals(50_000L, spent())
     }
@@ -90,7 +93,7 @@ class OwedMoneyTest {
     @Test
     fun `lending a friend money is not spending`() = runTest {
         repository.save(
-            draft(50_000, TransactionDirection.DEBIT, TransactionKind.LENT, who = "Rafi")
+            draft(50_000, TransactionDirection.DEBIT, who = "Rafi")
         ).getOrThrow()
 
         assertEquals(0L, spent())
@@ -99,35 +102,36 @@ class OwedMoneyTest {
     @Test
     fun `paying back what you borrowed is not spending`() = runTest {
         repository.save(
-            draft(50_000, TransactionDirection.DEBIT, TransactionKind.BORROWED_RETURNED, who = "Rafi")
+            draft(50_000, TransactionDirection.DEBIT, who = "Rafi")
         ).getOrThrow()
 
         assertEquals(0L, spent())
     }
 
     @Test
-    fun `who the money is owed to is kept`() = runTest {
+    fun `who the money is owed to and how much is kept`() = runTest {
         val id = repository.save(
-            draft(50_000, TransactionDirection.DEBIT, TransactionKind.LENT, who = "Rafi")
+            draft(50_000, TransactionDirection.DEBIT, who = "Rafi")
         ).getOrThrow()
 
         val saved = repository.observe(id).first()!!
         assertEquals("Rafi", saved.counterparty)
-        assertEquals(TransactionKind.LENT, saved.kind)
+        assertEquals(Money(50_000), saved.owed)
+        assertEquals(TransactionKind.NORMAL, saved.kind)
     }
 
     @Test
     fun `a plain purchase needs no counterparty`() = runTest {
-        val id = repository.save(draft(50_000, TransactionDirection.DEBIT, TransactionKind.NORMAL)).getOrThrow()
+        val id = repository.save(draft(50_000, TransactionDirection.DEBIT)).getOrThrow()
 
         assertNull(repository.observe(id).first()!!.counterparty)
+        assertEquals(Money.ZERO, repository.observe(id).first()!!.owed)
     }
 
     @Test
-    fun `every kind of owed money still moves the balance`() = runTest {
-        // Not spending is not the same as not happening: the cash really left.
+    fun `owed money from an account still moves the balance`() = runTest {
         repository.save(
-            draft(50_000, TransactionDirection.DEBIT, TransactionKind.LENT, who = "Rafi")
+            draft(50_000, TransactionDirection.DEBIT, who = "Rafi")
         ).getOrThrow()
 
         assertEquals(-50_000L, db.accountDao().getAll().single().currentBalanceMinor)
@@ -135,16 +139,69 @@ class OwedMoneyTest {
 
     @Test
     fun `getting the loan back restores the balance and is still not income`() = runTest {
-        repository.save(draft(50_000, TransactionDirection.DEBIT, TransactionKind.LENT, "Rafi")).getOrThrow()
-        repository.save(draft(50_000, TransactionDirection.CREDIT, TransactionKind.LENT_RETURNED, "Rafi")).getOrThrow()
+        repository.save(draft(50_000, TransactionDirection.DEBIT, who = "Rafi")).getOrThrow()
+        repository.save(draft(50_000, TransactionDirection.CREDIT, who = "Rafi")).getOrThrow()
 
         assertEquals(0L, db.accountDao().getAll().single().currentBalanceMinor)
         assertEquals(0L, spent())
+        assertEquals(0L, repository.observeReceivedBetween(0, Long.MAX_VALUE).first().minor)
+    }
+
+    @Test
+    fun `reclassifying an existing NORMAL row to owed updates owedMinor and removes it from spending`() = runTest {
+        val id = repository.save(draft(50_000, TransactionDirection.DEBIT)).getOrThrow()
+        assertEquals(50_000L, spent())
+
+        repository.save(
+            draft(50_000, TransactionDirection.DEBIT, who = "Rafi", owed = 50_000, id = id)
+        ).getOrThrow()
+
+        assertEquals(0L, spent())
+        val rafi = db.transactionDao().observeOwedByPerson().first().single()
+        assertEquals("Rafi", rafi.name)
+        assertEquals(50_000L, rafi.netMinor)
+    }
+
+    @Test
+    fun `splitting a purchase deducts full balance, counts your share as spending, and puts their share on Owed`() = runTest {
+        repository.save(
+            draft(100_000, TransactionDirection.DEBIT, who = "Rafi", owed = 40_000)
+        ).getOrThrow()
+
+        assertEquals(-100_000L, db.accountDao().getAll().single().currentBalanceMinor)
+        assertEquals(60_000L, spent())
+        val rafi = db.transactionDao().observeOwedByPerson().first().single()
+        assertEquals("Rafi", rafi.name)
+        assertEquals(40_000L, rafi.netMinor)
+    }
+
+    @Test
+    fun `an IOU leaves account balance untouched, counts as spending when incurred, and settles cleanly`() = runTest {
+        val iouId = repository.save(
+            draft(50_000, TransactionDirection.DEBIT, kind = TransactionKind.IOU, who = "Rafi", owed = 50_000)
+        ).getOrThrow()
+
+        assertEquals(0L, db.accountDao().getAll().single().currentBalanceMinor)
+        assertEquals(50_000L, spent())
+        assertEquals(-50_000L, db.transactionDao().observeOwedByPerson().first().single().netMinor)
+
+        // Settling it by paying Rafi from Cash moves the account balance without double-counting spending.
+        repository.save(
+            draft(50_000, TransactionDirection.DEBIT, kind = TransactionKind.NORMAL, who = "Rafi", owed = 50_000)
+        ).getOrThrow()
+
+        assertEquals(-50_000L, db.accountDao().getAll().single().currentBalanceMinor)
+        assertEquals(50_000L, spent())
+        assertEquals(0, db.transactionDao().observeOwedByPerson().first().size)
+
+        // Deleting an IOU row must also leave the account balance untouched.
+        repository.delete(iouId).getOrThrow()
+        assertEquals(-50_000L, db.accountDao().getAll().single().currentBalanceMinor)
     }
 
     @Test
     fun `resetting an account to zero writes a dated adjustment rather than editing the balance`() = runTest {
-        repository.save(draft(162_100_00, TransactionDirection.CREDIT, TransactionKind.NORMAL)).getOrThrow()
+        repository.save(draft(162_100_00, TransactionDirection.CREDIT)).getOrThrow()
 
         repository.setBalance(accountId, targetMinor = 0L, at = 9_000L).getOrThrow()
 

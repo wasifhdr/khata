@@ -165,8 +165,14 @@ interface TransactionDao {
     @Query("SELECT COUNT(*) FROM transactions WHERE transferReviewPending = 1 AND deletedAt IS NULL")
     fun observePendingReviewCount(): Flow<Int>
 
-    @Query("SELECT * FROM transactions WHERE accountId = :accountId AND deletedAt IS NULL")
+    @Query("SELECT * FROM transactions WHERE accountId = :accountId AND kind != 'IOU' AND deletedAt IS NULL")
     suspend fun allForAccount(accountId: Long): List<TransactionEntity>
+
+    @Query(
+        "UPDATE transactions SET counterparty = :counterparty, owedMinor = amountMinor, " +
+            "transferReviewPending = 0, updatedAt = :updatedAt WHERE id = :id",
+    )
+    suspend fun settleAsOwed(id: Long, counterparty: String, updatedAt: Long)
 
     // Paired rows are excluded: money that left one of your accounts and arrived
     // in another was never spent. Keyed on transferGroupId rather than on kind,
@@ -178,11 +184,16 @@ interface TransactionDao {
     // database on every first launch.
     @Query(
         """
-        SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
+        SELECT COALESCE(SUM(
+            CASE WHEN kind = 'IOU' THEN amountMinor
+                 WHEN amountMinor > owedMinor THEN amountMinor - owedMinor
+                 ELSE 0 END
+        ), 0) FROM transactions
         WHERE deletedAt IS NULL
           AND direction = :direction
           AND transferGroupId IS NULL
-          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LOAN_REPAYMENT')
+          AND (:direction = 'DEBIT' OR kind NOT IN ('LOAN_DISBURSEMENT', 'IOU'))
           AND occurredAt >= :fromInclusive
           AND occurredAt < :toExclusive
         """,
@@ -201,14 +212,14 @@ interface TransactionDao {
     @Query(
         """
         SELECT TRIM(counterparty) AS name,
-               SUM(CASE WHEN kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED') THEN amountMinor
-                        WHEN kind IN ('LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED') THEN -amountMinor
-                        ELSE 0 END) AS netMinor,
+               SUM(CASE WHEN kind = 'IOU' THEN -owedMinor
+                        WHEN direction = 'DEBIT' THEN owedMinor
+                        ELSE -owedMinor END) AS netMinor,
                COUNT(*) AS entries
         FROM transactions
         WHERE deletedAt IS NULL
           AND counterparty IS NOT NULL AND TRIM(counterparty) != ''
-          AND kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED', 'LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED')
+          AND owedMinor > 0
         GROUP BY LOWER(TRIM(counterparty))
         HAVING netMinor != 0
         ORDER BY ABS(netMinor) DESC
@@ -222,20 +233,47 @@ interface TransactionDao {
         SELECT * FROM transactions
         WHERE deletedAt IS NULL
           AND (counterparty IS NULL OR TRIM(counterparty) = '')
-          AND kind IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED', 'LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED')
+          AND owedMinor > 0
         ORDER BY occurredAt DESC, id DESC
         """,
     )
     fun observeUnnamedOwed(): Flow<List<TransactionEntity>>
 
+    @Query(
+        """
+        SELECT * FROM transactions
+        WHERE deletedAt IS NULL
+          AND counterparty IS NOT NULL
+          AND LOWER(TRIM(counterparty)) = LOWER(TRIM(:name))
+          AND owedMinor > 0
+        ORDER BY occurredAt DESC, id DESC
+        """,
+    )
+    fun observeOwedEntriesForPerson(name: String): Flow<List<TransactionEntity>>
+
+    @Query(
+        """
+        SELECT TRIM(counterparty) FROM transactions
+        WHERE deletedAt IS NULL
+          AND counterparty IS NOT NULL AND TRIM(counterparty) != ''
+        GROUP BY LOWER(TRIM(counterparty))
+        ORDER BY MAX(occurredAt) DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeRecentCounterparties(limit: Int): Flow<List<String>>
+
     // Same exclusions as the spending total, or the breakdown would not add up to
     // the figure printed above it.
     @Query(
         """
-        SELECT categoryId, SUM(amountMinor) AS totalMinor, COUNT(*) AS entries
+        SELECT categoryId,
+               SUM(CASE WHEN kind = 'IOU' THEN amountMinor ELSE MAX(amountMinor - owedMinor, 0) END) AS totalMinor,
+               COUNT(*) AS entries
         FROM transactions
         WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
-          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LOAN_REPAYMENT')
+          AND (kind = 'IOU' OR amountMinor > owedMinor)
           AND occurredAt >= :fromInclusive AND occurredAt < :toExclusive
         GROUP BY categoryId
         ORDER BY totalMinor DESC
@@ -251,7 +289,7 @@ interface TransactionDao {
         SELECT accountId, ((occurredAt + 21600000) / 86400000) AS dayIndex,
                SUM(CASE WHEN direction = 'CREDIT' THEN amountMinor ELSE -amountMinor END) AS netMinor
         FROM transactions
-        WHERE deletedAt IS NULL
+        WHERE deletedAt IS NULL AND kind != 'IOU'
         GROUP BY accountId, dayIndex
         ORDER BY dayIndex
         """,
@@ -279,12 +317,15 @@ interface TransactionDao {
         """
         SELECT categoryId,
                COALESCE(SUM(CASE WHEN occurredAt >= :thisFrom AND occurredAt < :thisTo
-                                 THEN amountMinor ELSE 0 END), 0) AS thisMonthMinor,
+                                 THEN (CASE WHEN kind = 'IOU' THEN amountMinor ELSE MAX(amountMinor - owedMinor, 0) END)
+                                 ELSE 0 END), 0) AS thisMonthMinor,
                COALESCE(SUM(CASE WHEN occurredAt >= :lastFrom AND occurredAt < :lastTo
-                                 THEN amountMinor ELSE 0 END), 0) AS lastMonthMinor
+                                 THEN (CASE WHEN kind = 'IOU' THEN amountMinor ELSE MAX(amountMinor - owedMinor, 0) END)
+                                 ELSE 0 END), 0) AS lastMonthMinor
         FROM transactions
         WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
-          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LOAN_REPAYMENT')
+          AND (kind = 'IOU' OR amountMinor > owedMinor)
           AND occurredAt >= :lastFrom AND occurredAt < :thisTo
         GROUP BY categoryId
         """,
@@ -301,11 +342,12 @@ interface TransactionDao {
     @Query(
         """
         SELECT COALESCE(m.canonicalName, t.merchantRaw) AS merchantName,
-               SUM(t.amountMinor) AS totalMinor
+               SUM(CASE WHEN t.kind = 'IOU' THEN t.amountMinor ELSE MAX(t.amountMinor - t.owedMinor, 0) END) AS totalMinor
         FROM transactions t
         LEFT JOIN merchants m ON m.id = t.merchantId
         WHERE t.deletedAt IS NULL AND t.direction = 'DEBIT' AND t.transferGroupId IS NULL
-          AND t.kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND t.kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LOAN_REPAYMENT')
+          AND (t.kind = 'IOU' OR t.amountMinor > t.owedMinor)
           AND t.occurredAt >= :fromInclusive AND t.occurredAt < :toExclusive
           AND COALESCE(m.canonicalName, t.merchantRaw) IS NOT NULL
         GROUP BY merchantName
@@ -325,10 +367,11 @@ interface TransactionDao {
     @Query(
         """
         SELECT ((occurredAt + 21600000) / 86400000) AS dhakaDayIndex,
-               SUM(amountMinor) AS spentMinor
+               SUM(CASE WHEN kind = 'IOU' THEN amountMinor ELSE MAX(amountMinor - owedMinor, 0) END) AS spentMinor
         FROM transactions
         WHERE deletedAt IS NULL AND direction = 'DEBIT' AND transferGroupId IS NULL
-          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LENT', 'BORROWED_RETURNED', 'LOAN_REPAYMENT', 'COVERED_FOR_SOMEONE')
+          AND kind NOT IN ('TRANSFER', 'ADJUSTMENT', 'LOAN_REPAYMENT')
+          AND (kind = 'IOU' OR amountMinor > owedMinor)
         GROUP BY dhakaDayIndex
         """,
     )

@@ -70,7 +70,7 @@ import com.wasif.khata.core.data.entity.VisitDishEntity
         WatchEntity::class,
         NoteEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class KhataDatabase : RoomDatabase() {

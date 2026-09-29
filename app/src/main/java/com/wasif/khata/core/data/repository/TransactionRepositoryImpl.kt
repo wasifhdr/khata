@@ -104,15 +104,26 @@ class TransactionRepositoryImpl @Inject constructor(
 
             // Reverse the previous effect before applying the new one, or an edit
             // compounds onto the balance instead of replacing.
-            if (existing != null) {
+            if (existing != null && existing.kind != TransactionKind.IOU) {
                 accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
             }
+
+            val resolvedKind = if (
+                existing != null &&
+                existing.kind !in setOf(TransactionKind.NORMAL, TransactionKind.IOU) &&
+                draft.kind == TransactionKind.NORMAL
+            ) {
+                existing.kind
+            } else {
+                draft.kind
+            }
+            val clampedOwedMinor = draft.owed.minor.coerceIn(0L, draft.amount.minor)
 
             val rowId = transactionDao.upsert(
                 TransactionEntity(
                     id = existing?.id ?: 0,
                     uuid = existing?.uuid ?: UUID.randomUUID().toString(),
-                    accountId = draft.accountId,
+                    accountId = if (resolvedKind == TransactionKind.IOU) 0L else draft.accountId,
                     amountMinor = draft.amount.minor,
                     direction = draft.direction,
                     occurredAt = draft.occurredAt,
@@ -121,15 +132,14 @@ class TransactionRepositoryImpl @Inject constructor(
                     categoryId = draft.categoryId,
                     note = draft.note,
                     counterparty = draft.counterparty,
+                    owedMinor = clampedOwedMinor,
                     source = existing?.source ?: draft.source,
                     // Saving by hand IS the review: the row was on screen, in an
                     // editor, and the person looked at it. That is the affordance for
                     // clearing a flag, and it does not require filing the thing under
                     // a category to get it.
                     confidence = Confidence.HIGH,
-                    // An edit never reclassifies: a transfer stays a transfer when its
-                    // note changes. Only a fresh row takes the draft's kind.
-                    kind = existing?.kind ?: draft.kind,
+                    kind = resolvedKind,
                     rawMessageId = existing?.rawMessageId,
                     transferGroupId = existing?.transferGroupId,
                     feeMinor = existing?.feeMinor,
@@ -139,7 +149,9 @@ class TransactionRepositoryImpl @Inject constructor(
                 )
             )
 
-            accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
+            if (resolvedKind != TransactionKind.IOU) {
+                accountDao.adjustBalance(draft.accountId, signedMinor(draft.amount.minor, draft.direction), now)
+            }
 
             // Confirming a merchant is a one-time job: remember the choice, then
             // apply it to that merchant's other rows Khata had left uncertain.
@@ -175,6 +187,7 @@ class TransactionRepositoryImpl @Inject constructor(
                     categoryId = draft.categoryId,
                     note = draft.note,
                     counterparty = draft.counterparty,
+                    owedMinor = draft.owed.minor.coerceIn(0L, draft.amount.minor),
                     source = TransactionSource.MANUAL,
                     confidence = Confidence.HIGH,
                     kind = draft.kind,
@@ -327,6 +340,19 @@ class TransactionRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun settleAsOwed(
+        transactionId: Long,
+        counterparty: String,
+    ): Result<Unit> = runCatchingData {
+        val trimmed = counterparty.trim()
+        require(trimmed.isNotEmpty()) { "Counterparty name cannot be blank" }
+        db.withTransaction {
+            transactionDao.findById(transactionId) ?: throw DataError.NotFound
+            transactionDao.settleAsOwed(transactionId, trimmed, clock.now())
+            searchIndex.reindex("transaction", transactionId)
+        }
+    }
+
     override suspend fun dismissTransferReview(transactionId: Long): Result<Unit> =
         runCatchingData {
             transactionDao.setReviewPending(transactionId, pending = false, updatedAt = clock.now())
@@ -336,7 +362,9 @@ class TransactionRepositoryImpl @Inject constructor(
         db.withTransaction {
             val existing = transactionDao.findById(id) ?: throw DataError.NotFound
             val now = clock.now()
-            accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
+            if (existing.kind != TransactionKind.IOU) {
+                accountDao.adjustBalance(existing.accountId, -existing.signedMinor(), now)
+            }
             transactionDao.softDelete(id, now)
             searchIndex.remove("transaction", id)
         }

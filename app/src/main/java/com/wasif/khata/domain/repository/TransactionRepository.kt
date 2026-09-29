@@ -23,6 +23,7 @@ data class TransactionDraft(
     val note: String?,
     /** The person on the other side, when the money is owed one way or the other. */
     val counterparty: String? = null,
+    val owed: Money = Money.ZERO,
     /**
      * Defaulted so the editor's call sites are unaffected: a hand-entered
      * transaction is ordinary. Reconciliation is the first caller that needs to say
@@ -81,6 +82,13 @@ interface TransactionRepository {
      * other side, pairs the two, and takes both out of spending.
      */
     suspend fun settleAsOwnTransfer(transactionId: Long, otherAccountId: Long): Result<Unit>
+
+    /**
+     * Records that a movement was sent to or received from a person on the Owed ledger,
+     * clearing the pending review flag and assigning the full amount to [counterparty].
+     */
+    suspend fun settleAsOwed(transactionId: Long, counterparty: String): Result<Unit> =
+        Result.success(Unit)
 
     /** Records that it did not: the row stays ordinary spending, and stops asking. */
     suspend fun dismissTransferReview(transactionId: Long): Result<Unit>

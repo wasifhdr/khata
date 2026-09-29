@@ -3,6 +3,24 @@ package com.wasif.khata.core.data.migration
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `transactions` ADD COLUMN `owedMinor` INTEGER NOT NULL DEFAULT 0",
+        )
+        // Convert the six legacy person-to-person kinds into owedMinor + direction on
+        // NORMAL rows so existing debts keep their exact net balance.
+        db.execSQL(
+            "UPDATE `transactions` SET `owedMinor` = `amountMinor`, `direction` = 'DEBIT', " +
+                "`kind` = 'NORMAL' WHERE `kind` IN ('LENT', 'COVERED_FOR_SOMEONE', 'BORROWED_RETURNED')",
+        )
+        db.execSQL(
+            "UPDATE `transactions` SET `owedMinor` = `amountMinor`, `direction` = 'CREDIT', " +
+                "`kind` = 'NORMAL' WHERE `kind` IN ('LENT_RETURNED', 'REIMBURSEMENT', 'BORROWED')",
+        )
+    }
+}
+
 val MIGRATION_13_14 = object : Migration(13, 14) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Statements copied verbatim from schemas/14.json, as every migration since 7 -> 8.

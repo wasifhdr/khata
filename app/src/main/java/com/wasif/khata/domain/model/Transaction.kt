@@ -18,6 +18,7 @@ data class Transaction(
     val categoryId: Long?,
     val note: String?,
     val counterparty: String? = null,
+    val owed: Money = Money.ZERO,
     val kind: TransactionKind = TransactionKind.NORMAL,
     val source: TransactionSource,
     val confidence: Confidence,

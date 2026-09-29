@@ -37,6 +37,12 @@ data class TransactionEntity(
      */
     val counterparty: String? = null,
     /**
+     * How much of this transaction moves the tab with [counterparty]. Zero on an
+     * ordinary purchase; equal to [amountMinor] on a full loan, repayment, or IOU;
+     * between the two when splitting a bill.
+     */
+    val owedMinor: Long = 0,
+    /**
      * Set when a transfer-shaped row went three minutes without a partner message and
      * the owner has not yet said whether it left their accounts. Cleared by either
      * answer, and by a partner arriving late.

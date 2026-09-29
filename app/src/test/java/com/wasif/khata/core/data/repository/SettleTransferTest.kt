@@ -160,4 +160,19 @@ class SettleTransferTest {
         assertEquals(1, db.transactionDao().allForAccount(cash).size)
         assertEquals(5_000_00L, db.accountDao().findById(cash)!!.currentBalanceMinor)
     }
+
+    @Test
+    fun `settling a transfer as owed records the person and removes it from spending`() = runTest {
+        val ebl = account("EBL", opening = 20_000_00)
+        val id = parsedDebit(ebl, amountMinor = 5_000_00, merchantRaw = "EBL Account Transfer")
+
+        repository.settleAsOwed(id, counterparty = "Rafi").getOrThrow()
+
+        val updated = db.transactionDao().findById(id)!!
+        assertEquals("Rafi", updated.counterparty)
+        assertEquals(5_000_00L, updated.owedMinor)
+        assertFalse(updated.transferReviewPending)
+        assertEquals(0L, repository.observeSpentBetween(0, Long.MAX_VALUE).first().minor)
+        assertEquals(5_000_00L, db.transactionDao().observeOwedByPerson().first().single().netMinor)
+    }
 }
