@@ -7,6 +7,12 @@ import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.domain.model.Account
 import com.wasif.khata.domain.model.Category
 
+enum class EditorMode(val label: String) {
+    SPENT("Spent"),
+    RECEIVED("Received"),
+    THEY_PAID("They paid"),
+}
+
 data class TransactionEditorUiState(
     val amountInput: String = "",
     val merchantInput: String = "",
@@ -16,10 +22,13 @@ data class TransactionEditorUiState(
     val direction: TransactionDirection = TransactionDirection.DEBIT,
     val kind: TransactionKind = TransactionKind.NORMAL,
     val counterpartyInput: String = "",
+    /** Null means "All of it" (full amount) when a person is attached; non-null is a custom split share. */
+    val customOwedInput: String? = null,
     val occurredAt: Long = 0L,
 
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
+    val recentPeople: List<String> = emptyList(),
 
     /** The SMS this row was parsed from. Null for a row typed by hand. */
     val originalMessage: String? = null,
@@ -28,42 +37,53 @@ data class TransactionEditorUiState(
     val isSaving: Boolean = false,
     val saveError: String? = null,
 ) {
-    // Derived as getters, never constructor params, so no copy() can leave a
-    // validity flag disagreeing with the input it describes.
     val amount: Money? get() = if (amountInput.isBlank()) null else Money.parse(amountInput)
 
     val amountHasError: Boolean get() = amountInput.isNotBlank() && amount == null
 
-    /**
-     * The kinds worth offering for this direction, in the words they are thought
-     * about rather than the enum's. Money owed in one direction or the other is a
-     * different question from what was bought.
-     */
-    val kindChoices: List<Pair<TransactionKind, String>>
-        get() = if (direction == TransactionDirection.DEBIT) {
-            listOf(
-                TransactionKind.NORMAL to "Spending",
-                TransactionKind.LENT to "Lent to someone",
-                TransactionKind.COVERED_FOR_SOMEONE to "Paid a bill for someone",
-                TransactionKind.BORROWED_RETURNED to "Paid back what I borrowed",
-            )
-        } else {
-            listOf(
-                TransactionKind.NORMAL to "Earning",
-                TransactionKind.REIMBURSEMENT to "Their share of a bill I paid",
-                TransactionKind.LENT_RETURNED to "Loan I gave, returned",
-                TransactionKind.BORROWED to "Borrowed from someone",
-            )
+    val mode: EditorMode
+        get() = when {
+            kind == TransactionKind.IOU -> EditorMode.THEY_PAID
+            direction == TransactionDirection.CREDIT -> EditorMode.RECEIVED
+            else -> EditorMode.SPENT
         }
 
-    /** Anything owed in either direction wants a name against it. */
-    val wantsCounterparty: Boolean get() = kind != TransactionKind.NORMAL
+    /** An SMS-parsed row already moved a real account, so it cannot become a no-account IOU. */
+    val availableModes: List<EditorMode>
+        get() = if (isEditing && originalMessage != null && kind != TransactionKind.IOU) {
+            listOf(EditorMode.SPENT, EditorMode.RECEIVED)
+        } else {
+            EditorMode.entries
+        }
 
-    val counterpartyLabel: String
-        get() = if (direction == TransactionDirection.DEBIT) "To whom" else "From whom"
+    val isIou: Boolean get() = kind == TransactionKind.IOU
+
+    val hasPerson: Boolean get() = counterpartyInput.isNotBlank() || isIou || customOwedInput != null
+
+    val isSplit: Boolean get() = mode == EditorMode.SPENT && customOwedInput != null
+
+    val owedAmount: Money
+        get() {
+            val total = amount ?: return Money.ZERO
+            if (!hasPerson) return Money.ZERO
+            if (mode != EditorMode.SPENT || customOwedInput == null) return total
+            val parsed = Money.parse(customOwedInput) ?: return Money.ZERO
+            return Money(parsed.minor.coerceIn(0L, total.minor))
+        }
+
+    val wantsAccount: Boolean get() = !isIou
+
+    val wantsMerchant: Boolean
+        get() = direction == TransactionDirection.DEBIT
 
     val canSave: Boolean
-        get() = amount.let { it != null && !it.isZero } && accountId != null && !isSaving
+        get() {
+            val validAmount = amount.let { it != null && !it.isZero }
+            val validAccount = isIou || accountId != null
+            val validPerson = !isIou || counterpartyInput.isNotBlank()
+            val validSplit = !isSplit || owedAmount.let { !it.isZero && it.minor <= (amount?.minor ?: 0L) }
+            return validAmount && validAccount && validPerson && validSplit && !isSaving
+        }
 }
 
 sealed interface TransactionEditorEffect {
@@ -79,8 +99,12 @@ interface TransactionEditorActions {
     fun onAccountSelected(id: Long)
     fun onCategorySelected(id: Long?)
     fun onDirectionChange(direction: TransactionDirection)
+    fun onModeChange(mode: EditorMode)
     fun onKindChange(kind: TransactionKind)
     fun onCounterpartyChange(value: String)
+    fun onSelectAllOwed()
+    fun onSelectSplitOwed()
+    fun onCustomOwedChange(value: String)
     fun onSave()
     fun onDelete()
 }

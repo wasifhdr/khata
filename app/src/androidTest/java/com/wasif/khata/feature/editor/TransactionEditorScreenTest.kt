@@ -53,8 +53,12 @@ class TransactionEditorScreenTest {
         override fun onAccountSelected(id: Long) = Unit
         override fun onCategorySelected(id: Long?) { selectedCategory = id }
         override fun onDirectionChange(direction: TransactionDirection) = Unit
+        override fun onModeChange(mode: EditorMode) = Unit
         override fun onKindChange(kind: TransactionKind) = Unit
         override fun onCounterpartyChange(value: String) = Unit
+        override fun onSelectAllOwed() = Unit
+        override fun onSelectSplitOwed() = Unit
+        override fun onCustomOwedChange(value: String) = Unit
         override fun onSave() { saved = true }
         override fun onDelete() = Unit
     }
@@ -74,8 +78,12 @@ class TransactionEditorScreenTest {
         override fun onAccountSelected(id: Long) = Unit
         override fun onCategorySelected(id: Long?) = Unit
         override fun onDirectionChange(direction: TransactionDirection) = Unit
+        override fun onModeChange(mode: EditorMode) = Unit
         override fun onKindChange(kind: TransactionKind) = Unit
         override fun onCounterpartyChange(value: String) = Unit
+        override fun onSelectAllOwed() = Unit
+        override fun onSelectSplitOwed() = Unit
+        override fun onCustomOwedChange(value: String) = Unit
         override fun onSave() = Unit
         override fun onDelete() = Unit
     }
@@ -177,6 +185,7 @@ class TransactionEditorScreenTest {
             actions,
         )
 
+        composeRule.onNodeWithTag("categoryDropdown").performClick()
         composeRule.onNodeWithText("Groceries").performClick()
 
         assertEquals(11L, actions.selectedCategory)

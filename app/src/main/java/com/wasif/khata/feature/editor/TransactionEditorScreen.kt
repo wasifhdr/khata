@@ -11,10 +11,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -23,7 +22,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,18 +47,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.ui.component.AmountKeypadDialog
-import com.wasif.khata.core.ui.component.FieldScaffold
-import com.wasif.khata.core.ui.component.NavCircle
-import com.wasif.khata.core.ui.component.Pill
-import com.wasif.khata.core.ui.component.SectionLabel
-import dev.chrisbanes.haze.HazeState
-import com.wasif.khata.core.ui.component.KhataGlass
 import com.wasif.khata.core.ui.component.CategoryDot
 import com.wasif.khata.core.ui.component.ContextHeader
+import com.wasif.khata.core.ui.component.FieldScaffold
+import com.wasif.khata.core.ui.component.KhataGlass
+import com.wasif.khata.core.ui.component.NavCircle
+import com.wasif.khata.core.ui.component.SectionLabel
 import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
+import dev.chrisbanes.haze.HazeState
 
 @Composable
 fun TransactionEditorScreen(
@@ -77,7 +79,7 @@ fun TransactionEditorScreen(
     TransactionEditorContent(state = state, actions = viewModel, onBack = onDone)
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionEditorContent(
     state: TransactionEditorUiState,
@@ -86,6 +88,7 @@ fun TransactionEditorContent(
 ) {
     val spacing = LocalSpacing.current
     var editingAmount by rememberSaveable { mutableStateOf(false) }
+    var editingSplitShare by rememberSaveable { mutableStateOf(false) }
 
     if (editingAmount) {
         AmountKeypadDialog(
@@ -94,6 +97,16 @@ fun TransactionEditorContent(
             onValueChange = actions::onAmountChange,
             onDismiss = { editingAmount = false },
             onConfirm = { editingAmount = false },
+        )
+    }
+
+    if (editingSplitShare) {
+        AmountKeypadDialog(
+            title = "Their share",
+            value = state.customOwedInput.orEmpty(),
+            onValueChange = actions::onCustomOwedChange,
+            onDismiss = { editingSplitShare = false },
+            onConfirm = { editingSplitShare = false },
         )
     }
 
@@ -118,25 +131,24 @@ fun TransactionEditorContent(
                 }
             }
 
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                ContextHeader(
-                    heading = if (state.isEditing) "Edit entry" else "New entry",
-                    // The defaults the editor already assumed, stated where they can
-                    // be corrected rather than left invisible.
-                    subline = state.accounts.firstOrNull { it.id == state.accountId }?.name
-                        ?: "No account",
-                )
-            }
-
             Column(
                 Modifier
+                    .weight(1f)
                     .fillMaxWidth()
                     .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = spacing.lg),
             ) {
-                // Amount first and largest. This is the single change that most
-                // directly answers "everything is the same size".
+                ContextHeader(
+                    heading = if (state.isEditing) "Edit entry" else "New entry",
+                    subline = if (state.isIou) {
+                        "Owed only · no account moved"
+                    } else {
+                        state.accounts.firstOrNull { it.id == state.accountId }?.name ?: "No account"
+                    },
+                    modifier = Modifier.padding(bottom = spacing.md),
+                )
+
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -150,9 +162,6 @@ fun TransactionEditorContent(
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    // The keypad rather than the system keyboard, the same one the
-                    // widget takes an amount with. The readout is the button: a
-                    // caret here would promise an IME that never arrives.
                     Row(
                         verticalAlignment = Alignment.Bottom,
                         modifier = Modifier
@@ -177,7 +186,6 @@ fun TransactionEditorContent(
                         )
                     }
                     if (state.amountHasError) {
-                        // Durable text under the field, never a transient toast.
                         Text(
                             text = "Enter an amount like 1234.56",
                             style = MaterialTheme.typography.bodySmall,
@@ -187,16 +195,14 @@ fun TransactionEditorContent(
                     }
                 }
 
-                // Two visible states, never a switch: a switch hides which state is
-                // which.
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = spacing.screenHorizontal, vertical = spacing.md),
                     horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                 ) {
-                    TransactionDirection.entries.forEach { direction ->
-                        val selected = state.direction == direction
+                    state.availableModes.forEach { mode ->
+                        val selected = state.mode == mode
                         GlassChoice(
                             haze = haze,
                             selected = selected,
@@ -206,11 +212,11 @@ fun TransactionEditorContent(
                             Box(
                                 Modifier
                                     .fillMaxSize()
-                                    .clickable { actions.onDirectionChange(direction) },
+                                    .clickable { actions.onModeChange(mode) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
-                                    text = if (direction == TransactionDirection.DEBIT) "Spent" else "Received",
+                                    text = mode.label,
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = if (selected) {
                                         MaterialTheme.colorScheme.onSecondaryContainer
@@ -223,80 +229,169 @@ fun TransactionEditorContent(
                     }
                 }
 
-                SectionLabel(top = spacing.md, text = "Account")
-                FlowRow(
-                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                    // Wrapped lines get no gap by default, so chips on the second
-                    // row sit flush against the first row's.
-                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                ) {
-                    state.accounts.forEach { account ->
-                        EditorChip(
-                            haze = haze,
-                            label = account.name,
-                            selected = state.accountId == account.id,
-                            token = null,
-                            onClick = { actions.onAccountSelected(account.id) },
-                        )
+                if (state.wantsAccount) {
+                    SectionLabel(top = spacing.md, text = "Account")
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        state.accounts.forEach { account ->
+                            EditorChip(
+                                haze = haze,
+                                label = account.name,
+                                selected = state.accountId == account.id,
+                                token = null,
+                                onClick = { actions.onAccountSelected(account.id) },
+                            )
+                        }
                     }
                 }
 
+                var categoryExpanded by rememberSaveable { mutableStateOf(false) }
+                val selectedCategory = state.categories.firstOrNull { it.id == state.categoryId }
                 SectionLabel(top = spacing.md, text = "Category")
-                FlowRow(
-                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                    // Wrapped lines get no gap by default, so chips on the second
-                    // row sit flush against the first row's.
-                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                ExposedDropdownMenuBox(
+                    expanded = categoryExpanded,
+                    onExpandedChange = { categoryExpanded = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                 ) {
-                    state.categories.forEach { category ->
-                        EditorChip(
-                            haze = haze,
-                            label = category.name,
-                            selected = state.categoryId == category.id,
-                            token = category.colorToken,
-                            onClick = { actions.onCategorySelected(category.id) },
-                        )
-                    }
-                }
-
-                // Only shown when there is more than one sensible answer, which
-                // for a plain purchase there is not.
-                SectionLabel(top = spacing.md, text = "What kind")
-                FlowRow(
-                    Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(spacing.sm),
-                ) {
-                    state.kindChoices.forEach { (kind, label) ->
-                        Pill(
-                            text = label,
-                            selected = state.kind == kind,
-                        ) { actions.onKindChange(kind) }
-                    }
-                }
-
-                if (state.wantsCounterparty) {
-                    SectionLabel(state.counterpartyLabel, top = spacing.md)
                     OutlinedTextField(
-                        value = state.counterpartyInput,
-                        onValueChange = actions::onCounterpartyChange,
-                        placeholder = { Text("Optional") },
+                        value = selectedCategory?.name.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        placeholder = { Text("Select category") },
+                        leadingIcon = selectedCategory?.colorToken?.let { token ->
+                            { CategoryDot(token = token) }
+                        },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                            .fillMaxWidth()
+                            .testTag("categoryDropdown"),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = categoryExpanded,
+                        onDismissRequest = { categoryExpanded = false },
+                    ) {
+                        state.categories.forEach { category ->
+                            DropdownMenuItem(
+                                leadingIcon = { CategoryDot(token = category.colorToken) },
+                                text = { Text(category.name) },
+                                onClick = {
+                                    actions.onCategorySelected(category.id)
+                                    categoryExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                SectionLabel(top = spacing.md, text = "With someone")
+                if (state.recentPeople.isNotEmpty()) {
+                    FlowRow(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.screenHorizontal)
+                            .padding(bottom = spacing.sm),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        state.recentPeople.forEach { person ->
+                            val selected = state.counterpartyInput.trim().equals(person, ignoreCase = true)
+                            EditorChip(
+                                haze = haze,
+                                label = person,
+                                selected = selected,
+                                token = null,
+                                onClick = {
+                                    actions.onCounterpartyChange(if (selected) "" else person)
+                                },
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = state.counterpartyInput,
+                    onValueChange = actions::onCounterpartyChange,
+                    placeholder = { Text(if (state.isIou) "Required" else "Optional") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
+                )
+
+                if (state.mode == EditorMode.SPENT && state.counterpartyInput.isNotBlank()) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.screenHorizontal)
+                            .padding(top = spacing.sm),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        GlassChoice(
+                            haze = haze,
+                            selected = !state.isSplit,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.weight(1f).height(spacing.minTouchTarget),
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clickable(onClick = actions::onSelectAllOwed),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "All of it",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (!state.isSplit) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        }
+                        GlassChoice(
+                            haze = haze,
+                            selected = state.isSplit,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier.weight(1f).height(spacing.minTouchTarget),
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .clickable {
+                                        actions.onSelectSplitOwed()
+                                        editingSplitShare = true
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "Split · ${state.owedAmount.format()}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (state.isSplit) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (state.wantsMerchant) {
+                    SectionLabel(top = spacing.md, text = "Merchant")
+                    OutlinedTextField(
+                        value = state.merchantInput,
+                        onValueChange = actions::onMerchantChange,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                     )
                 }
-
-                SectionLabel(top = spacing.md, text = "Merchant")
-                OutlinedTextField(
-                    value = state.merchantInput,
-                    onValueChange = actions::onMerchantChange,
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
-                )
 
                 SectionLabel(top = spacing.md, text = "Note")
                 OutlinedTextField(
@@ -306,10 +401,6 @@ fun TransactionEditorContent(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenHorizontal),
                 )
 
-                // What the bank actually said, verbatim and read-only. "EBL Account
-                // Transfer" alone cannot say whether the money went to another of your
-                // accounts or to someone else, and this is where that is settled.
-                // Absent entirely on a row typed by hand, which has no message.
                 state.originalMessage?.let { message ->
                     SectionLabel(top = spacing.md, text = "Original message")
                     Text(
@@ -334,7 +425,6 @@ fun TransactionEditorContent(
                     )
                 }
 
-                // Full-width, in the thumb arc, disabled until genuinely saveable.
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -344,8 +434,6 @@ fun TransactionEditorContent(
                             if (state.canSave) {
                                 Brush.linearGradient(KhataPalette.heroStops)
                             } else {
-                                // A flat fill, not a gradient with matching stops:
-                                // the disabled state has no accent to blend.
                                 SolidColor(MaterialTheme.colorScheme.surfaceContainer)
                             },
                         )
@@ -364,7 +452,7 @@ fun TransactionEditorContent(
                     )
                 }
             }
-            }
+        }
     }
 }
 
@@ -385,7 +473,6 @@ private fun EditorChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(spacing.sm),
         ) {
-            // Colour quarantined to a dot; the name always carries the meaning.
             token?.let { CategoryDot(token = it) }
             Text(
                 text = label,
@@ -400,11 +487,6 @@ private fun EditorChip(
     }
 }
 
-/**
- * One body, two surfaces. Only the *unselected* half is glass: a translucent
- * selected control reads as less committed than an opaque one, which inverts the
- * thing selection is meant to say.
- */
 @Composable
 private fun GlassChoice(
     haze: HazeState,

@@ -106,4 +106,7 @@ interface TransactionRepository {
 
 
     fun observeDayTotals(): Flow<Map<LocalDate, Money>>
+
+    fun observeRecentCounterparties(limit: Int = 6): Flow<List<String>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
 }

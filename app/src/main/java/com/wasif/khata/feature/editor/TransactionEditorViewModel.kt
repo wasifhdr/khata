@@ -2,6 +2,8 @@ package com.wasif.khata.feature.editor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.wasif.khata.core.model.AccountType
+import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.model.TransactionKind
 import com.wasif.khata.core.time.KhataClock
@@ -50,11 +52,12 @@ class TransactionEditorViewModel @AssistedInject constructor(
     init {
         viewModelScope.launch {
             referenceData.observeAccounts().collect { accounts ->
+                val ordered = accounts.sortedBy { it.type != AccountType.CASH }
                 _uiState.update { state ->
-                    // Preselect so a new entry is one field closer to saveable.
+                    // Preselect Cash (first in ordered) so a new entry is one field closer to saveable.
                     state.copy(
-                        accounts = accounts,
-                        accountId = state.accountId ?: accounts.firstOrNull()?.id,
+                        accounts = ordered,
+                        accountId = state.accountId ?: ordered.firstOrNull()?.id,
                     )
                 }
             }
@@ -64,19 +67,33 @@ class TransactionEditorViewModel @AssistedInject constructor(
                 _uiState.update { it.copy(categories = categories) }
             }
         }
+        viewModelScope.launch {
+            repository.observeRecentCounterparties(6).collect { people ->
+                _uiState.update { it.copy(recentPeople = people) }
+            }
+        }
         transactionId?.let { id ->
             viewModelScope.launch {
                 repository.observe(id).collect { existing ->
                     if (existing == null) return@collect
+                    val splitInput = if (
+                        existing.owed.minor > 0L &&
+                        existing.owed.minor < existing.amount.minor
+                    ) {
+                        existing.owed.format(withSymbol = false)
+                    } else {
+                        null
+                    }
                     _uiState.update {
                         it.copy(
                             amountInput = existing.amount.format(withSymbol = false),
                             merchantInput = existing.merchantRaw.orEmpty(),
                             noteInput = existing.note.orEmpty(),
-                            accountId = existing.accountId,
+                            accountId = existing.accountId.takeIf { accId -> accId != 0L } ?: it.accountId,
                             categoryId = existing.categoryId,
                             kind = existing.kind,
                             counterpartyInput = existing.counterparty.orEmpty(),
+                            customOwedInput = splitInput,
                             direction = existing.direction,
                             occurredAt = existing.occurredAt,
                         )
@@ -105,23 +122,54 @@ class TransactionEditorViewModel @AssistedInject constructor(
 
     override fun onCategorySelected(id: Long?) = _uiState.update { it.copy(categoryId = id) }
 
-    override fun onDirectionChange(direction: TransactionDirection) = _uiState.update {
-        // A kind belongs to one direction: "lent to someone" makes no sense once
-        // the money is coming in, so switching sides resets it rather than leaving
-        // a choice that cannot be seen or unset.
-        val stillOffered = it.copy(direction = direction).kindChoices.any { (k, _) -> k == it.kind }
-        it.copy(direction = direction, kind = if (stillOffered) it.kind else TransactionKind.NORMAL)
+    override fun onDirectionChange(direction: TransactionDirection) =
+        onModeChange(if (direction == TransactionDirection.DEBIT) EditorMode.SPENT else EditorMode.RECEIVED)
+
+    override fun onModeChange(mode: EditorMode) = _uiState.update { state ->
+        when (mode) {
+            EditorMode.SPENT -> state.copy(
+                direction = TransactionDirection.DEBIT,
+                kind = TransactionKind.NORMAL,
+            )
+            EditorMode.RECEIVED -> state.copy(
+                direction = TransactionDirection.CREDIT,
+                kind = TransactionKind.NORMAL,
+                customOwedInput = null,
+            )
+            EditorMode.THEY_PAID -> state.copy(
+                direction = TransactionDirection.DEBIT,
+                kind = TransactionKind.IOU,
+                customOwedInput = null,
+            )
+        }
     }
 
     override fun onKindChange(kind: TransactionKind) = _uiState.update { it.copy(kind = kind) }
 
     override fun onCounterpartyChange(value: String) =
-        _uiState.update { it.copy(counterpartyInput = value) }
+        _uiState.update {
+            it.copy(
+                counterpartyInput = value,
+                customOwedInput = if (value.isBlank()) null else it.customOwedInput,
+            )
+        }
+
+    override fun onSelectAllOwed() = _uiState.update { it.copy(customOwedInput = null) }
+
+    override fun onSelectSplitOwed() = _uiState.update { state ->
+        if (state.customOwedInput != null) return@update state
+        val halfMinor = (state.amount?.minor ?: 0L) / 2
+        state.copy(customOwedInput = Money(halfMinor).format(withSymbol = false))
+    }
+
+    override fun onCustomOwedChange(value: String) =
+        _uiState.update { it.copy(customOwedInput = value) }
 
     override fun onSave() {
         val state = _uiState.value
+        if (!state.canSave) return
         val amount = state.amount ?: return
-        val accountId = state.accountId ?: return
+        val accountId = if (state.isIou) 0L else (state.accountId ?: return)
 
         _uiState.update { it.copy(isSaving = true, saveError = null) }
 
@@ -133,10 +181,11 @@ class TransactionEditorViewModel @AssistedInject constructor(
                     amount = amount,
                     direction = state.direction,
                     occurredAt = state.occurredAt,
-                    merchantRaw = state.merchantInput.takeIf { it.isNotBlank() },
+                    merchantRaw = state.merchantInput.takeIf { it.isNotBlank() && (state.wantsMerchant || state.isEditing) },
                     categoryId = state.categoryId,
                     note = state.noteInput.takeIf { it.isNotBlank() },
                     counterparty = state.counterpartyInput.trim().takeIf { it.isNotBlank() },
+                    owed = state.owedAmount,
                     kind = state.kind,
                 )
             )

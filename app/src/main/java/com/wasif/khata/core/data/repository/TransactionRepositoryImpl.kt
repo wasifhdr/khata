@@ -96,6 +96,9 @@ class TransactionRepositoryImpl @Inject constructor(
             rows.associate { it.dhakaDayIndex.dhakaDayIndexToLocalDate() to Money(it.spentMinor) }
         }
 
+    override fun observeRecentCounterparties(limit: Int): Flow<List<String>> =
+        transactionDao.observeRecentCounterparties(limit)
+
     override suspend fun save(draft: TransactionDraft): Result<Long> = runCatchingData {
         db.withTransaction {
             val now = clock.now()

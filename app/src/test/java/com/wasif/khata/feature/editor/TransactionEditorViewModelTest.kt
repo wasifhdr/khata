@@ -273,4 +273,87 @@ class TransactionEditorViewModelTest {
 
         assertNull(state.value.originalMessage)
     }
+
+    @Test
+    fun `merchant is hidden when received`() {
+        val base = TransactionEditorUiState(direction = TransactionDirection.DEBIT)
+        assertTrue(base.copy(kind = com.wasif.khata.core.model.TransactionKind.NORMAL).wantsMerchant)
+
+        val received = TransactionEditorUiState(direction = TransactionDirection.CREDIT)
+        assertFalse(received.wantsMerchant)
+    }
+
+    @Test
+    fun `they paid mode requires a counterparty before saving and saves as IOU with full owed`() = runTest(dispatcher) {
+        val vm = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onAmountChange("500")
+        vm.onModeChange(EditorMode.THEY_PAID)
+
+        assertFalse(vm.uiState.value.canSave)
+        assertFalse(vm.uiState.value.wantsAccount)
+
+        vm.onCounterpartyChange("Rafi")
+        assertTrue(vm.uiState.value.canSave)
+
+        vm.onSave()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(com.wasif.khata.core.model.TransactionKind.IOU, savedDraft?.kind)
+        assertEquals(Money(50_000), savedDraft?.owed)
+        assertEquals("Rafi", savedDraft?.counterparty)
+    }
+
+    @Test
+    fun `selecting split defaults to half the amount and clamps custom share to total`() = runTest(dispatcher) {
+        val vm = viewModel()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        vm.onAmountChange("1000")
+        vm.onCounterpartyChange("Rafi")
+        assertEquals(Money(100_000), vm.uiState.value.owedAmount)
+
+        vm.onSelectSplitOwed()
+        assertTrue(vm.uiState.value.isSplit)
+        assertEquals(Money(50_000), vm.uiState.value.owedAmount)
+
+        vm.onCustomOwedChange("400")
+        assertEquals(Money(40_000), vm.uiState.value.owedAmount)
+
+        // Reducing total below custom share clamps owedAmount to the new total.
+        vm.onAmountChange("300")
+        assertEquals(Money(30_000), vm.uiState.value.owedAmount)
+
+        vm.onSelectAllOwed()
+        assertFalse(vm.uiState.value.isSplit)
+        assertEquals(Money(30_000), vm.uiState.value.owedAmount)
+    }
+
+    @Test
+    fun `cash account is ordered first and preselected for a new entry`() = runTest(dispatcher) {
+        val cash = Account(
+            id = 9,
+            uuid = "acc-cash",
+            name = "Cash",
+            type = AccountType.CASH,
+            currentBalance = Money.ZERO,
+            reportedBalance = null,
+            includeInNetWorth = true,
+        )
+        val refWithCash = object : ReferenceDataRepository by referenceData {
+            override fun observeAccounts(): Flow<List<Account>> = flowOf(listOf(bkash, cash))
+        }
+        val vm = TransactionEditorViewModel(
+            repository,
+            refWithCash,
+            OriginalMessage { null },
+            clock,
+            null,
+        )
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(cash, bkash), vm.uiState.value.accounts)
+        assertEquals(cash.id, vm.uiState.value.accountId)
+    }
 }
