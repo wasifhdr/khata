@@ -80,8 +80,9 @@ object KhataRoutes {
     const val VehicleCosts = "vehicle/costs"
     const val Watchlist = "watchlist"
     const val Title = "watchlist/{titleId}"
-    const val AddTitle = "watchlist/add"
+    const val AddTitle = "watchlist/add?watched={watched}"
     const val ArgTitleId = "titleId"
+    const val ArgWatched = "watched"
     const val Notes = "notes"
     const val Note = "notes/{noteId}"
     const val ArgNoteId = "noteId"
@@ -106,6 +107,8 @@ object KhataRoutes {
     fun vehicleService(id: Long): String = "vehicle/service/$id"
 
     fun title(id: Long): String = "watchlist/$id"
+
+    fun addTitle(watched: Boolean = false): String = "watchlist/add?watched=$watched"
 
     fun note(id: Long): String = "notes/$id"
 
@@ -334,14 +337,25 @@ fun KhataNavHost(
             WatchlistScreen(
                 onBack = { navController.popBackStack() },
                 onOpenTitle = { id -> navController.navigate(KhataRoutes.title(id)) },
-                onAddTitle = { navController.navigate(KhataRoutes.AddTitle) },
+                onAddTitle = { watched -> navController.navigate(KhataRoutes.addTitle(watched)) },
             )
         }
 
         // Registered before the {titleId} pattern so the literal wins outright; a
         // LongType arg would not parse "add", but the order removes the question.
-        composable(KhataRoutes.AddTitle) {
-            AddTitleScreen(onDone = { navController.popBackStack() })
+        composable(
+            route = KhataRoutes.AddTitle,
+            arguments = listOf(
+                navArgument(KhataRoutes.ArgWatched) {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) { entry ->
+            AddTitleScreen(
+                onDone = { navController.popBackStack() },
+                initialWatched = entry.arguments?.getBoolean(KhataRoutes.ArgWatched) == true,
+            )
         }
 
         composable(
@@ -448,6 +462,7 @@ fun KhataNavHost(
             OwedScreen(
                 onBack = { navController.popBackStack() },
                 onOpenTransaction = { id -> navController.navigate(KhataRoutes.editorEdit(id)) },
+                onAddTransaction = { navController.navigate(KhataRoutes.EditorNew) },
             )
         }
 
