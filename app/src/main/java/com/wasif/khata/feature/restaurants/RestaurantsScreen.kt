@@ -16,15 +16,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,9 +42,9 @@ import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.Pill
-import com.wasif.khata.core.ui.component.SectionLabel
 import com.wasif.khata.core.ui.component.StarRow
 import com.wasif.khata.core.ui.component.collapseFraction
+import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import dev.chrisbanes.haze.hazeSource
 import java.time.format.DateTimeFormatter
@@ -64,7 +70,7 @@ fun RestaurantsScreen(
 }
 
 /**
- * Two sections and one primary action. Been is ordered by recency; want-to-try is
+ * Two tabs and one primary action per tab. Visited is ordered by recency; Wishlist is
  * whatever has no visits yet, which is a query rather than a list anyone maintains.
  */
 @Composable
@@ -77,55 +83,59 @@ fun RestaurantsContent(
 ) {
     val spacing = LocalSpacing.current
     val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    var wishlistTab by rememberSaveable { mutableStateOf(false) }
+    val activeRows = if (wishlistTab) state.wishlist else state.been
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize().hazeSource(haze),
-                contentPadding = PaddingValues(top = CollapsingHeaderHeight, bottom = spacing.xxl),
+                contentPadding = PaddingValues(
+                    top = CollapsingHeaderHeight,
+                    bottom = spacing.xxl + spacing.xl,
+                ),
             ) {
                 item {
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = spacing.screenHorizontal),
+                            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
                         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
                     ) {
                         Pill(
-                            text = "Log a visit",
-                            selected = true,
-                            leadingIcon = Icons.Filled.Add,
+                            text = "Visited",
+                            selected = !wishlistTab,
                             modifier = Modifier.weight(1f),
-                            onClick = onLogVisit,
+                            onClick = { wishlistTab = false },
                         )
                         Pill(
-                            text = "Add to wishlist",
-                            selected = false,
+                            text = "Wishlist",
+                            selected = wishlistTab,
                             modifier = Modifier.weight(1f),
-                            onClick = onAddToWishlist,
+                            onClick = { wishlistTab = true },
                         )
                     }
                 }
 
-                if (state.been.isNotEmpty()) {
-                    item { SectionLabel("Been") }
+                if (wishlistTab) {
+                    items(state.wishlist, key = { it.id }) { card ->
+                        WishlistRow(card) { onOpenRestaurant(card.id) }
+                    }
+                } else {
                     items(state.been, key = { it.id }) { card ->
                         BeenRow(card) { onOpenRestaurant(card.id) }
                     }
                 }
 
-                if (state.wishlist.isNotEmpty()) {
-                    item { SectionLabel("Want to try") }
-                    items(state.wishlist, key = { it.id }) { card ->
-                        WishlistRow(card) { onOpenRestaurant(card.id) }
-                    }
-                }
-
-                if (state.isEmpty) {
+                if (activeRows.isEmpty()) {
                     item {
                         Text(
-                            text = "Nothing yet. Log a visit, or share a place from Maps.",
+                            text = if (wishlistTab) {
+                                "Nothing on the wishlist yet. Tap + to add a place, or share one from Maps."
+                            } else {
+                                "Nothing visited yet. Tap + to log a visit."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(
@@ -146,6 +156,24 @@ fun RestaurantsContent(
                 hazeState = haze,
                 onBack = onBack,
             )
+
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(spacing.screenHorizontal)
+                    .size(58.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(KhataPalette.heroStops))
+                    .clickable(onClick = if (wishlistTab) onAddToWishlist else onLogVisit),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = if (wishlistTab) "Add to wishlist" else "Log a visit",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }

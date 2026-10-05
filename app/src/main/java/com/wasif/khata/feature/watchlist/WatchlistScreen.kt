@@ -1,5 +1,6 @@
 package com.wasif.khata.feature.watchlist
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,22 +11,30 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,9 +46,9 @@ import com.wasif.khata.core.time.toDhakaLocalDate
 import com.wasif.khata.core.ui.component.CollapsingHeaderHeight
 import com.wasif.khata.core.ui.component.CollapsingTopBar
 import com.wasif.khata.core.ui.component.FieldScaffold
-import com.wasif.khata.core.ui.component.collapseFraction
 import com.wasif.khata.core.ui.component.Pill
-import com.wasif.khata.core.ui.component.SectionLabel
+import com.wasif.khata.core.ui.component.collapseFraction
+import com.wasif.khata.core.ui.theme.KhataPalette
 import com.wasif.khata.core.ui.theme.LocalSpacing
 import dev.chrisbanes.haze.hazeSource
 import java.time.format.DateTimeFormatter
@@ -50,7 +59,7 @@ private val DayFormat = DateTimeFormatter.ofPattern("d MMM yyyy")
 fun WatchlistScreen(
     onBack: () -> Unit,
     onOpenTitle: (Long) -> Unit,
-    onAddTitle: () -> Unit,
+    onAddTitle: (Boolean) -> Unit,
     viewModel: WatchlistViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -63,7 +72,7 @@ fun WatchlistScreen(
 }
 
 /**
- * Up next, then watched. A title with no poster shows its name set large rather than a
+ * Watched and Watchlist tabs. A title with no poster shows its name set large rather than a
  * placeholder graphic: an absent poster is normal, and inventing an image the product
  * does not have would be worse than the gap.
  */
@@ -72,22 +81,57 @@ fun WatchlistContent(
     state: WatchlistUiState,
     onBack: () -> Unit,
     onOpenTitle: (Long) -> Unit,
-    onAddTitle: () -> Unit,
+    onAddTitle: (Boolean) -> Unit,
 ) {
     val spacing = LocalSpacing.current
     val list = rememberLazyListState()
+    var watchlistTab by rememberSaveable { mutableStateOf(false) }
+    val activeRows = if (watchlistTab) state.queue else state.watched
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 state = list,
                 modifier = Modifier.fillMaxSize().hazeSource(haze),
-                contentPadding = PaddingValues(top = CollapsingHeaderHeight, bottom = spacing.xxl),
+                contentPadding = PaddingValues(
+                    top = CollapsingHeaderHeight,
+                    bottom = spacing.xxl + spacing.xl,
+                ),
             ) {
-                if (state.isEmpty) {
+                item {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+                    ) {
+                        Pill(
+                            text = "Watched",
+                            selected = !watchlistTab,
+                            modifier = Modifier.weight(1f),
+                            onClick = { watchlistTab = false },
+                        )
+                        Pill(
+                            text = "Watchlist",
+                            selected = watchlistTab,
+                            modifier = Modifier.weight(1f),
+                            onClick = { watchlistTab = true },
+                        )
+                    }
+                }
+
+                items(activeRows, key = { it.id }) { card ->
+                    TitleRow(card = card, onClick = { onOpenTitle(card.id) })
+                }
+
+                if (activeRows.isEmpty()) {
                     item {
                         Text(
-                            text = "Nothing here yet. Add something you mean to watch.",
+                            text = if (watchlistTab) {
+                                "Nothing on the watchlist yet. Tap + to add something you mean to watch."
+                            } else {
+                                "Nothing watched yet. Tap + to log something you've seen."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(
@@ -95,20 +139,6 @@ fun WatchlistContent(
                                 vertical = spacing.lg,
                             ),
                         )
-                    }
-                }
-
-                if (state.queue.isNotEmpty()) {
-                    item { SectionLabel("Up next", top = spacing.sm) }
-                    items(state.queue, key = { "q-${it.id}" }) { card ->
-                        TitleRow(card = card, onClick = { onOpenTitle(card.id) })
-                    }
-                }
-
-                if (state.watched.isNotEmpty()) {
-                    item { SectionLabel("Watched", top = spacing.lg) }
-                    items(state.watched, key = { "w-${it.id}" }) { card ->
-                        TitleRow(card = card, onClick = { onOpenTitle(card.id) })
                     }
                 }
 
@@ -125,16 +155,19 @@ fun WatchlistContent(
 
             Box(
                 Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
+                    .align(Alignment.BottomEnd)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = spacing.screenHorizontal, vertical = spacing.sm),
+                    .padding(spacing.screenHorizontal)
+                    .size(58.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(KhataPalette.heroStops))
+                    .clickable { onAddTitle(!watchlistTab) },
+                contentAlignment = Alignment.Center,
             ) {
-                Pill(
-                    text = "Add a title",
-                    selected = true,
-                    modifier = Modifier.fillMaxWidth().testTag("addTitle"),
-                    onClick = onAddTitle,
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = if (watchlistTab) "Add to watchlist" else "Log watched",
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }

@@ -57,11 +57,13 @@ import com.wasif.khata.core.watch.posterUrl
 @Composable
 fun AddTitleScreen(
     onDone: () -> Unit,
+    initialWatched: Boolean = false,
     viewModel: AddTitleViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
+    LaunchedEffect(initialWatched) { viewModel.onLogWatchNowChange(initialWatched) }
     LaunchedEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.effects.collect { effect ->

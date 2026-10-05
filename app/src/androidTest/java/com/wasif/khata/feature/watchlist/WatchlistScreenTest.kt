@@ -1,17 +1,24 @@
 package com.wasif.khata.feature.watchlist
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.wasif.khata.core.data.dao.TitleSummary
 import com.wasif.khata.core.data.entity.TitleKind
 import com.wasif.khata.core.ui.theme.KhataTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class WatchlistScreenTest {
 
     @get:Rule val compose = createComposeRule()
+
+    private val watchlistTab = hasText("Watchlist") and hasClickAction()
 
     private fun summary(
         id: Long = 1,
@@ -39,7 +46,7 @@ class WatchlistScreenTest {
     )
 
     @Test
-    fun the_queue_and_the_watched_list_are_separate_sections() {
+    fun watched_and_watchlist_tabs_switch_the_list_shown() {
         compose.setContent {
             KhataTheme {
                 WatchlistContent(
@@ -66,12 +73,22 @@ class WatchlistScreenTest {
             }
         }
 
-        compose.onNodeWithText("UP NEXT").assertIsDisplayed()
-        compose.onNodeWithText("WATCHED").assertIsDisplayed()
-        compose.onNodeWithText("Heat").assertIsDisplayed()
+        compose.onNodeWithText("Watched").assertIsDisplayed()
+        compose.onNode(watchlistTab).assertIsDisplayed()
         compose.onNodeWithText("The Wire").assertIsDisplayed()
         // The user's own average, starred. TMDB's 7.9 is not shown in a list.
         compose.onNodeWithText("★ 4.5").assertIsDisplayed()
+        compose.onNodeWithText("Heat").assertDoesNotExist()
+
+        compose.onNode(watchlistTab).performClick()
+
+        compose.onNodeWithText("Heat").assertIsDisplayed()
+        compose.onNodeWithText("The Wire").assertDoesNotExist()
+
+        compose.onNodeWithText("Watched").performClick()
+
+        compose.onNodeWithText("The Wire").assertIsDisplayed()
+        compose.onNodeWithText("Heat").assertDoesNotExist()
     }
 
     @Test
@@ -87,25 +104,35 @@ class WatchlistScreenTest {
             }
         }
 
+        compose.onNode(watchlistTab).performClick()
         compose.onNodeWithText("HE").assertIsDisplayed()
         compose.onNodeWithText("1995 · Film").assertIsDisplayed()
     }
 
     @Test
-    fun an_empty_module_says_so_and_still_offers_the_way_in() {
+    fun an_empty_module_says_so_and_the_plus_button_adds_to_the_active_tab() {
+        val addedWatched = mutableListOf<Boolean>()
+
         compose.setContent {
             KhataTheme {
                 WatchlistContent(
                     state = WatchlistUiState(),
                     onBack = {},
                     onOpenTitle = {},
-                    onAddTitle = {},
+                    onAddTitle = { watched -> addedWatched += watched },
                 )
             }
         }
 
-        compose.onNodeWithText("Nothing here yet. Add something you mean to watch.").assertIsDisplayed()
-        compose.onNodeWithText("Add a title").assertIsDisplayed()
+        compose.onNodeWithText("Nothing watched yet. Tap + to log something you've seen.").assertIsDisplayed()
+
+        compose.onNodeWithContentDescription("Log watched").performClick()
+        assertEquals(listOf(true), addedWatched)
+
+        compose.onNode(watchlistTab).performClick()
+        compose.onNodeWithText("Nothing on the watchlist yet. Tap + to add something you mean to watch.").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Add to watchlist").performClick()
+        assertEquals(listOf(true, false), addedWatched)
     }
 
     @Test
