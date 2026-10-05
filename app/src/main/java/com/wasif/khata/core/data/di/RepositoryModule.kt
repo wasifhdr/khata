@@ -34,6 +34,7 @@ import com.wasif.khata.core.watch.TmdbClient
 import com.wasif.khata.core.search.VehicleServiceIndexSource
 import com.wasif.khata.core.sms.IngestionScheduler
 import com.wasif.khata.core.sms.TeachRequest
+import com.wasif.khata.core.sms.WatchedSenders
 import com.wasif.khata.core.sms.ai.GeminiClient
 import com.wasif.khata.core.sms.ai.RuleSuggester
 import com.wasif.khata.core.sms.ScheduleTransferReview
@@ -152,6 +153,21 @@ abstract class RepositoryModule {
             // No key is the kill switch, and this is the one place it is checked.
             if (preferences.preferences.first().geminiKey != null) scheduler.teach(rawMessageId)
         }
+
+        @Provides
+        fun provideWatchedSenders(preferences: PreferencesRepository) =
+            WatchedSenders { preferences.preferences.first().watchedSenders }
+
+        @Provides
+        fun provideSmsStartFrom(preferences: PreferencesRepository) =
+            com.wasif.khata.core.sms.SmsStartFrom {
+                preferences.preferences.first().smsStartYearMonth
+                    ?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() }
+                    ?.atDay(1)
+                    ?.atStartOfDay(com.wasif.khata.core.time.DHAKA)
+                    ?.toInstant()
+                    ?.toEpochMilli()
+            }
 
         @Provides
         fun provideRuleSuggester(client: GeminiClient): RuleSuggester = client

@@ -72,8 +72,12 @@ data class KhataPreferences(
      * bumping the constant is then the whole of the fix.
      */
     val searchIndexVersion: Int = 0,
+    val watchedSenders: Set<String> = DEFAULT_WATCHED_SENDERS,
+    val smsStartYearMonth: String? = null,
 ) {
     companion object {
+        val DEFAULT_WATCHED_SENDERS = setOf("bKash", "EBL")
+
         val Default = KhataPreferences(
             themeSpec = ThemeSpec.Default,
             homeView = HomeView.Modules,
@@ -89,6 +93,8 @@ data class KhataPreferences(
             driveLastUploadAt = null,
             driveNeedsReconnect = false,
             searchIndexVersion = 0,
+            watchedSenders = DEFAULT_WATCHED_SENDERS,
+            smsStartYearMonth = null,
         )
     }
 }

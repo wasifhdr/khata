@@ -36,6 +36,12 @@ import javax.inject.Singleton
 fun namesSender(smsIdentifiers: String, sender: String): Boolean =
     smsIdentifiers.split(",").any { it.isNotBlank() && it.trim().equals(sender, ignoreCase = true) }
 
+fun matchesAccountTail(smsIdentifiers: String, tail: String): Boolean =
+    smsIdentifiers.split(",").any { token ->
+        val trimmed = token.trim()
+        trimmed.isNotEmpty() && accountTail(trimmed) == tail
+    }
+
 sealed interface IngestResult {
     data class Recorded(val transactionId: Long) : IngestResult
     data class Updated(val transactionId: Long) : IngestResult
@@ -67,21 +73,29 @@ class IngestionPipeline @Inject constructor(
     private val teach: TeachRequest = TeachRequest {},
     // Defaulted for the same reason: a pipeline built in a test is not about this.
     private val scheduleTransferReview: ScheduleTransferReview = ScheduleTransferReview {},
+    private val watchedSenders: WatchedSenders = WatchedSenders { null },
+    private val smsStartFrom: SmsStartFrom = SmsStartFrom { null },
 ) {
 
-    suspend fun ingest(sender: String, body: String, receivedAt: Long): IngestResult {
+    suspend fun ingest(
+        sender: String,
+        body: String,
+        receivedAt: Long,
+        teachOnMiss: Boolean = true,
+    ): IngestResult {
         val now = clock.now()
+        val since = smsStartFrom()
+        if (since != null && receivedAt < since) return IngestResult.NotMine
 
-        // Before the message is stored, not after. On a real inbox 84% of messages
-        // are from senders no rule claims -- friends, OTPs, operator promos -- and
-        // keeping them would put the whole of someone's SMS history in this
-        // database while burying the handful worth reviewing.
-        //
-        // ponytail: a sender no rule claims can never be taught either, so a new
-        // bank needs a seeded rule before its messages are seen. Two banks and a
-        // wallet is the whole world here; revisit if adding a bank stops being a
-        // code change.
-        if (!engine.claimsSender(sender, parsingRuleDao.allIncludingDisabled())) return IngestResult.NotMine
+        // Watched SMS threads from Settings when present; falls back to rule-claimed
+        // senders for tests that construct the pipeline without preferences.
+        val watched = watchedSenders()
+        val claimed = if (watched != null) {
+            watched.any { it.isNotBlank() && sender.contains(it.trim(), ignoreCase = true) }
+        } else {
+            engine.claimsSender(sender, parsingRuleDao.allIncludingDisabled())
+        }
+        if (!claimed) return IngestResult.NotMine
 
         val rawId = rawMessageDao.insertIgnoringDuplicate(
             RawMessageEntity(
@@ -98,13 +112,11 @@ class IngestionPipeline @Inject constructor(
         )
         if (rawId == -1L) return IngestResult.Duplicate
 
-        val result = process(rawId, sender, body, receivedAt, now)
+        val result = process(rawId, sender, body, receivedAt, now, liveCapture = teachOnMiss)
 
-        // Only from here, never from process(): process is also the reparse path, and
-        // a backfill over years of messages would otherwise fire hundreds of requests
-        // before the user had seen a screen. Whether a key is set is the binding's
-        // question, not this one's.
-        if (result is IngestResult.Unmatched) teach(rawId)
+        // Only when requested, never from process() or backfill (which teaches inline
+        // so the second message of a format reuses the rule drafted from the first).
+        if (teachOnMiss && result is IngestResult.Unmatched) teach(rawId)
         return result
     }
 
@@ -115,6 +127,7 @@ class IngestionPipeline @Inject constructor(
         body: String,
         receivedAt: Long,
         now: Long = clock.now(),
+        liveCapture: Boolean = false,
     ): IngestResult {
         return when (val outcome = engine.parse(sender, body, parsingRuleDao.enabled())) {
             is ParseOutcome.Ignored -> {
@@ -127,7 +140,7 @@ class IngestionPipeline @Inject constructor(
                 IngestResult.Unmatched
             }
 
-            is ParseOutcome.Parsed -> write(rawId, sender, outcome.value, receivedAt, now)
+            is ParseOutcome.Parsed -> write(rawId, sender, outcome.value, receivedAt, now, liveCapture)
         }
     }
 
@@ -137,6 +150,7 @@ class IngestionPipeline @Inject constructor(
         parsed: ParsedMessage,
         receivedAt: Long,
         now: Long,
+        liveCapture: Boolean,
     ): IngestResult {
         val account = resolveAccount(sender, parsed.accountTail)
         if (account == null) {
@@ -221,9 +235,9 @@ class IngestionPipeline @Inject constructor(
                 depositIntoCash(transactionId, parsed, occurredAt, now)
             } else {
                 val group = pairing.pair(transactionId)
-                // Only when pairing did not already answer it. Scheduling regardless
-                // would wake a worker three minutes later to find nothing to do.
-                if (group == null && isTransferShaped(parsed.merchant)) {
+                // Only when pairing did not already answer it, and only on a brand-new
+                // live capture -- never during backfill or reparse of historical rows.
+                if (liveCapture && existing == null && group == null && isTransferShaped(parsed.merchant)) {
                     scheduleTransferReview(transactionId)
                 }
             }
@@ -308,13 +322,15 @@ class IngestionPipeline @Inject constructor(
         val rules = parsingRuleDao.enabled()
         val accounts = accountDao.getAll().filter { it.type != AccountType.CASH }
         val found = mutableMapOf<Long, StatedBalance>()
+        val since = smsStartFrom()
 
         for (message in rawMessageDao.allForReparse().asReversed()) {
             if (found.size == accounts.size) break
+            if (since != null && message.receivedAt < since) continue
             val parsed = (engine.parse(message.sender, message.body, rules) as? ParseOutcome.Parsed)
                 ?.value ?: continue
             val balance = parsed.balance ?: continue
-            val account = resolveAccount(message.sender, parsed.accountTail) ?: continue
+            val account = resolveAccount(message.sender, parsed.accountTail, createOnNewTail = false) ?: continue
             if (account.type == AccountType.CASH) continue
             found.getOrPut(account.id) {
                 StatedBalance(balance.minor, parsed.occurredAt ?: message.receivedAt)
@@ -323,10 +339,49 @@ class IngestionPipeline @Inject constructor(
         return found
     }
 
-    private suspend fun resolveAccount(sender: String, tail: String?): AccountEntity? {
+    private suspend fun resolveAccount(
+        sender: String,
+        tail: String?,
+        createOnNewTail: Boolean = true,
+    ): AccountEntity? {
         val accounts = accountDao.getAll()
         if (tail != null) {
-            accounts.firstOrNull { accountTail(it.smsIdentifiers) == tail }?.let { return it }
+            accounts.firstOrNull { matchesAccountTail(it.smsIdentifiers, tail) }?.let { return it }
+
+            val untailedSenderAccount = accounts.firstOrNull { acc ->
+                namesSender(acc.smsIdentifiers, sender) &&
+                    acc.smsIdentifiers.split(",").none { accountTail(it.trim()) != null }
+            }
+            if (untailedSenderAccount != null) {
+                val updated = untailedSenderAccount.copy(
+                    smsIdentifiers = "${untailedSenderAccount.smsIdentifiers}, $tail",
+                    updatedAt = clock.now(),
+                )
+                accountDao.upsert(updated)
+                return updated
+            }
+
+            if (createOnNewTail) {
+                val now = clock.now()
+                val slug = "${sender.lowercase().replace(Regex("[^a-z0-9]+"), "-")}-$tail"
+                val id = accountDao.upsert(
+                    AccountEntity(
+                        uuid = "sms-$slug",
+                        name = "$sender $tail",
+                        type = AccountType.BANK,
+                        openingBalanceMinor = 0L,
+                        currentBalanceMinor = 0L,
+                        reportedBalanceMinor = null,
+                        reportedBalanceAt = null,
+                        includeInNetWorth = true,
+                        smsIdentifiers = tail,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                )
+                return accountDao.findById(id)
+            }
+            return null
         }
         return accounts.firstOrNull { namesSender(it.smsIdentifiers, sender) }
     }
@@ -362,6 +417,7 @@ class IngestionPipeline @Inject constructor(
 
 private fun RuleKind.toTransactionKind(): TransactionKind = when (this) {
     RuleKind.LOAN_DISBURSEMENT -> TransactionKind.LOAN_DISBURSEMENT
+    RuleKind.LOAN_REPAYMENT -> TransactionKind.LOAN_REPAYMENT
     RuleKind.TRANSFER_IN, RuleKind.TRANSFER_OUT, RuleKind.ATM_WITHDRAWAL -> TransactionKind.TRANSFER
     RuleKind.FEE -> TransactionKind.FEE
     RuleKind.NORMAL, RuleKind.IGNORE -> TransactionKind.NORMAL

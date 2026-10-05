@@ -282,4 +282,53 @@ class IngestionPipelineTest {
         // Tk 11.98 moved with no message describing it.
         assertEquals(-1198L, bkash.unexplainedMinor)
     }
+
+    @Test
+    fun `a message with a new account tail provisions and routes to its own account`() = runTest {
+        val msg = "AC 115***771 is credited with BDT 5000 as SALARY on 01-SEP-26 10:00:00 AM Balance is BDT 5000.00 Thanks. EBL Helpline 16230"
+        val result = pipeline.ingest("EBL", msg, receivedAt = 1000)
+
+        assertTrue("expected Recorded, got $result", result is IngestResult.Recorded)
+        val created = accountNamed("EBL 771")
+        assertEquals(500000L, created.currentBalanceMinor)
+        assertEquals(created.id, transactions().single().accountId)
+    }
+
+    @Test
+    fun `transfer review is scheduled only for live capture and not on backfill or reparse`() = runTest {
+        val scheduled = mutableListOf<Long>()
+        val p = IngestionPipeline(
+            db = db,
+            rawMessageDao = db.rawMessageDao(),
+            parsingRuleDao = db.parsingRuleDao(),
+            transactionDao = db.transactionDao(),
+            accountDao = db.accountDao(),
+            merchantDao = db.merchantDao(),
+            engine = RuleEngine(),
+            pairing = TransferPairing(
+                db.transactionDao(),
+                TransferNotifier(ApplicationProvider.getApplicationContext()),
+                clock,
+            ),
+            clock = clock,
+            scheduleTransferReview = { scheduled += it },
+        )
+
+        val liveMsg = "AC 112***286 is debited with BDT 1500 as Own Account Transfer on 18-AUG-26 01:20:19 PM Balance is BDT 34.2 Thanks. EBL Helpline 16230"
+        val backfillMsg = "AC 112***286 is debited with BDT 2500 as Own Account Transfer on 19-AUG-26 01:20:19 PM Balance is BDT 34.2 Thanks. EBL Helpline 16230"
+
+        // 1. Live incoming SMS (teachOnMiss = true) schedules a review.
+        p.ingest("EBL", liveMsg, receivedAt = 1000, teachOnMiss = true)
+        assertEquals(1, scheduled.size)
+
+        // 2. Backfill SMS (teachOnMiss = false) does NOT schedule a review.
+        p.ingest("EBL", backfillMsg, receivedAt = 2000, teachOnMiss = false)
+        assertEquals(1, scheduled.size)
+
+        // 3. Reparse of existing raw messages does NOT schedule reviews again.
+        db.rawMessageDao().allForReparse().forEach { raw ->
+            p.process(raw.id, raw.sender, raw.body, raw.receivedAt)
+        }
+        assertEquals(1, scheduled.size)
+    }
 }

@@ -299,6 +299,76 @@ class WidenedRulesTest {
     }
 
     @Test
+    fun `digital loan repayment is a loan repayment debit`() {
+        val p = parsed(
+            "bKash",
+            "Your Digital Loan Repayment of Tk 116.43 is successful. " +
+                "Balance Tk 1,683.57. TrxID DIN8SQ2Y3A at 23/09/2026 18:52.",
+        )
+        assertEquals(11643L, p.amount.minor)
+        assertEquals(TransactionDirection.DEBIT, p.direction)
+        assertEquals(RuleKind.LOAN_REPAYMENT, p.kind)
+    }
+
+    @Test
+    fun `payment with inline fee and payment refund are both read`() {
+        val out = parsed(
+            "bKash",
+            "Payment of Tk 200.00 to DTCA is successful. Fee Tk 1.66. " +
+                "Balance Tk 13,148.86. TrxID DBL0BVCNUS at 21/02/2026 16:40",
+        )
+        assertEquals(20000L, out.amount.minor)
+        assertEquals(166L, out.feeMinor)
+        assertEquals("DTCA", out.merchant)
+
+        val refund = parsed(
+            "bKash",
+            "Payment of Tk 23.00 to ROBI AXIATA LIMITED-RM9564 is returned at 25/02/2026 10:27. " +
+                "Original TrxID DBP9FWLBSR. Refund TrxID DBP6FWLQ7A. Balance Tk 100.36.",
+        )
+        assertEquals(2300L, refund.amount.minor)
+        assertEquals(TransactionDirection.CREDIT, refund.direction)
+        assertEquals("DBP6FWLQ7A", refund.providerTxnId)
+    }
+
+    @Test
+    fun `deferred send money request and its unsuccessful return cancel out`() {
+        val req = parsed(
+            "bKash",
+            "Send Money request of Tk 200.00 to 01700000001 is accepted for processing. " +
+                "Fee Tk 0.00. Balance Tk 43.34. TrxID DF925ARENI at 09/06/2026 17:43",
+        )
+        assertEquals(20000L, req.amount.minor)
+        assertEquals(TransactionDirection.DEBIT, req.direction)
+
+        val ret = parsed(
+            "bKash",
+            "Sorry, your Send Money request to 01700000001 is unsuccessful! " +
+                "Tk 200 has been returned. Balance Tk 243.34. TrxID DFC291BCOA at 12/06/2026 18:00",
+        )
+        assertEquals(20000L, ret.amount.minor)
+        assertEquals(TransactionDirection.CREDIT, ret.direction)
+    }
+
+    @Test
+    fun `zero-amount card verification and balance enquiry are ignored`() {
+        assertIgnored(
+            "EBL",
+            "Purchase txn USD0 fromGOOGLE *TEMPORARY HOLD.Card 452017**6707 " +
+                "on 04-Aug-26 02:35:04 AM BST.Your A/C 112***286 Balance BDT 664.45.",
+        )
+        assertIgnored(
+            "EBL",
+            "Balance enquiry from EBL. Card 452017**9386 on 26-Jun-23 09:20:32 AM BST. " +
+                "Your A/C 112***286 Balance BDT 11068.00. EBL Helpline 16230",
+        )
+        assertIgnored(
+            "bKash",
+            "Tk 116.43 will be automatically deducted from your bKash Account as Loan instalment on 23/09/2026.",
+        )
+    }
+
+    @Test
     fun `every built-in rule has its own priority`() {
         val priorities = BUILT_IN_RULES.map { it.priority }
         assertEquals("two rules at the same priority make matching order arbitrary", priorities.size, priorities.toSet().size)

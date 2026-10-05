@@ -186,4 +186,24 @@ class PreferencesRepositoryTest {
 
         assertEquals(ThemeSpec.Default, repo.preferences.first().themeSpec)
     }
+
+    @Test
+    fun `watched senders default to bKash and EBL and round-trip when updated`() = runTest {
+        assertEquals(setOf("bKash", "EBL"), repo.preferences.first().watchedSenders)
+
+        repo.setWatchedSenders(setOf("bKash", "NAGAD", "CityBank"))
+
+        assertEquals(setOf("bKash", "NAGAD", "CityBank"), repo.preferences.first().watchedSenders)
+    }
+
+    @Test
+    fun `sms start year month defaults to null and round-trips or clears`() = runTest {
+        assertNull(repo.preferences.first().smsStartYearMonth)
+
+        repo.setSmsStartYearMonth("2026-06")
+        assertEquals("2026-06", repo.preferences.first().smsStartYearMonth)
+
+        repo.setSmsStartYearMonth(null)
+        assertNull(repo.preferences.first().smsStartYearMonth)
+    }
 }

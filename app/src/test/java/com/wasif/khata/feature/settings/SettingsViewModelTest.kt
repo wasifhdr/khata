@@ -234,4 +234,15 @@ class SettingsViewModelTest {
 
         assertFalse(vm.ingestion.value.isWorking)
     }
+
+    @Test
+    fun `toggling a new watched sender updates preferences and creates a bank account`() = runTest(dispatcher) {
+        val vm = viewModel()
+        advanceUntilIdle()
+
+        vm.onToggleWatchedSender("NAGAD")
+        advanceUntilIdle()
+
+        assertTrue( db.accountDao().getAll().any { it.name == "NAGAD" && it.smsIdentifiers == "NAGAD" })
+    }
 }

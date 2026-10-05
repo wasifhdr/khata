@@ -82,4 +82,20 @@ class RuleDrafterTest {
         // prompted it, which is the one message we know it must handle.
         assertFalse(drafter.store(drafted, "bKash", "Payment of Tk 5.00 to SHOP"))
     }
+
+    @Test
+    fun `an ignore rule whose regex misses falls back to deriveIgnorePattern`() = runTest {
+        val sample = "Special weekend offer at partner outlets with bKash 20% cashback"
+        val drafted = DraftedRule(
+            name = "promo",
+            senderPattern = "bKash",
+            bodyPattern = "does-not-match-sample",
+            direction = null,
+            kind = RuleKind.IGNORE,
+        )
+
+        assertTrue(drafter.store(drafted, "bKash", sample))
+        val stored = db.parsingRuleDao().allIncludingDisabled().single { it.origin == "AI" }
+        assertTrue(Regex(stored.bodyPattern).containsMatchIn(sample))
+    }
 }

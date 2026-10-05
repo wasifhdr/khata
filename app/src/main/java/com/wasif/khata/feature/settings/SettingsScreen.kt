@@ -22,8 +22,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -61,12 +64,20 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.data.entity.ParsingRuleEntity
 import com.wasif.khata.core.drive.DriveFile
+import com.wasif.khata.core.model.RuleKind
+import com.wasif.khata.core.model.TransactionDirection
 import com.wasif.khata.core.permission.AndroidSmsPermissionChecker
 import com.wasif.khata.core.permission.SmsPermissionState
 import com.wasif.khata.core.model.Money
 import com.wasif.khata.core.prefs.HomeView
 import com.wasif.khata.core.prefs.KhataPreferences
+import com.wasif.khata.core.sms.IncomingMessage
+import com.wasif.khata.core.sms.ParseOutcome
+import com.wasif.khata.core.sms.RuleEngine
+import com.wasif.khata.core.sms.ai.DraftedRule
 import com.wasif.khata.core.ui.component.FieldScaffold
 import com.wasif.khata.core.ui.component.Pill
 import com.wasif.khata.core.ui.component.AmountKeypadDialog
@@ -135,6 +146,12 @@ fun SettingsScreen(
         onAccentSelected = viewModel::onAccentSelected,
         onIntensitySelected = viewModel::onIntensitySelected,
         onResetTheme = viewModel::onResetTheme,
+        onLoadInboxThreads = viewModel::inboxThreads,
+        onToggleWatchedSender = viewModel::onToggleWatchedSender,
+        onTestSmsWithGemini = viewModel::testSmsWithGemini,
+        onSavePlaygroundRule = viewModel::savePlaygroundRule,
+        onSaveAccount = viewModel::onSaveAccount,
+        onSmsStartYearMonthChanged = viewModel::onSmsStartYearMonthChanged,
     )
 }
 
@@ -166,9 +183,16 @@ fun SettingsContent(
     onAccentSelected: (Color) -> Unit,
     onIntensitySelected: (FieldIntensity) -> Unit,
     onResetTheme: () -> Unit,
+    onLoadInboxThreads: suspend () -> List<IncomingMessage> = { emptyList() },
+    onToggleWatchedSender: (String) -> Unit = {},
+    onTestSmsWithGemini: suspend (String, String) -> DraftedRule? = { _, _ -> null },
+    onSavePlaygroundRule: suspend (DraftedRule, String, String) -> Boolean = { _, _, _ -> false },
+    onSaveAccount: (Long?, String, String) -> Unit = { _, _, _ -> },
+    onSmsStartYearMonthChanged: (String?) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     val scroll = rememberScrollState()
+    var testingSms by rememberSaveable { mutableStateOf(false) }
 
     FieldScaffold(Modifier.fillMaxSize()) { haze ->
         Box(Modifier.fillMaxSize()) {
@@ -189,11 +213,17 @@ fun SettingsContent(
 
                 MessagesSection(
                     state = ingestion,
+                    watchedSenders = prefs.watchedSenders,
+                    smsStartYearMonth = prefs.smsStartYearMonth,
                     onPermissionRequested = onPermissionRequested,
                     onBackfill = onBackfill,
                     onReparse = onReparse,
                     onOpenUnmatched = onOpenUnmatched,
                     onOpenReconcile = onOpenReconcile,
+                    onLoadInboxThreads = onLoadInboxThreads,
+                    onToggleWatchedSender = onToggleWatchedSender,
+                    onSaveAccount = onSaveAccount,
+                    onSmsStartYearMonthChanged = onSmsStartYearMonthChanged,
                 )
 
                 SectionLabel("Categories")
@@ -208,8 +238,22 @@ fun SettingsContent(
 
                 SectionLabel("AI fallback")
                 GeminiKeyField(current = prefs.geminiKey, onChange = onGeminiKeyChanged)
+                ActionRow(
+                    title = "Test SMS with Gemini",
+                    subtitle = "Paste any SMS to preview extracted fields and save a rule.",
+                    enabled = prefs.geminiKey != null,
+                    onClick = { testingSms = true },
+                )
 
                 TmdbKeyField(current = prefs.tmdbKey, onChange = onTmdbKeyChanged)
+
+                if (testingSms) {
+                    SmsPlaygroundDialog(
+                        onDismiss = { testingSms = false },
+                        onTest = onTestSmsWithGemini,
+                        onSave = onSavePlaygroundRule,
+                    )
+                }
 
 
                 SectionLabel("Home view")
@@ -429,14 +473,23 @@ private fun AmountDialog(
 @Composable
 private fun MessagesSection(
     state: IngestionState,
+    watchedSenders: Set<String> = KhataPreferences.DEFAULT_WATCHED_SENDERS,
+    smsStartYearMonth: String? = null,
     onPermissionRequested: () -> Unit,
     onBackfill: () -> Unit,
     onReparse: () -> Unit,
     onOpenUnmatched: () -> Unit,
     onOpenReconcile: () -> Unit,
+    onLoadInboxThreads: suspend () -> List<IncomingMessage> = { emptyList() },
+    onToggleWatchedSender: (String) -> Unit = {},
+    onSaveAccount: (Long?, String, String) -> Unit = { _, _, _ -> },
+    onSmsStartYearMonthChanged: (String?) -> Unit = {},
 ) {
     val spacing = LocalSpacing.current
     val context = LocalContext.current
+    var pickingThreads by rememberSaveable { mutableStateOf(false) }
+    var managingAccounts by rememberSaveable { mutableStateOf(false) }
+    var pickingStartMonth by rememberSaveable { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { onPermissionRequested() }
@@ -473,6 +526,63 @@ private fun MessagesSection(
             }
         },
     )
+
+    ActionRow(
+        title = "Watched SMS threads",
+        subtitle = watchedSenders.sorted().joinToString(", ").ifEmpty { "None selected" },
+        onClick = { pickingThreads = true },
+    )
+
+    if (pickingThreads) {
+        WatchedThreadsDialog(
+            watchedSenders = watchedSenders,
+            onLoadInboxThreads = onLoadInboxThreads,
+            onToggle = onToggleWatchedSender,
+            onDismiss = { pickingThreads = false },
+        )
+    }
+
+    ActionRow(
+        title = "Bank accounts & SMS tails",
+        subtitle = state.accounts.joinToString(" · ") { "${it.name} (${it.smsIdentifiers})" }
+            .ifEmpty { "Map account numbers or card tails to separate accounts" },
+        onClick = { managingAccounts = true },
+    )
+
+    if (managingAccounts) {
+        AccountTailsDialog(
+            accounts = state.accounts,
+            onSave = onSaveAccount,
+            onDismiss = { managingAccounts = false },
+        )
+    }
+
+    val startSubtitle = remember(smsStartYearMonth) {
+        val ym = smsStartYearMonth?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() }
+        if (ym == null) {
+            "All time"
+        } else {
+            val monthName = ym.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+            "From $monthName ${ym.year} onwards"
+        }
+    }
+
+    ActionRow(
+        title = "Read messages starting from",
+        subtitle = startSubtitle,
+        onClick = { pickingStartMonth = true },
+    )
+
+    if (pickingStartMonth) {
+        StartMonthDialog(
+            current = smsStartYearMonth,
+            onSelect = {
+                onSmsStartYearMonthChanged(it)
+                pickingStartMonth = false
+            },
+            onDismiss = { pickingStartMonth = false },
+        )
+    }
 
     ActionRow(
         title = "Read my message history",
@@ -526,6 +636,544 @@ private fun MessagesSection(
         title = "Check balances",
         subtitle = "Your balances come from the bank. See what has no message behind it.",
         onClick = onOpenReconcile,
+    )
+}
+
+@Composable
+private fun WatchedThreadsDialog(
+    watchedSenders: Set<String>,
+    onLoadInboxThreads: suspend () -> List<IncomingMessage>,
+    onToggle: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    var query by rememberSaveable { mutableStateOf("") }
+    var inboxThreads by remember { mutableStateOf<List<IncomingMessage>>(emptyList()) }
+
+    LaunchedEffect(Unit) {
+        inboxThreads = onLoadInboxThreads()
+    }
+
+    val allThreads = remember(watchedSenders, inboxThreads, query) {
+        val bySender = inboxThreads.associateBy { it.sender.uppercase() }
+        val combined = buildList {
+            watchedSenders.sorted().forEach { watched ->
+                add(bySender[watched.uppercase()] ?: IncomingMessage(watched, "Watched thread", 0L))
+            }
+            inboxThreads.forEach { msg ->
+                if (watchedSenders.none { it.equals(msg.sender, ignoreCase = true) }) {
+                    add(msg)
+                }
+            }
+        }
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            combined
+        } else {
+            val filtered = combined.filter {
+                it.sender.contains(trimmed, ignoreCase = true) ||
+                    it.body.contains(trimmed, ignoreCase = true)
+            }
+            if (filtered.none { it.sender.equals(trimmed, ignoreCase = true) }) {
+                filtered + IncomingMessage(trimmed, "Add \"$trimmed\"", 0L)
+            } else {
+                filtered
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Watched SMS threads") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search SMS threads") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    if (allThreads.isEmpty()) {
+                        Text(
+                            text = "No SMS threads found.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = spacing.sm),
+                        )
+                    } else {
+                        allThreads.forEach { thread ->
+                            val isWatched = watchedSenders.any {
+                                it.equals(thread.sender, ignoreCase = true)
+                            }
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onToggle(thread.sender) }
+                                    .padding(vertical = spacing.xs),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = isWatched,
+                                    onCheckedChange = { onToggle(thread.sender) },
+                                )
+                                Column(Modifier.weight(1f).padding(start = spacing.xs)) {
+                                    Text(
+                                        text = thread.sender,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    Text(
+                                        text = thread.body,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
+        },
+    )
+}
+
+@Composable
+private fun AccountTailsDialog(
+    accounts: List<AccountEntity>,
+    onSave: (Long?, String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var editingNew by rememberSaveable { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var identifiers by rememberSaveable { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Bank accounts & SMS tails") },
+        text = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                Text(
+                    text = "Map each account to its SMS sender (e.g. bKash) or last 3 account/card digits (e.g. 352, 286).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                accounts.forEach { acc ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                editingId = acc.id
+                                editingNew = false
+                                name = acc.name
+                                identifiers = acc.smsIdentifiers
+                            }
+                            .padding(vertical = spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                text = acc.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "SMS match: ${acc.smsIdentifiers.ifBlank { "None" }}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                if (editingId != null || editingNew) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Account name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = identifiers,
+                        onValueChange = { identifiers = it },
+                        label = { Text("SMS sender or 3-digit tails (comma-separated)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    TextButton(
+                        onClick = {
+                            editingId = null
+                            editingNew = true
+                            name = ""
+                            identifiers = ""
+                        },
+                    ) { Text("Add account") }
+                }
+            }
+        },
+        confirmButton = {
+            if (editingId != null || editingNew) {
+                TextButton(
+                    enabled = name.isNotBlank() && identifiers.isNotBlank(),
+                    onClick = {
+                        onSave(editingId, name, identifiers)
+                        editingId = null
+                        editingNew = false
+                    },
+                ) { Text("Save") }
+            } else {
+                TextButton(onClick = onDismiss) { Text("Done") }
+            }
+        },
+        dismissButton = {
+            if (editingId != null || editingNew) {
+                TextButton(
+                    onClick = {
+                        editingId = null
+                        editingNew = false
+                    },
+                ) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun StartMonthDialog(
+    current: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val now = remember { java.time.YearMonth.now() }
+    val initialYm = remember(current) {
+        current?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() }
+    }
+    var selectedYear by rememberSaveable { mutableStateOf(initialYm?.year ?: now.year) }
+    var selectedMonth by rememberSaveable { mutableStateOf(initialYm?.monthValue ?: now.monthValue) }
+    val monthLabels = remember {
+        java.time.Month.entries.map {
+            it.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH)
+        }.toTypedArray()
+    }
+    val textColorArgb = MaterialTheme.colorScheme.onSurface.toArgb()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Read messages starting from") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                Text(
+                    text = "Messages before this month are skipped when reading history, re-reading rules, or starting over.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        modifier = Modifier.weight(1f),
+                        factory = { ctx ->
+                            android.widget.NumberPicker(ctx).apply {
+                                minValue = 1
+                                maxValue = 12
+                                displayedValues = monthLabels
+                                wrapSelectorWheel = true
+                                descendantFocusability = android.widget.NumberPicker.FOCUS_BLOCK_DESCENDANTS
+                                textColor = textColorArgb
+                                value = selectedMonth
+                                setOnValueChangedListener { _, _, newVal ->
+                                    selectedMonth = newVal
+                                }
+                            }
+                        },
+                        update = { picker ->
+                            picker.textColor = textColorArgb
+                            if (picker.value != selectedMonth) picker.value = selectedMonth
+                        },
+                    )
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        modifier = Modifier.weight(1f),
+                        factory = { ctx ->
+                            android.widget.NumberPicker(ctx).apply {
+                                minValue = 2015
+                                maxValue = now.year
+                                wrapSelectorWheel = false
+                                descendantFocusability = android.widget.NumberPicker.FOCUS_BLOCK_DESCENDANTS
+                                textColor = textColorArgb
+                                value = selectedYear.coerceIn(2015, now.year)
+                                setOnValueChangedListener { _, _, newVal ->
+                                    selectedYear = newVal
+                                }
+                            }
+                        },
+                        update = { picker ->
+                            picker.textColor = textColorArgb
+                            val clamped = selectedYear.coerceIn(2015, now.year)
+                            if (picker.value != clamped) picker.value = clamped
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSelect(java.time.YearMonth.of(selectedYear, selectedMonth).toString())
+                },
+            ) { Text("Set") }
+        },
+        dismissButton = {
+            Row {
+                if (current != null) {
+                    TextButton(onClick = { onSelect(null) }) { Text("All time") }
+                }
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun SmsPlaygroundDialog(
+    onDismiss: () -> Unit,
+    onTest: suspend (String, String) -> DraftedRule?,
+    onSave: suspend (DraftedRule, String, String) -> Boolean,
+) {
+    val spacing = LocalSpacing.current
+    val scope = rememberCoroutineScope()
+    val engine = remember { RuleEngine() }
+
+    var sender by rememberSaveable { mutableStateOf("bKash") }
+    var sample by rememberSaveable { mutableStateOf("") }
+    var asking by remember { mutableStateOf(false) }
+    var drafted by remember { mutableStateOf<DraftedRule?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+
+    var name by rememberSaveable { mutableStateOf("") }
+    var senderPattern by rememberSaveable { mutableStateOf("") }
+    var bodyPattern by rememberSaveable { mutableStateOf("") }
+    var kind by rememberSaveable { mutableStateOf(RuleKind.NORMAL) }
+    var direction by rememberSaveable { mutableStateOf(TransactionDirection.DEBIT) }
+
+    val previewOutcome = remember(sender, sample, name, senderPattern, bodyPattern, kind, direction) {
+        if (sample.isBlank() || bodyPattern.isBlank()) {
+            null
+        } else {
+            val rule = ParsingRuleEntity(
+                uuid = "preview",
+                name = name.ifBlank { "Preview" },
+                senderPattern = senderPattern.ifBlank { Regex.escape(sender.trim()) },
+                bodyPattern = bodyPattern,
+                direction = if (kind != RuleKind.IGNORE) direction else null,
+                kind = kind,
+                priority = 0,
+                origin = "AI",
+                isEnabled = true,
+                sampleMessage = sample,
+                createdAt = 0L,
+                updatedAt = 0L,
+            )
+            engine.parse(sender.trim(), sample, listOf(rule))
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Test SMS with Gemini") },
+        text = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(spacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = sender,
+                    onValueChange = { sender = it },
+                    label = { Text("Sender") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = sample,
+                    onValueChange = { sample = it },
+                    label = { Text("Paste SMS message") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    enabled = !asking && sender.isNotBlank() && sample.isNotBlank(),
+                    onClick = {
+                        asking = true
+                        status = null
+                        scope.launch {
+                            val res = onTest(sender.trim(), sample.trim())
+                            asking = false
+                            if (res == null) {
+                                status = "Gemini could not draft a rule for this message."
+                            } else {
+                                drafted = res
+                                name = res.name
+                                senderPattern = res.senderPattern
+                                bodyPattern = res.bodyPattern
+                                kind = res.kind
+                                res.direction?.let { direction = it }
+                            }
+                        }
+                    },
+                ) {
+                    Text(if (asking) "Asking Gemini..." else "Test with Gemini")
+                }
+
+                status?.let { msg ->
+                    Text(
+                        text = msg,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (drafted != null || bodyPattern.isNotBlank()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+                        Pill(
+                            text = "DEBIT",
+                            selected = kind != RuleKind.IGNORE && direction == TransactionDirection.DEBIT,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (kind == RuleKind.IGNORE) kind = RuleKind.NORMAL
+                            direction = TransactionDirection.DEBIT
+                        }
+                        Pill(
+                            text = "CREDIT",
+                            selected = kind != RuleKind.IGNORE && direction == TransactionDirection.CREDIT,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (kind == RuleKind.IGNORE) kind = RuleKind.NORMAL
+                            direction = TransactionDirection.CREDIT
+                        }
+                        Pill(
+                            text = "IGNORE",
+                            selected = kind == RuleKind.IGNORE,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            kind = RuleKind.IGNORE
+                        }
+                    }
+
+                    drafted?.let { d ->
+                        val aiFields = buildList {
+                            d.amount?.let { add("Amount: $it") }
+                            d.merchant?.let { add("Merchant: $it") }
+                            d.datetime?.let { add("Time: $it") }
+                            d.balance?.let { add("Balance: $it") }
+                        }
+                        if (aiFields.isNotEmpty()) {
+                            Text(
+                                text = "AI extracted: " + aiFields.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+
+                    previewOutcome?.let { outcome ->
+                        val matchSummary = when (outcome) {
+                            is ParseOutcome.Parsed -> buildList {
+                                add("Regex matches (${outcome.value.amount.format()})")
+                                outcome.value.merchant?.let { add("merchant=$it") }
+                                outcome.value.providerTxnId?.let { add("ref=$it") }
+                                outcome.value.balance?.let { add("bal=${it.format()}") }
+                            }.joinToString(" · ")
+                            is ParseOutcome.Ignored -> "Regex matches as ignored non-transaction"
+                            ParseOutcome.Unmatched -> "Regex does not match sample yet"
+                        }
+                        Text(
+                            text = matchSummary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (outcome is ParseOutcome.Unmatched) {
+                                KhataPalette.warn
+                            } else {
+                                KhataPalette.ok
+                            },
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Rule name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = senderPattern,
+                        onValueChange = { senderPattern = it },
+                        label = { Text("Sender regex") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = bodyPattern,
+                        onValueChange = { bodyPattern = it },
+                        label = { Text("Body regex") },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = bodyPattern.isNotBlank() && sample.isNotBlank(),
+                onClick = {
+                    scope.launch {
+                        val toSave = DraftedRule(
+                            name = name.ifBlank { sender.trim() },
+                            senderPattern = senderPattern.ifBlank { Regex.escape(sender.trim()) },
+                            bodyPattern = bodyPattern,
+                            direction = if (kind != RuleKind.IGNORE) direction else null,
+                            kind = kind,
+                        )
+                        if (onSave(toSave, sender.trim(), sample.trim())) {
+                            onDismiss()
+                        } else {
+                            status = "Regex must match the sample (and capture (?<amount>...)) before saving."
+                        }
+                    }
+                },
+            ) { Text("Save rule") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
     )
 }
 

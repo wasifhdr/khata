@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.wasif.khata.core.backup.BackupFile
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.KhataPalette
@@ -44,6 +45,8 @@ class PreferencesRepositoryImpl @Inject constructor(
         val DriveLastUploadAt = longPreferencesKey("drive_last_upload_at")
         val DriveNeedsReconnect = intPreferencesKey("drive_needs_reconnect")
         val SearchIndexVersion = intPreferencesKey("search_index_version")
+        val WatchedSenders = stringSetPreferencesKey("watched_senders")
+        val SmsStartYearMonth = stringPreferencesKey("sms_start_year_month")
     }
 
     override val preferences: Flow<KhataPreferences> = store.data
@@ -81,6 +84,9 @@ class PreferencesRepositoryImpl @Inject constructor(
                 driveFolderId = p[Keys.DriveFolderId],
                 driveLastUploadAt = p[Keys.DriveLastUploadAt],
                 driveNeedsReconnect = p[Keys.DriveNeedsReconnect] == 1,
+                searchIndexVersion = p[Keys.SearchIndexVersion] ?: 0,
+                watchedSenders = p[Keys.WatchedSenders] ?: KhataPreferences.DEFAULT_WATCHED_SENDERS,
+                smsStartYearMonth = p[Keys.SmsStartYearMonth],
             )
         }
 
@@ -119,6 +125,16 @@ class PreferencesRepositoryImpl @Inject constructor(
 
     override suspend fun setSearchIndexVersion(version: Int) {
         store.edit { it[Keys.SearchIndexVersion] = version }
+    }
+
+    override suspend fun setWatchedSenders(senders: Set<String>) {
+        store.edit { it[Keys.WatchedSenders] = senders }
+    }
+
+    override suspend fun setSmsStartYearMonth(yearMonth: String?) {
+        store.edit { p ->
+            if (yearMonth.isNullOrBlank()) p.clear(Keys.SmsStartYearMonth) else p[Keys.SmsStartYearMonth] = yearMonth
+        }
     }
 
     /**

@@ -31,6 +31,14 @@ fun interface TeachRequest {
     suspend operator fun invoke(rawMessageId: Long)
 }
 
+fun interface WatchedSenders {
+    suspend operator fun invoke(): Set<String>?
+}
+
+fun interface SmsStartFrom {
+    suspend operator fun invoke(): Long?
+}
+
 /**
  * Asking for a transfer-shaped row to be reviewed in three minutes, as a function
  * type, for the same reason TeachRequest is one: the pipeline must not hold the

@@ -20,6 +20,10 @@ data class DraftedRule(
     val bodyPattern: String,
     val direction: TransactionDirection?,
     val kind: RuleKind,
+    val amount: String? = null,
+    val merchant: String? = null,
+    val datetime: String? = null,
+    val balance: String? = null,
 )
 
 /**
@@ -83,6 +87,10 @@ fun parseSuggestion(json: String): DraftedRule? = runCatching {
         bodyPattern = body,
         direction = direction,
         kind = kind,
+        amount = payload.optString("amount").takeIf { it.isNotBlank() },
+        merchant = payload.optString("merchant").takeIf { it.isNotBlank() },
+        datetime = payload.optString("datetime").takeIf { it.isNotBlank() },
+        balance = payload.optString("balance").takeIf { it.isNotBlank() },
     )
 }.getOrNull()
 
@@ -131,13 +139,27 @@ class GeminiClient @Inject constructor(
      * Structured output, not prose: this is field extraction, and a sentence reply
      * would need a parser of its own.
      */
-    private fun requestBody(sender: String, body: String): String {
+    internal fun requestBody(sender: String, body: String): String {
         val instruction = """
             You are given one SMS from a Bangladeshi bank or mobile money service that an
-            existing rule set failed to parse. Produce a Kotlin-compatible regular
-            expression that extracts this message FORMAT, not this message. Use named
-            groups from: amount, merchant, datetime, balance, account, reference. Do not
-            match literal amounts or names. senderPattern should match the sender.
+            existing rule set failed to parse.
+            1. Classify whether this SMS is a completed financial transaction. If it is NOT a
+               transaction (e.g. OTP, verification code, promotional offer, declined alert,
+               or statement notice), set kind to "IGNORE" and produce a bodyPattern matching
+               its static opening phrasing.
+            2. If it IS a transaction, set direction ("DEBIT" or "CREDIT"), kind, extract
+               amount, merchant, datetime, and balance (if present), and produce a
+               Kotlin-compatible regular expression in bodyPattern that matches this
+               message FORMAT (generalizing dynamic values, never hardcoding literals) using
+               these exact named capture groups where present in the message:
+               - (?<amount>...) [required]: transaction amount (may include BDT/Tk prefix and commas/decimals)
+               - (?<merchant>...) [optional]: merchant, biller, recipient, or narrative
+               - (?<balance>...) [optional]: post-transaction account balance
+               - (?<datetime>...) [optional]: transaction date/time string
+               - (?<account>...) [optional]: masked bank account number (e.g. [\d*]+ after A/C or AC) for multi-account tail routing; if both Card and A/C appear, capture A/C as (?<account>...)
+               - (?<refId>...) [optional]: provider transaction ID (e.g. TrxID / TxnID)
+               - (?<fee>...) [optional]: transaction fee amount
+            senderPattern should match the sender.
             Sender: $sender
             Message: $body
         """.trimIndent()
@@ -167,11 +189,15 @@ class GeminiClient @Inject constructor(
                                 "enum",
                                 JSONArray(RuleKind.entries.map { it.name }),
                             ),
-                    ),
+                    )
+                    .put("amount", JSONObject().put("type", "STRING"))
+                    .put("merchant", JSONObject().put("type", "STRING"))
+                    .put("datetime", JSONObject().put("type", "STRING"))
+                    .put("balance", JSONObject().put("type", "STRING")),
             )
             .put(
                 "required",
-                JSONArray(listOf("name", "senderPattern", "bodyPattern", "direction")),
+                JSONArray(listOf("name", "senderPattern", "bodyPattern", "kind")),
             )
 
         return JSONObject()

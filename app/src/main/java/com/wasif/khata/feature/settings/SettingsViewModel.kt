@@ -23,9 +23,16 @@ import com.wasif.khata.core.drive.DriveUploader
 import com.wasif.khata.core.drive.UploadOutcome
 import com.wasif.khata.core.prefs.PreferencesRepository
 import java.io.File
+import com.wasif.khata.core.data.entity.AccountEntity
+import com.wasif.khata.core.sms.IncomingMessage
 import com.wasif.khata.core.sms.IngestProgress
 import com.wasif.khata.core.sms.IngestSummary
 import com.wasif.khata.core.sms.IngestionScheduler
+import com.wasif.khata.core.sms.MessageSource
+import com.wasif.khata.core.sms.ai.DraftedRule
+import com.wasif.khata.core.sms.ai.RuleDrafter
+import com.wasif.khata.core.sms.ai.RuleSuggester
+import com.wasif.khata.core.sms.namesSender
 import com.wasif.khata.core.ui.theme.FieldIntensity
 import com.wasif.khata.core.ui.theme.FieldPalette
 import com.wasif.khata.core.ui.theme.ThemeSpec
@@ -50,6 +57,7 @@ data class IngestionState(
     val backfill: IngestProgress? = null,
     val lastRun: String? = null,
     val cashBalance: Money = Money.ZERO,
+    val accounts: List<AccountEntity> = emptyList(),
 ) {
     val isWorking: Boolean get() = backfill != null && !backfill.isComplete
 }
@@ -68,6 +76,11 @@ class SettingsViewModel @Inject constructor(
     private val driveAuth: DriveAuth,
     private val driveBackups: DriveBackups,
     private val driveUploader: DriveUploader,
+    private val messageSource: MessageSource = object : MessageSource {
+        override suspend fun readAll() = emptyList<IncomingMessage>()
+    },
+    private val suggester: RuleSuggester = RuleSuggester { _, _ -> null },
+    private val drafter: RuleDrafter? = null,
 ) : ViewModel() {
 
     /** Only what a pass cannot say for itself, like the cash reset. */
@@ -79,10 +92,9 @@ class SettingsViewModel @Inject constructor(
         rawMessageDao.observeByStatus(RawMessageStatus.UNMATCHED).map { it.size },
         scheduler.observePass(),
         _lastAction,
-        accountDao.observeAll().map { accounts ->
-            Money(accounts.firstOrNull { it.type == AccountType.CASH }?.currentBalanceMinor ?: 0L)
-        },
-    ) { permission, unmatched, pass, lastAction, cash ->
+        accountDao.observeAll(),
+    ) { permission, unmatched, pass, lastAction, accounts ->
+        val cash = Money(accounts.firstOrNull { it.type == AccountType.CASH }?.currentBalanceMinor ?: 0L)
         IngestionState(
             permission = permission,
             unmatchedCount = unmatched,
@@ -91,6 +103,7 @@ class SettingsViewModel @Inject constructor(
             // cannot say.
             lastRun = pass.finished?.inWords() ?: lastAction,
             cashBalance = cash,
+            accounts = accounts.filter { it.type != AccountType.CASH },
         )
     }.stateIn(
         scope = viewModelScope,
@@ -254,6 +267,78 @@ class SettingsViewModel @Inject constructor(
                 },
             )
         }
+    }
+
+    suspend fun inboxThreads(): List<IncomingMessage> =
+        messageSource.readAll().asReversed().distinctBy { it.sender.uppercase() }
+
+    fun onToggleWatchedSender(sender: String) = viewModelScope.launch {
+        val current = repository.preferences.first().watchedSenders
+        val existing = current.firstOrNull { it.equals(sender, ignoreCase = true) }
+        val updated = if (existing != null) current - existing else current + sender
+        repository.setWatchedSenders(updated)
+        if (existing == null && !sender.equals("EBL", ignoreCase = true)) {
+            val accounts = accountDao.getAll()
+            if (accounts.none { namesSender(it.smsIdentifiers, sender) }) {
+                accountDao.upsert(
+                    AccountEntity(
+                        uuid = "sms-${sender.lowercase().replace(Regex("[^a-z0-9]+"), "-")}",
+                        name = sender,
+                        type = AccountType.BANK,
+                        openingBalanceMinor = 0L,
+                        currentBalanceMinor = 0L,
+                        reportedBalanceMinor = null,
+                        reportedBalanceAt = null,
+                        includeInNetWorth = true,
+                        smsIdentifiers = sender,
+                        createdAt = clock.now(),
+                        updatedAt = clock.now(),
+                    ),
+                )
+            }
+        }
+    }
+
+    suspend fun testSmsWithGemini(sender: String, body: String): DraftedRule? =
+        suggester(sender, body)
+
+    suspend fun savePlaygroundRule(drafted: DraftedRule, sender: String, sample: String): Boolean =
+        drafter?.store(drafted, sender, sample) == true
+
+    fun onSaveAccount(id: Long?, name: String, smsIdentifiers: String) = viewModelScope.launch {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) return@launch
+        val now = clock.now()
+        val existing = id?.let { accountDao.findById(it) }
+        if (existing != null) {
+            accountDao.upsert(
+                existing.copy(
+                    name = trimmedName,
+                    smsIdentifiers = smsIdentifiers.trim(),
+                    updatedAt = now,
+                ),
+            )
+        } else {
+            accountDao.upsert(
+                AccountEntity(
+                    uuid = "acc-${java.util.UUID.randomUUID()}",
+                    name = trimmedName,
+                    type = AccountType.BANK,
+                    openingBalanceMinor = 0L,
+                    currentBalanceMinor = 0L,
+                    reportedBalanceMinor = null,
+                    reportedBalanceAt = null,
+                    includeInNetWorth = true,
+                    smsIdentifiers = smsIdentifiers.trim(),
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+        }
+    }
+
+    fun onSmsStartYearMonthChanged(yearMonth: String?) = viewModelScope.launch {
+        repository.setSmsStartYearMonth(yearMonth)
     }
 
     // Reads the store rather than state.value. `state` is WhileSubscribed, so

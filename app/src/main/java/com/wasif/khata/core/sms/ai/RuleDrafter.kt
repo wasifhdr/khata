@@ -2,6 +2,8 @@ package com.wasif.khata.core.sms.ai
 
 import com.wasif.khata.core.data.dao.ParsingRuleDao
 import com.wasif.khata.core.data.entity.ParsingRuleEntity
+import com.wasif.khata.core.model.RuleKind
+import com.wasif.khata.core.sms.deriveIgnorePattern
 import com.wasif.khata.core.time.KhataClock
 import java.util.UUID
 import javax.inject.Inject
@@ -27,9 +29,15 @@ class RuleDrafter @Inject constructor(
      */
     suspend fun store(drafted: DraftedRule, sender: String, sample: String): Boolean {
         val senderRegex = runCatching { Regex(drafted.senderPattern) }.getOrNull() ?: return false
-        val bodyRegex = runCatching { Regex(drafted.bodyPattern) }.getOrNull() ?: return false
         if (!senderRegex.containsMatchIn(sender)) return false
-        if (bodyRegex.find(sample) == null) return false
+
+        val bodyPattern = when {
+            runCatching { Regex(drafted.bodyPattern).find(sample) }.getOrNull() != null ->
+                drafted.bodyPattern
+            drafted.kind == RuleKind.IGNORE ->
+                deriveIgnorePattern(sample) ?: return false
+            else -> return false
+        }
 
         val now = clock.now()
         val existing = rules.allIncludingDisabled().count { it.origin == "AI" }
@@ -39,7 +47,7 @@ class RuleDrafter @Inject constructor(
                     uuid = UUID.randomUUID().toString(),
                     name = drafted.name,
                     senderPattern = drafted.senderPattern,
-                    bodyPattern = drafted.bodyPattern,
+                    bodyPattern = bodyPattern,
                     direction = drafted.direction,
                     kind = drafted.kind,
                     priority = AI_PRIORITY_BASE + existing,

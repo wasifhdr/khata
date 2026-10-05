@@ -12,10 +12,16 @@ interface AccountDao {
     @Upsert
     suspend fun upsert(entity: AccountEntity): Long
 
-    @Query("SELECT * FROM accounts WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    @Query(
+        "SELECT * FROM accounts WHERE deletedAt IS NULL " +
+            "ORDER BY CASE WHEN type = 'CASH' THEN 0 ELSE 1 END, name COLLATE NOCASE",
+    )
     fun observeAll(): Flow<List<AccountEntity>>
 
-    @Query("SELECT * FROM accounts WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    @Query(
+        "SELECT * FROM accounts WHERE deletedAt IS NULL " +
+            "ORDER BY CASE WHEN type = 'CASH' THEN 0 ELSE 1 END, name COLLATE NOCASE",
+    )
     suspend fun getAll(): List<AccountEntity>
 
     @Query("SELECT * FROM accounts WHERE id = :id")

@@ -60,16 +60,22 @@ val BUILT_IN_RULES: List<ParsingRuleEntity> = listOf(
     ),
     rule(
         "ignore-bkash-loan-terms", "bKash loan terms", "bKash",
-        """You have received Loan of .+ in your bKash Account""", 3, RuleKind.IGNORE,
+        """You have received Loan of .+ in your bKash Account|will be (?:automatically )?deducted (?:from your bKash Account )?as Loan instalment""",
+        3, RuleKind.IGNORE,
     ),
     rule("ignore-bkash-binding", "bKash account binding", "bKash", """Account Binding""", 4, RuleKind.IGNORE),
-    rule("ignore-ebl-standing", "EBL standing instruction", "EBL", """Standing Instruction Execution Status""", 5, RuleKind.IGNORE),
+    rule(
+        "ignore-ebl-standing", "EBL standing instruction", "EBL",
+        """Standing Instruction Execution Status|Standing Instruction submitted successfully""",
+        5, RuleKind.IGNORE,
+    ),
 
     // A declined card is not a transaction: no money moved.
     rule("ignore-ebl-declined", "EBL declined", "EBL", """Not sufficient fund""", 6, RuleKind.IGNORE),
     rule(
         "ignore-ebl-statement", "EBL statement notice", "EBL",
-        """Dear Customer, your Deposit Account|Dear Cardholder""", 7, RuleKind.IGNORE,
+        """Dear Customer, your (?:Half Yearly |Yearly )?Deposit A|Dear Cardholder""",
+        7, RuleKind.IGNORE,
     ),
     // The money already left at "Received Recharge request"; this later note
     // carries no balance and no TrxID, so recording it would double the recharge.
@@ -83,7 +89,7 @@ val BUILT_IN_RULES: List<ParsingRuleEntity> = listOf(
     // is a real charge, so the request wording is matched instead.
     rule(
         "ignore-ebl-card-admin", "EBL card notices", "EBL",
-        """(?i)has not been activated|request for Card replacement|VISA DEBIT CARD has been sent|Smart IVR service|Stay alert to fraud|discount coupons|Add Money transaction at bKash merchant|cheque book is now available|Skybanking account has been activated|One Time PIN for EBL Skybanking|internet outage""",
+        """(?i)has not been activated|request for Card replacement|VISA DEBIT CARD has been sent|DEBIT CARD (?:has been sent|will be delivered)|CARD has been delivered|Smart IVR service|Stay alert to fraud|discount coupons|Add Money transaction at bKash merchant|cheque book is now available|Skybanking account has been activated|One Time PIN for EBL Skybanking|internet outage|Balance enquiry from|Purchase txn USD0\b|Avoid unauthorized modifications|temporarily unavailable|services will be unavailable|Beware of fraudsters|Win guaranteed rewards|instruction to update your (?:Permanent|Mailing|Present) Address|successfully opened EBL|Welcome to EBL Insta Banking|request for SKYBANKING|^FF FFFFF""",
         9, RuleKind.IGNORE,
     ),
     rule(
@@ -92,7 +98,7 @@ val BUILT_IN_RULES: List<ParsingRuleEntity> = listOf(
         10, RuleKind.IGNORE,
     ),
 
-    // 20-39: bKash, most specific first.
+    // 20-42: bKash, most specific first.
     rule(
         "bkash-loan", "bKash digital loan", "bKash",
         """You have received Digital Loan (?<amount>$AMT) from (?<merchant>.+?)\. Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
@@ -149,10 +155,11 @@ val BUILT_IN_RULES: List<ParsingRuleEntity> = listOf(
         29, RuleKind.NORMAL, TransactionDirection.CREDIT,
     ),
     // bKash writes this both ways -- "Payment of Tk 20" and "Payment Tk 20" --
-    // and the second spelling is the more common one across six years.
+    // and the second spelling is the more common one across six years. Some billers
+    // (e.g. DTCA) also include an inline "Fee Tk X.XX." sentence before Balance.
     rule(
         "bkash-payment-success", "bKash payment", "bKash",
-        """Payment (?:of )?(?<amount>$AMT) to (?<merchant>.+?) is successful\. Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
+        """Payment (?:of )?(?<amount>$AMT) to (?<merchant>.+?) is successful\.(?:\s*Fee (?<fee>$AMT)\.)? Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
         30, RuleKind.NORMAL, TransactionDirection.DEBIT,
     ),
     rule(
@@ -205,22 +212,42 @@ val BUILT_IN_RULES: List<ParsingRuleEntity> = listOf(
         """bKash to Bank of (?<amount>$AMT) for (?<merchant>.+?) is successful\. Fee (?<fee>$AMT)\. Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
         34, RuleKind.TRANSFER_OUT, TransactionDirection.DEBIT,
     ),
+    rule(
+        "bkash-loan-repayment", "bKash loan repayment", "bKash",
+        """Your Digital Loan Repayment of (?<amount>$AMT) is successful\. Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
+        39, RuleKind.LOAN_REPAYMENT, TransactionDirection.DEBIT,
+    ),
+    rule(
+        "bkash-payment-returned", "bKash payment refund", "bKash",
+        """Payment (?:of )?(?<amount>$AMT) to (?<merchant>.+?) is returned at (?<datetime>$BKASH_DT)\. Original TrxID $TRX\. Refund TrxID (?<refId>$TRX)\. Balance (?<balance>$AMT)""",
+        40, RuleKind.NORMAL, TransactionDirection.CREDIT,
+    ),
+    rule(
+        "bkash-send-money-request", "bKash send money request", "bKash",
+        """Send Money request of (?<amount>$AMT) to (?<merchant>\d+) is accepted for processing\. Fee (?<fee>$AMT)\. Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
+        41, RuleKind.NORMAL, TransactionDirection.DEBIT,
+    ),
+    rule(
+        "bkash-send-money-returned", "bKash send money refund", "bKash",
+        """Sorry, your Send Money request to (?<merchant>\d+) is unsuccessful! (?<amount>$AMT) has been returned\. Balance (?<balance>$AMT)\. TrxID (?<refId>$TRX) at (?<datetime>$BKASH_DT)""",
+        42, RuleKind.NORMAL, TransactionDirection.CREDIT,
+    ),
 
-    // 40-59: EBL, most specific first.
+    // 44-59: EBL, most specific first.
     rule(
         "ebl-cash-wd", "EBL ATM withdrawal", "EBL",
         """Cash WD (?<amount>$AMT) from (?<merchant>.+?)\. Card $MASK on (?<datetime>$EBL_DT) BST\.Your A/C (?<account>$MASK) Balance (?<balance>$AMT)""",
-        40, RuleKind.ATM_WITHDRAWAL, TransactionDirection.DEBIT,
+        44, RuleKind.ATM_WITHDRAWAL, TransactionDirection.DEBIT,
     ),
     rule(
         "ebl-purchase", "EBL card purchase", "EBL",
         """Purchase txn (?<amount>$AMT) from (?<merchant>.+?)\s*\.Card $MASK on (?<datetime>$EBL_DT) BST\.Your A/C (?<account>$MASK) Balance (?<balance>$AMT)""",
-        41, RuleKind.NORMAL, TransactionDirection.DEBIT,
+        45, RuleKind.NORMAL, TransactionDirection.DEBIT,
     ),
     rule(
         "ebl-cards-npsb", "EBL cards NPSB transfer", "EBL",
         """EBL CARDS: (?<merchant>NPSB Fund Transfer) (?<amount>$AMT) using Card $MASK on (?<datetime>$EBL_DT)\.Your A/C (?<account>$MASK) Balance (?<balance>$AMT)""",
-        42, RuleKind.TRANSFER_OUT, TransactionDirection.DEBIT,
+        46, RuleKind.TRANSFER_OUT, TransactionDirection.DEBIT,
     ),
 
     // Money leaving the card to top up a wallet. Same shape as a purchase but
@@ -228,7 +255,7 @@ val BUILT_IN_RULES: List<ParsingRuleEntity> = listOf(
     rule(
         "ebl-fund-transfer", "EBL fund transfer", "EBL",
         """Fund Transfer of (?<amount>$AMT) from (?<merchant>.+?)\.Card $MASK on (?<datetime>$EBL_DT) BST\.Your A/C (?<account>$MASK) Balance (?<balance>$AMT)""",
-        43, RuleKind.TRANSFER_OUT, TransactionDirection.DEBIT,
+        47, RuleKind.TRANSFER_OUT, TransactionDirection.DEBIT,
     ),
 
     // Two rules rather than one alternation, because direction is a field on the

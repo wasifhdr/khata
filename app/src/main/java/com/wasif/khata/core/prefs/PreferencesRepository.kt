@@ -19,4 +19,6 @@ interface PreferencesRepository {
     suspend fun setDriveUploaded(at: Long)
     suspend fun setDriveNeedsReconnect()
     suspend fun setSearchIndexVersion(version: Int)
+    suspend fun setWatchedSenders(senders: Set<String>) = Unit
+    suspend fun setSmsStartYearMonth(yearMonth: String?) = Unit
 }

@@ -83,4 +83,46 @@ class GeminiResponseTest {
         assertEquals(RuleKind.IGNORE, drafted.kind)
         assertNull(drafted.direction)
     }
+
+    @Test
+    fun `extracted entity fields are parsed alongside the reusable regex`() {
+        val payload = """
+            {"name":"bKash payment","senderPattern":"bKash",
+             "bodyPattern":"Payment of Tk (?<amount>[0-9.,]+) to (?<merchant>.+?) is successful\\. Balance Tk (?<balance>[0-9.,]+)\\. TrxID (?<refId>[A-Z0-9]+) at (?<datetime>[0-9/: ]+)",
+             "direction":"DEBIT","kind":"NORMAL",
+             "amount":"856.00","merchant":"FOODPANDA","datetime":"31/08/2026 19:01","balance":"41.98"}
+        """.trimIndent()
+
+        val drafted = parseSuggestion(envelope(payload))!!
+
+        assertEquals("856.00", drafted.amount)
+        assertEquals("FOODPANDA", drafted.merchant)
+        assertEquals("31/08/2026 19:01", drafted.datetime)
+        assertEquals("41.98", drafted.balance)
+    }
+
+    @Test
+    fun `requestBody asks for refId and IGNORE classification`() {
+        val client = GeminiClient(object : com.wasif.khata.core.prefs.PreferencesRepository {
+            override val preferences = kotlinx.coroutines.flow.emptyFlow<com.wasif.khata.core.prefs.KhataPreferences>()
+            override suspend fun setTheme(spec: com.wasif.khata.core.ui.theme.ThemeSpec) = Unit
+            override suspend fun resetTheme() = Unit
+            override suspend fun setHomeView(view: com.wasif.khata.core.prefs.HomeView) = Unit
+            override suspend fun setMonthlyBudget(minor: Long?) = Unit
+            override suspend fun setSmsPermissionRequested() = Unit
+            override suspend fun setBackfilled() = Unit
+            override suspend fun setGeminiKey(key: String?) = Unit
+            override suspend fun setTmdbKey(key: String?) = Unit
+            override suspend fun setBackupPassphrase(passphrase: String?) = Unit
+            override suspend fun setDriveConnected(connected: Boolean) = Unit
+            override suspend fun setDriveFolderId(id: String?) = Unit
+            override suspend fun setDriveUploaded(at: Long) = Unit
+            override suspend fun setDriveNeedsReconnect() = Unit
+            override suspend fun setSearchIndexVersion(version: Int) = Unit
+        })
+        val body = client.requestBody("bKash", "Sample SMS")
+        org.junit.Assert.assertTrue(body.contains("refId"))
+        org.junit.Assert.assertFalse(body.contains("reference"))
+        org.junit.Assert.assertTrue(body.contains("IGNORE"))
+    }
 }
